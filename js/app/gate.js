@@ -2,6 +2,7 @@ import { REDUCED, $ } from './dom.js';
 import { appState } from './state.js';
 import { startMusic, attemptAutoFullscreen } from './ui.js';
 import { startHeroVideo, heroEntrance } from './hero.js';
+import { videoSuffix } from './net.js';
 
 export function initGate() {
   const gateEl = $('#gate');
@@ -40,7 +41,7 @@ export function initGate() {
     video.poster = `assets/images/art-gate-closed${n}${w}.jpg`;
     const src = video.querySelector('source');
     if (!src) return;
-    const want = `assets/videos/gate-reveal${n || '-day'}${w}.mp4`;
+    const want = `assets/videos/gate-reveal${n || '-day'}${w}${videoSuffix()}.mp4`;
     if (!(src.getAttribute('src') || '').endsWith(want)) {
       src.setAttribute('src', want);
       video.load();

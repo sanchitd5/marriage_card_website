@@ -1,5 +1,6 @@
 import { REDUCED, $, $$ } from './dom.js';
 import { appState } from './state.js';
+import { videoSuffix } from './net.js';
 
 export function startHeroVideo() {
   const v = $('#hero-video');
@@ -25,6 +26,16 @@ export function startHeroVideo() {
     window.addEventListener('pointerdown', retry, { once: true, passive: true });
     window.addEventListener('keydown', retry, { once: true });
   };
+
+  // pick the connection-appropriate rendition before loading
+  const src = v.querySelector('source');
+  if (src) {
+    const want = `assets/videos/hero-loop-boomerang${videoSuffix()}.mp4`;
+    if (!(src.getAttribute('src') || '').endsWith(want)) {
+      src.setAttribute('src', want);
+      v.load();
+    }
+  }
 
   v.muted = true;
   v.playsInline = true;

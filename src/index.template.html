@@ -52,16 +52,31 @@
       color: #efe3c8;
     }
     #theme-boot-loader .boot-inner { display: grid; place-items: center; gap: .85rem; }
-    #theme-boot-loader .boot-ring {
-      width: 2.2rem;
-      height: 2.2rem;
-      border-radius: 50%;
-      border: 2px solid currentColor;
-      border-right-color: transparent;
-      animation: themeBootSpin 1s linear infinite;
-      opacity: .9;
+    /* Determinate progress dial: conic ring driven by --boot-p (0-100) + % text. */
+    #theme-boot-loader .boot-dial {
+      position: relative;
+      width: 3rem;
+      height: 3rem;
+      display: grid;
+      place-items: center;
     }
-    @keyframes themeBootSpin { to { transform: rotate(360deg); } }
+    #theme-boot-loader .boot-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background-image: conic-gradient(currentColor calc(var(--boot-p, 0) * 1%), rgba(128, 128, 128, .22) 0);
+      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+              mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+      opacity: .95;
+      transition: background-image .25s linear;
+    }
+    #theme-boot-loader .boot-pct {
+      position: relative;
+      z-index: 1;
+      font-size: .62rem;
+      letter-spacing: .04em;
+      font-variant-numeric: tabular-nums;
+    }
   </style>
 
   <script>
@@ -161,7 +176,10 @@
 <body>
   <div id="theme-boot-loader" aria-live="polite" aria-label="Loading invitation theme">
     <div class="boot-inner">
-      <span class="boot-ring" aria-hidden="true"></span>
+      <span class="boot-dial" aria-hidden="true">
+        <span class="boot-ring"></span>
+        <span class="boot-pct">0%</span>
+      </span>
       <span>Setting the mood for your invitation…</span>
     </div>
   </div>
