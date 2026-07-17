@@ -188,9 +188,14 @@ let setGateTheme = () => {};
   setGateTheme(document.documentElement.dataset.theme);
 
   // the whole card opens the invitation; the seal is the visual button
+  // if the seal goes untapped, the invitation opens itself
+  // (auto-open is not a user gesture, so music will wait for the toggle)
+  const autoOpen = setTimeout(() => $('.gate-card').click(), 8000);
+
   $('.gate-card').addEventListener('click', () => {
     if (opened) return;
     opened = true;
+    clearTimeout(autoOpen);
     $('#seal').classList.add('opened'); // stop the pulse so the crack animation owns the transform
     window.scrollTo(0, 0);
     if (smoother) smoother.scrollTop(0);
