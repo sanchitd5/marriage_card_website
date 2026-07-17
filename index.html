@@ -18,7 +18,7 @@
       // dark from sunset to sunrise, computed from coordinates guessed
       // off the IANA timezone (no geolocation prompt).
       var stored = localStorage.getItem('theme');
-      document.documentElement.dataset.theme = stored || (isNightNow() ? 'dark' : 'light');
+      document.documentElement.dataset.theme = stored || 'dark';
 
       function isNightNow() {
         try {
@@ -79,7 +79,6 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪷</text></svg>">
 </head>
 <body>
-
   <!-- ══════════ INTRO GATE ══════════ -->
   <div id="gate" aria-label="Wedding invitation envelope. Tap the wax seal to open.">
     <div class="gate-stage">
@@ -106,11 +105,16 @@
     <svg class="icon-sun" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.2 5.2l1.9 1.9M16.9 16.9l1.9 1.9M18.8 5.2l-1.9 1.9M7.1 16.9l-1.9 1.9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
   </button>
 
-  <!-- ══════════ MUSIC DOCK ══════════ -->
-  <div id="music-dock" hidden>
-    <button id="music-toggle" aria-label="Pause the music" aria-pressed="false">
-      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path class="icon-note" d="M9 18V5l12-2v13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="18" cy="16" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
-    </button>
+  <!-- ══════════ RIGHT DOCK (scroll cue + music) ══════════ -->
+  <div id="right-dock">
+    <div id="floating-cue" aria-hidden="true">
+      <span class="cue-chevrons" aria-hidden="true"><i></i><i></i></span>
+    </div>
+    <div id="music-dock" hidden>
+      <button id="music-toggle" aria-label="Pause the music" aria-pressed="false">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path class="icon-note" d="M9 18V5l12-2v13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="18" cy="16" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+      </button>
+    </div>
   </div>
 
   <div id="smooth-wrapper">
@@ -178,7 +182,7 @@
               <div class="event-art arch"><img src="assets/images/art-haldi.jpg" alt="Painting of hands holding turmeric and marigold petals" loading="lazy"></div>
               <p class="event-no">The First Affair</p>
               <h3 class="event-name">Haldi</h3>
-              <p class="event-when"><time datetime="2026-12-11T11:00+05:30">Thursday, 11 December 2026 · 11 o'clock in the morning</time></p>
+              <p class="event-when"><time datetime="2026-12-11T11:00+05:30">Friday, 11 December 2026 · 11 o'clock in the morning</time></p>
               <p class="event-venue">Radisson Hotel Chandigarh Zirakpur</p>
               <p class="event-dress"><span>Dress code</span> Shades of yellow</p>
               <div class="event-actions">
@@ -191,7 +195,7 @@
               <div class="event-art arch"><img src="assets/images/art-cocktail.jpg" alt="Painting of raised glasses on a palace terrace at dusk" loading="lazy"></div>
               <p class="event-no">The Second Affair</p>
               <h3 class="event-name">Cocktail &amp; Engagement</h3>
-              <p class="event-when"><time datetime="2026-12-11T20:00+05:30">Thursday, 11 December 2026 · 8 o'clock in the evening</time></p>
+              <p class="event-when"><time datetime="2026-12-11T20:00+05:30">Friday, 11 December 2026 · 8 o'clock in the evening</time></p>
               <p class="event-venue">Radisson Hotel Chandigarh Zirakpur</p>
               <p class="event-dress"><span>Dress code</span> Dazzling as you dare</p>
               <div class="event-actions">
@@ -204,7 +208,7 @@
               <div class="event-art arch"><img src="assets/images/art-pheras.jpg" alt="Painting of a couple at the pheras beneath a floral mandap" loading="lazy"></div>
               <p class="event-no">The Grand Affair</p>
               <h3 class="event-name">The Wedding</h3>
-              <p class="event-when"><time datetime="2026-12-12T19:00+05:30">Friday, 12 December 2026 · 7 o'clock in the evening</time></p>
+              <p class="event-when"><time datetime="2026-12-12T19:00+05:30">Saturday, 12 December 2026 · 7 o'clock in the evening</time></p>
               <p class="event-venue">De'vansh Resort, Ambala Cantt</p>
               <div class="event-actions">
                 <a class="btn-quiet" href="https://maps.app.goo.gl/RdueUZ2XfNiAnbD18" target="_blank" rel="noopener">Get directions</a>
@@ -239,15 +243,7 @@
           <img class="family-motif fade-up" src="assets/images/art-peacock.jpg" alt="" aria-hidden="true" loading="lazy">
           <p class="kicker fade-up">With the blessings of</p>
           <div class="family-grid">
-            <div class="family-side fade-up">
-              <p class="family-role">Parents of the bride</p>
-              <h3 class="family-names">Vishal <em>&amp;</em> Renu Verma</h3>
-            </div>
-            <span class="family-divider fade-up" aria-hidden="true"></span>
-            <div class="family-side fade-up">
-              <p class="family-role">Parents of the groom</p>
-              <h3 class="family-names">Ajay <em>&amp;</em> Geeta Dang</h3>
-            </div>
+            <h3 class="family-names fade-up">Dang <em>&amp;</em> Verma Family</h3>
           </div>
           <p class="family-blessing fade-up">Your blessings are the only gift we seek</p>
         </div>

@@ -49,6 +49,9 @@ const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = (s, c = document) => c.querySelector(s);
 const $$ = (s, c = document) => [...c.querySelectorAll(s)];
 
+// Assigned inside initGsap once GSAP is ready; called from heroEntrance
+let doSparkleReveal = null;
+
 /* ── gallery DOM (before GSAP batch setup) ──────────────────── */
 (function buildGallery() {
   const grid = $('#gallery-grid');
@@ -130,14 +133,22 @@ function initGsap() {
 
   // gentle section snapping, mobile/tablet only (where sections are full-screen);
   // waits for a real pause and never fights an active touch or scratch
+  // disabled while the user is scrolling downward — only snaps on the way back up
   const snapSections = $$('.hero, .band, .footer');
   let snapTimer = null;
   let pointerBusy = false;
+  let _lastScrollY = window.scrollY;
+  let _scrollDir = 0; // +1 = down, -1 = up
+  window.addEventListener('scroll', () => {
+    const y = window.scrollY;
+    _scrollDir = y > _lastScrollY ? 1 : -1;
+    _lastScrollY = y;
+  }, { passive: true });
   window.addEventListener('pointerdown', () => { pointerBusy = true; }, { capture: true });
   window.addEventListener('pointerup', () => { pointerBusy = false; }, { capture: true });
   window.addEventListener('pointercancel', () => { pointerBusy = false; }, { capture: true });
   function trySnap() {
-    if (pointerBusy || !matchMedia('(max-width: 899px)').matches) return;
+    if (pointerBusy || _scrollDir > 0 || !matchMedia('(max-width: 899px)').matches) return;
     const max = ScrollTrigger.maxScroll(window);
     const y = window.scrollY; // native position: the smoothed value lags behind
     let best = null;
@@ -159,20 +170,99 @@ function initGsap() {
     scrollTrigger: { trigger: '.count-grid', start: 'top 85%', once: true },
   });
 
-  // nobody comes first: the hero names and the two families gently trade
-  // places every few seconds (Flip animates the real layout positions)
-  function flipSwap(container) {
-    const el = $(container);
-    if (!el) return;
-    const state = Flip.getState(el.children);
-    [...el.children].reverse().forEach(c => el.appendChild(c));
-    Flip.from(state, { duration: 1.4, ease: 'luxe', absolute: true });
-  }
-  setInterval(() => {
-    if (document.getElementById('gate')) return; // wait until the invitation is open
-    flipSwap('.hero-names');
-    flipSwap('.family-grid');
-  }, 6000);
+  // One-time golden sparkle reveal: fades "Riya & Sanchit" out with a sparkle burst,
+  // then fades in "Sanchit & Riya" as the final, definitive name order.
+  // A min-height placeholder is set before animation so surrounding content never shifts.
+  doSparkleReveal = function() {
+    const el = $('.hero-names');
+    if (!el || el.dataset.sparkled) return;
+    el.dataset.sparkled = '1';
+
+    // Lock container height to prevent layout shift while names are invisible
+    el.style.minHeight = el.offsetHeight + 'px';
+    el.style.position = 'relative';
+
+    // Canvas for the golden sparkle burst
+    const cvs = document.createElement('canvas');
+    cvs.width = el.offsetWidth || 360;
+    cvs.height = el.offsetHeight || 130;
+    cvs.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5;';
+    el.appendChild(cvs);
+    const ctx = cvs.getContext('2d');
+
+    const GOLDS = ['#f5c518','#ffd700','#ffe080','#e8950a','#c88a10','#fff0a0'];
+    const pts = Array.from({length: 60}, () => ({
+      x: Math.random() * cvs.width,
+      y: Math.random() * cvs.height,
+      r: Math.random() * 2.8 + 0.7,
+      vx: (Math.random() - 0.5) * 1.8,
+      vy: (Math.random() - 0.5) * 1.8 - 0.6,
+      col: GOLDS[Math.floor(Math.random() * GOLDS.length)],
+      delay: Math.random() * 0.5,
+    }));
+
+    const nameEls = $$('.hero-name, .hero-amp', el);
+
+    const tl = gsap.timeline({
+      onComplete() {
+        cvs.remove();
+        el.style.position = '';
+        el.style.minHeight = '';
+      }
+    });
+
+    // 1. Sparkle burst fires immediately, overlaying the text while it is still visible
+    tl.add(() => {
+      let f = 0;
+      const TOTAL = 75;
+      (function tick() {
+        ctx.clearRect(0, 0, cvs.width, cvs.height);
+        const prog = f / TOTAL;
+        pts.forEach(p => {
+          const lp = Math.max(0, (prog - p.delay) / (1 - p.delay + 0.001));
+          if (!lp) return;
+          const a = lp < 0.5 ? lp * 2 : 2 - lp * 2;
+          const px = p.x + p.vx * f * 0.55;
+          const py = p.y + p.vy * f * 0.55;
+          ctx.save();
+          ctx.globalAlpha = a * 0.9;
+          ctx.fillStyle = p.col;
+          ctx.shadowColor = '#ffd700';
+          ctx.shadowBlur = 8;
+          ctx.beginPath();
+          for (let i = 0; i < 8; i++) {
+            const angle = i * Math.PI / 4 - Math.PI / 2;
+            const rad = i % 2 === 0 ? p.r : p.r * 0.38;
+            i === 0
+              ? ctx.moveTo(px + rad * Math.cos(angle), py + rad * Math.sin(angle))
+              : ctx.lineTo(px + rad * Math.cos(angle), py + rad * Math.sin(angle));
+          }
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        });
+        f++;
+        if (f <= TOTAL) requestAnimationFrame(tick);
+        else ctx.clearRect(0, 0, cvs.width, cvs.height);
+      })();
+    });
+
+    // 2. Fade names out at sparkle peak (~0.5 s in)
+    tl.to(nameEls, { autoAlpha: 0, duration: 0.4, ease: 'power2.in' }, '+=0.5');
+
+    // 3. Swap DOM order to "Sanchit & Riya"
+    tl.add(() => {
+      const kids = [...el.children].filter(c => c !== cvs);
+      kids.reverse().forEach(c => el.insertBefore(c, cvs));
+    }, '+=0.05');
+
+    // 4. Fade in the final names (sparkles are fading out in the background)
+    tl.add(() => {
+      gsap.fromTo($$('.hero-name, .hero-amp', el),
+        { autoAlpha: 0, y: 10 },
+        { autoAlpha: 1, y: 0, duration: 0.85, ease: 'power2.out', stagger: 0.13 });
+    });
+  };
 }
 
 /* ── intro gate ─────────────────────────────────────────────── */
@@ -300,7 +390,8 @@ function heroEntrance(instant) {
     .from('.hero-amp', { scale: 0, autoAlpha: 0, duration: 1.2, ease: 'back.out(1.4)' }, 1.4)
     .from('.hero-date', { y: 22, autoAlpha: 0, duration: 1.4 }, 1.7)
     .from('.hero-tag', { y: 16, autoAlpha: 0, duration: 1.2 }, 1.95)
-    .from('.scroll-cue', { autoAlpha: 0, duration: 1.1 }, 2.4);
+    .from('.scroll-cue', { autoAlpha: 0, duration: 1.1 }, 2.4)
+    .call(() => { if (doSparkleReveal) gsap.delayedCall(0.5, doSparkleReveal); });
 }
 
 /* ── music: local mp3 preferred, else visible YouTube mini-player ── */
@@ -439,11 +530,14 @@ const scratchAPI = {};
   scratchAPI.revealed = () => revealed;
 })();
 
-/* ── celebration: red and lavender rose petals falling from the top ── */
+/* ── celebration: rose petals (or golden in dark mode) falling from the top ── */
 let petalShape = null;
 function petalRain() {
   petalShape = petalShape || confetti.shapeFromPath({ path: 'M5 0C8.5 2 9.5 7 5 13C.5 7 1.5 2 5 0' });
-  const colors = ['#b3273e', '#d94b60', '#b7a6d9', '#cfc3e6'];
+  const isDark = document.documentElement.dataset.theme === 'dark';
+  const colors = isDark
+    ? ['#ffd700', '#f5c518', '#e8a020', '#ffe080', '#c88a10']
+    : ['#b3273e', '#d94b60', '#b7a6d9', '#cfc3e6'];
   for (let wave = 0; wave < 3; wave++) {
     setTimeout(() => {
       for (const x of [0.12, 0.38, 0.62, 0.88]) {
@@ -492,7 +586,9 @@ async function initPetals() {
         detectRetina: true,
         particles: {
           number: { value: 14, density: { enable: true, width: 1200 } },
-          color: { value: ['#e8a24b', '#b7a6d9', '#eecfc7', '#dfc27e'] },
+          color: { value: document.documentElement.dataset.theme === 'dark'
+            ? ['#ffd700', '#f5c518', '#e8a020', '#ffe080', '#c8920a']
+            : ['#e8a24b', '#b7a6d9', '#eecfc7', '#dfc27e'] },
           shape: { type: 'circle' },
           size: { value: { min: 2.5, max: 5.5 } },
           opacity: { value: { min: .35, max: .8 } },
@@ -532,6 +628,31 @@ function initTilt() {
   if (REDUCED || !window.VanillaTilt || !matchMedia('(pointer: fine)').matches) return;
   VanillaTilt.init($$('[data-tilt]'), { max: 5, speed: 900, perspective: 900, glare: true, 'max-glare': .1 });
 }
+
+/* ── floating cue: visibility + click-to-next-section ────────────── */
+(function scrollProgress() {
+  const cue = document.getElementById('floating-cue');
+  if (REDUCED || !cue) return;
+
+  // show cue only after leaving the hero and before nearing the end
+  function update() {
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    const pct = max > 0 ? window.scrollY / max : 0;
+    cue.classList.toggle('cue-gone', pct < 0.10 || pct > 0.85);
+  }
+  window.addEventListener('scroll', update, { passive: true });
+  update();
+
+  // click scrolls to the next section below the current viewport centre
+  cue.addEventListener('click', () => {
+    const sections = $$('.hero, .band, .footer');
+    const mid = window.scrollY + window.innerHeight / 2;
+    const next = sections.find(s => s.offsetTop > mid + 8);
+    if (!next) return;
+    if (smoother) smoother.scrollTo(next, true, 'top top');
+    else next.scrollIntoView({ behavior: 'smooth' });
+  });
+})();
 
 /* ── boot ───────────────────────────────────────────────────── */
 window.addEventListener('DOMContentLoaded', () => {
