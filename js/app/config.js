@@ -1,11 +1,9 @@
-import { NAMES } from './couple.mjs';
+import { NAMES, SONGS } from './couple.mjs';
 
-export { NAMES };
+// SONGS is auto-discovered from assets/audio/theme-N.mp3 at build time.
+export { NAMES, SONGS };
 
 export const WEDDING_TS = Date.UTC(2026, 11, 12, 13, 30, 0); // 12 Dec 2026, 19:00 IST (edit here)
-
-// couple's approved pool (assets/audio/*.mp3); one is drawn at random each visit
-export const SONGS = ['theme-1', 'theme-2', 'theme-3', 'theme-4', 'theme-5'];
 
 export const MAPS = {
   radisson: 'https://maps.app.goo.gl/fQhBFytYAZKu4qBB7',

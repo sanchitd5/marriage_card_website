@@ -113,7 +113,10 @@
         settled = true;
         resolve();
       }
-      var track = 'assets/audio/theme-' + (Math.floor(Math.random() * 5) + 1) + '.mp3';
+      // Warm one track's metadata so the loader reflects "music can start".
+      // theme-1 always exists; the actual (shuffled) playback pool is chosen
+      // later by ui.js from the build-discovered SONGS list.
+      var track = 'assets/audio/theme-1.mp3';
       var audio = new Audio();
       audio.preload = 'metadata';
       audio.addEventListener('loadedmetadata', finish, { once: true });
