@@ -43,6 +43,78 @@ export function initMusicToggle() {
   });
 }
 
+function hasFullscreenSupport() {
+  return !!(
+    document.fullscreenEnabled ||
+    document.webkitFullscreenEnabled ||
+    document.documentElement.requestFullscreen ||
+    document.documentElement.webkitRequestFullscreen
+  );
+}
+
+function isFullscreenNow() {
+  return !!(document.fullscreenElement || document.webkitFullscreenElement);
+}
+
+async function requestFullscreenMode() {
+  const root = document.documentElement;
+  try {
+    if (root.requestFullscreen) {
+      await root.requestFullscreen({ navigationUI: 'hide' });
+      return true;
+    }
+  } catch (_) {
+    // fall through to legacy API
+  }
+  if (root.webkitRequestFullscreen) {
+    root.webkitRequestFullscreen();
+    return true;
+  }
+  return false;
+}
+
+async function exitFullscreenMode() {
+  if (document.exitFullscreen && document.fullscreenElement) {
+    await document.exitFullscreen();
+    return true;
+  }
+  if (document.webkitExitFullscreen && document.webkitFullscreenElement) {
+    document.webkitExitFullscreen();
+    return true;
+  }
+  return false;
+}
+
+function refreshFullscreenButton(btn) {
+  const on = isFullscreenNow();
+  btn.setAttribute('aria-pressed', String(on));
+  btn.setAttribute('aria-label', on ? 'Exit fullscreen' : 'Enter fullscreen');
+}
+
+export async function attemptAutoFullscreen() {
+  if (!hasFullscreenSupport() || isFullscreenNow()) return;
+  await requestFullscreenMode();
+}
+
+export function initFullscreenToggle() {
+  const btn = $('#fullscreen-toggle');
+  if (!btn) return;
+  if (!hasFullscreenSupport()) return;
+
+  btn.hidden = false;
+  refreshFullscreenButton(btn);
+
+  btn.addEventListener('click', async () => {
+    if (isFullscreenNow()) await exitFullscreenMode();
+    else await requestFullscreenMode();
+    refreshFullscreenButton(btn);
+  });
+
+  const sync = () => refreshFullscreenButton(btn);
+  document.addEventListener('fullscreenchange', sync);
+  document.addEventListener('webkitfullscreenchange', sync);
+}
+
 export function initCountdown() {
   const els = { d: $('#cd-days'), h: $('#cd-hours'), m: $('#cd-mins'), s: $('#cd-secs') };
   if (!els.d || !els.h || !els.m || !els.s) return;

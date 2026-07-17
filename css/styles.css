@@ -223,6 +223,19 @@ html[data-theme="dark"] #theme-toggle .icon-sun { display: block; }
 }
 #music-toggle[aria-pressed="false"] .icon-note { opacity: .45; }
 
+#fullscreen-toggle {
+  width: 44px; height: 44px; border-radius: 50%;
+  display: grid; place-items: center;
+  color: hsl(var(--wisteria-deep));
+  background: hsl(var(--ivory) / .92);
+  border: 1px solid hsl(var(--gold-soft));
+  box-shadow: var(--shadow-lift);
+  backdrop-filter: blur(6px);
+}
+#fullscreen-toggle .icon-exit { display: none; }
+#fullscreen-toggle[aria-pressed="true"] .icon-enter { display: none; }
+#fullscreen-toggle[aria-pressed="true"] .icon-exit { display: block; }
+
 /* ═══ HERO ═══════════════════════════════════════════════════ */
 .hero {
   position: relative;

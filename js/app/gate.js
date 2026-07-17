@@ -1,6 +1,6 @@
 import { REDUCED, $ } from './dom.js';
 import { appState } from './state.js';
-import { startMusic } from './ui.js';
+import { startMusic, attemptAutoFullscreen } from './ui.js';
 import { startHeroVideo, heroEntrance } from './hero.js';
 
 export function initGate() {
@@ -46,6 +46,7 @@ export function initGate() {
     seal.classList.add('opened'); // stop the pulse so the crack animation owns the transform
     window.scrollTo(0, 0);
     if (appState.smoother) appState.smoother.scrollTop(0);
+    attemptAutoFullscreen();
     startMusic(); // inside the user gesture: unlocks audio autoplay policy
 
     if (REDUCED || !window.gsap) {
