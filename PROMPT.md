@@ -41,8 +41,8 @@ review with exact animation values. Roles:
 ## Content
 
 ### Couple
-- Groom: **Sanchit Dang** (parents: Ajay Dang & Geeta Dang)
-- Bride: **Riya Verma** (parents: Vishal Verma & Renu Verma)
+- Groom: **Sanchit Dang** (parents: Ajay Dang & Geeta Dang; Grand Parents : Lt. Subhash Chander Dang & Raj Rani Dang)
+- Bride: **Riya Verma** (parents: Vishal Verma & Renu Verma; Grand Parents : Lt. To be updated & To be updated)
 
 ### Events (IST; times confirmed by the couple)
 1. **Haldi** — Thu 11 Dec 2026, 11:00 AM,
