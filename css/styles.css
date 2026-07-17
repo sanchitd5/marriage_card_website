@@ -147,9 +147,10 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
 }
 .seal {
   position: relative;
-  width: 108px; height: 108px;
+  width: 164px; height: 164px;
   margin-inline: auto;
   border-radius: 50%;
+  overflow: hidden;
   box-shadow: 0 10px 26px -8px hsl(var(--wisteria-deep) / .45);
   -webkit-tap-highlight-color: transparent;
 }
@@ -164,16 +165,16 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
   opacity: 0;
 }
 .seal.opened .seal-ripple { display: none; }
-.seal img { width: 100%; height: 100%; border-radius: 50%; }
+.seal img { width: 100%; height: 100%; border-radius: 50%; transform: scale(1.22); transform-origin: center; }
 .seal-monogram {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
   font-family: "Prata", var(--font-display); font-weight: 400;
-  font-size: 1.05rem; letter-spacing: .02em;
-  color: hsl(28 30% 38% / .85);
-  text-shadow: 0 1px 0 hsl(45 60% 92% / .6);
+  font-size: 1.15rem; letter-spacing: .06em;
+  color: hsl(40 60% 95% / .92);
+  text-shadow: 0 1px 3px hsl(20 30% 15% / .5);
 }
-.seal-monogram em { font-family: var(--font-script); font-style: normal; font-size: 1.15rem; margin-inline: .1em; }
+.seal-monogram em { font-family: var(--font-script); font-style: normal; font-size: .62em; color: hsl(0 0% 98%); margin-inline: .1em; }
 .gate-hint { font-size: .8rem; color: hsl(var(--ink) / .55); margin-top: 1.1rem; font-style: italic; }
 
 /* ═══ THEME TOGGLE ═══════════════════════════════════════════ */
