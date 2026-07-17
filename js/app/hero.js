@@ -4,15 +4,41 @@ import { appState } from './state.js';
 export function startHeroVideo() {
   const v = $('#hero-video');
   const poster = $('.hero-poster');
-  if (!v || !poster || REDUCED) return; // poster only, no autoplaying video
+  if (!v || !poster) return;
+  if (REDUCED) {
+    poster.classList.add('is-visible');
+    return; // poster only, no autoplaying video
+  }
 
+  const reveal = () => {
+    poster.classList.remove('is-visible', 'kenburns');
+    if (window.gsap) window.gsap.to(v, { opacity: 1, duration: 1.2 });
+    else v.style.opacity = '1';
+  };
+
+  const armInteractionRetry = () => {
+    const retry = () => {
+      const rp = v.play();
+      if (rp && rp.then) rp.then(reveal).catch(() => {});
+      else reveal();
+    };
+    window.addEventListener('pointerdown', retry, { once: true, passive: true });
+    window.addEventListener('keydown', retry, { once: true });
+  };
+
+  v.muted = true;
+  v.playsInline = true;
   v.preload = 'auto';
   const p = v.play();
   if (p && p.then) {
-    p.then(() => window.gsap && window.gsap.to(v, { opacity: 1, duration: 1.2 }))
-      .catch(() => poster.classList.add('kenburns'));
+    p.then(reveal)
+      .catch(() => {
+        poster.classList.add('is-visible');
+        poster.classList.add('kenburns');
+        armInteractionRetry();
+      });
   } else {
-    poster.classList.add('kenburns');
+    reveal();
   }
 }
 

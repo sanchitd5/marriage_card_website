@@ -251,7 +251,9 @@ html[data-theme="dark"] #theme-toggle .icon-sun { display: block; }
   object-fit: cover; object-position: center 62%;
 }
 .hero-media video { opacity: 0; }
-html.reduce-motion .hero-poster { animation: none; }
+.hero-poster { opacity: 0; pointer-events: none; }
+.hero-poster.is-visible { opacity: 1; }
+html.reduce-motion .hero-poster { opacity: 1; animation: none; }
 .hero-veil {
   position: absolute; inset: 0; z-index: 1;
   background:
