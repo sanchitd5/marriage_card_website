@@ -20,15 +20,51 @@
   <meta name="apple-mobile-web-app-title" content="Riya &amp; Sanchit">
   <link rel="manifest" href="manifest.webmanifest">
 
+  <style>
+    #theme-boot-loader { display: none; }
+    html.theme-decision-pending #theme-boot-loader {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 20% 20%, hsl(40 45% 52% / .18), transparent 45%),
+        radial-gradient(circle at 80% 78%, hsl(264 22% 62% / .22), transparent 42%),
+        linear-gradient(180deg, #f7f4ee 0%, #ece4d7 100%);
+      color: #5e4c38;
+      font-family: "Lora", Georgia, serif;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      font-size: .72rem;
+    }
+    html[data-theme="dark"].theme-decision-pending #theme-boot-loader {
+      background:
+        radial-gradient(circle at 20% 20%, hsl(42 58% 64% / .12), transparent 45%),
+        radial-gradient(circle at 80% 78%, hsl(264 32% 74% / .14), transparent 42%),
+        linear-gradient(180deg, #191322 0%, #100b16 100%);
+      color: #efe3c8;
+    }
+    #theme-boot-loader .boot-inner { display: grid; place-items: center; gap: .85rem; }
+    #theme-boot-loader .boot-ring {
+      width: 2.2rem;
+      height: 2.2rem;
+      border-radius: 50%;
+      border: 2px solid currentColor;
+      border-right-color: transparent;
+      animation: themeBootSpin 1s linear infinite;
+      opacity: .9;
+    }
+    @keyframes themeBootSpin { to { transform: rotate(360deg); } }
+  </style>
+
   <script>
     document.documentElement.classList.add('js');
+    document.documentElement.classList.add('theme-decision-pending');
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('reduce-motion');
     (function () {
-      // manual choice wins; otherwise follow the viewer's local sun:
-      // dark from sunset to sunrise, computed from coordinates guessed
-      // off the IANA timezone (no geolocation prompt).
-      var stored = localStorage.getItem('theme');
-      document.documentElement.dataset.theme = stored || 'dark';
+      // Infer day/night from local sun without geolocation permission.
+      // Expose a resolver so JS modules can refresh this over time.
 
       function isNightNow() {
         try {
@@ -52,7 +88,12 @@
             'Australia/Perth': [-31.9, 115.9], 'Australia/Brisbane': [-27.5, 153], 'Pacific/Auckland': [-36.8, 174.8],
           };
           var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-          var c = ZONES[tz] || [23, -new Date().getTimezoneOffset() / 60 * 15];
+          var c = ZONES[tz] || null;
+          if (!c) {
+            // Fallback: estimate longitude from current zone offset (DST-aware)
+            // and use a temperate latitude so sunrise/sunset math stays stable.
+            c = [23, -new Date().getTimezoneOffset() / 60 * 15];
+          }
           var lat = c[0] * Math.PI / 180, lon = c[1];
           var now = new Date();
           var doy = Math.floor((now - new Date(Date.UTC(now.getUTCFullYear(), 0, 0))) / 864e5);
@@ -64,22 +105,45 @@
                    - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
           var cosHa = (Math.cos(90.833 * Math.PI / 180) - Math.sin(lat) * Math.sin(decl))
                     / (Math.cos(lat) * Math.cos(decl));
-          if (cosHa < -1 || cosHa > 1) { // polar day/night: fall back to clock
+          if (cosHa > 1) return true;   // sun never rises: polar night
+          if (cosHa < -1) return false; // sun never sets: midnight sun
+          if (!isFinite(cosHa)) {
             var h = now.getHours();
             return h < 6 || h >= 19;
           }
           var ha = Math.acos(cosHa) * 180 / Math.PI;
           var utcNowMin = now.getUTCHours() * 60 + now.getUTCMinutes();
-          var sunriseUtc = 720 - 4 * (lon + ha) - eq;
-          var sunsetUtc = 720 - 4 * (lon - ha) - eq;
+          var TWILIGHT_BUFFER_MIN = 24;
+          var sunriseUtc = 720 - 4 * (lon + ha) - eq + TWILIGHT_BUFFER_MIN;
+          var sunsetUtc = 720 - 4 * (lon - ha) - eq - TWILIGHT_BUFFER_MIN;
           var mod = function (m) { return ((m % 1440) + 1440) % 1440; };
           var afterSunset = mod(utcNowMin - sunsetUtc) < mod(sunriseUtc - sunsetUtc);
           return afterSunset;
         } catch (e) {
+          // Last-resort fallback: follow system dark preference if available,
+          // then use a broad local-hour estimate.
+          if (window.matchMedia) {
+            return matchMedia('(prefers-color-scheme: dark)').matches;
+          }
           var hh = new Date().getHours();
           return hh < 6 || hh >= 19;
         }
       }
+
+      function resolveAutoTheme() {
+        var night = isNightNow();
+        document.documentElement.dataset.autoNight = night ? '1' : '0';
+        return night ? 'dark' : 'light';
+      }
+
+      window.__getWeddingAutoTheme = resolveAutoTheme;
+      document.documentElement.dataset.theme = resolveAutoTheme();
+
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.content = document.documentElement.dataset.theme === 'dark' ? '#191322' : '#f7f4ee';
+
+      window.__weddingThemeDecisionReady = true;
+      window.dispatchEvent(new Event('wedding-theme-ready'));
     })();
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -89,6 +153,14 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪷</text></svg>">
 </head>
 <body>
+  <div id="theme-boot-loader" aria-live="polite" aria-label="Loading invitation theme">
+    <div class="boot-inner">
+      <span class="boot-ring" aria-hidden="true"></span>
+      <span>Setting the mood for your invitation…</span>
+    </div>
+  </div>
+  <script src="js/app/boot-loader.js"></script>
+
   <!-- ══════════ INTRO GATE ══════════ -->
   <div id="gate" aria-label="Wedding invitation envelope. Tap the wax seal to open.">
     <div class="gate-stage">
@@ -152,7 +224,7 @@
             <span class="hero-amp hero-seq">&amp;</span>
             <span class="hero-name hero-seq">Sanchit</span>
           </h1>
-          <p class="hero-date hero-seq">11 <span>&amp;</span> 12 December 2026 · Chandigarh &amp; Ambala</p>
+          <p class="hero-date hero-seq">11 <span class="hero-amp">&amp;</span> 12 December 2026 <span class="hero-date-sep">·</span> <span class="hero-date-location">Chandigarh &amp; Ambala</span></p>
           <p class="hero-tag hero-seq">#SanchitKiRiya</p>
         </div>
         <div class="scroll-cue hero-seq">

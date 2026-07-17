@@ -301,7 +301,11 @@ html[data-theme="dark"] .hero-veil {
   font-size: clamp(1.35rem, 4.5vw, 2rem);
   letter-spacing: .14em;
 }
-.hero-date span { color: hsl(var(--gold)); }
+.hero-date .hero-amp span { color: hsl(var(--gold)); }
+@media (max-width: 600px) {
+  .hero-date-sep { display: none; }
+  .hero-date-location { display: block; }
+}
 .hero-tag {
   margin-top: .9rem;
   font-family: var(--font-body);

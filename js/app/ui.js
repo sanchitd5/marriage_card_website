@@ -216,20 +216,59 @@ export function initTheme() {
   const btn = $('#theme-toggle');
   if (!btn) return;
 
+  const validTheme = t => t === 'dark' || t === 'light';
+  const readManualTheme = () => validTheme(appState.themeManual) ? appState.themeManual : null;
+  const readAutoTheme = () => {
+    if (typeof window.__getWeddingAutoTheme === 'function') {
+      const resolved = window.__getWeddingAutoTheme();
+      if (validTheme(resolved)) return resolved;
+    }
+    const hintedNight = document.documentElement.dataset.autoNight;
+    if (hintedNight === '1') return 'dark';
+    if (hintedNight === '0') return 'light';
+    return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  };
+
   const meta = document.querySelector('meta[name="theme-color"]');
-  function apply(t, persist) {
-    document.documentElement.dataset.theme = t;
-    if (persist) localStorage.setItem('theme', t);
-    btn.setAttribute('aria-pressed', String(t === 'dark'));
-    btn.setAttribute('aria-label', t === 'dark' ? 'Switch to day mode' : 'Switch to night mode');
-    if (meta) meta.content = t === 'dark' ? '#191322' : '#f7f4ee';
-    appState.setGateTheme(t);
+  function apply(t, rememberManual) {
+    const theme = validTheme(t) ? t : 'light';
+    document.documentElement.dataset.theme = theme;
+    if (rememberManual) appState.themeManual = theme;
+    btn.setAttribute('aria-pressed', String(theme === 'dark'));
+    btn.setAttribute('aria-label', theme === 'dark' ? 'Switch to day mode' : 'Switch to night mode');
+    if (meta) meta.content = theme === 'dark' ? '#191322' : '#f7f4ee';
+    appState.setGateTheme(theme);
   }
 
-  // reflect whatever the head script decided (stored choice or local sun)
-  apply(document.documentElement.dataset.theme || 'light', false);
-  btn.addEventListener('click', () =>
-    apply(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark', true));
+  let autoTimer = 0;
+  const stopAuto = () => {
+    if (!autoTimer) return;
+    window.clearInterval(autoTimer);
+    autoTimer = 0;
+  };
+  const startAuto = () => {
+    stopAuto();
+    if (readManualTheme()) return;
+    const refresh = () => {
+      if (readManualTheme()) {
+        stopAuto();
+        return;
+      }
+      apply(readAutoTheme(), false);
+    };
+    refresh();
+    autoTimer = window.setInterval(refresh, 60 * 1000);
+    document.addEventListener('visibilitychange', refresh, { passive: true });
+  };
+
+  // Reflect whatever the head script decided (local sun) unless overridden in runtime memory.
+  apply(readManualTheme() || document.documentElement.dataset.theme || readAutoTheme(), false);
+  startAuto();
+
+  btn.addEventListener('click', () => {
+    stopAuto();
+    apply(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark', true);
+  });
 }
 
 export function initTilt() {
