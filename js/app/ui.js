@@ -394,9 +394,30 @@ export function initTheme() {
   apply(readManualTheme() || document.documentElement.dataset.theme || readAutoTheme(), false);
   startAuto();
 
-  btn.addEventListener('click', () => {
+  // Day↔night with a circular reveal that wipes out from the toggle button.
+  // Uses the View Transitions API (GPU-composited clip-path); falls back to an
+  // instant swap where it's unsupported or the viewer prefers reduced motion.
+  function animateThemeChange(next, e) {
+    if (REDUCED || typeof document.startViewTransition !== 'function') {
+      apply(next, true);
+      return;
+    }
+    const rect = btn.getBoundingClientRect();
+    const x = (e && e.clientX) || (rect.left + rect.width / 2);
+    const y = (e && e.clientY) || (rect.top + rect.height / 2);
+    const endR = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+    const vt = document.startViewTransition(() => apply(next, true));
+    vt.ready.then(() => {
+      document.documentElement.animate(
+        { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${endR}px at ${x}px ${y}px)`] },
+        { duration: 640, easing: 'cubic-bezier(.4, 0, .2, 1)', pseudoElement: '::view-transition-new(root)' }
+      );
+    }).catch(() => {});
+  }
+
+  btn.addEventListener('click', (e) => {
     stopAuto();
-    apply(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark', true);
+    animateThemeChange(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark', e);
   });
 }
 

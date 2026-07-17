@@ -587,3 +587,11 @@ html[data-theme="dark"] .footer { background: hsl(263 28% 7%); }
   .ambient, #tsparticles { display: none; }
   .scroll-cue { display: none; }
 }
+
+/* ── Day↔night circular reveal (View Transitions API) ──────────────────
+   New theme wipes in as an expanding circle from the toggle button (driven in
+   js/app/ui.js). Disable the default crossfade so the clip reveal reads clean. */
+::view-transition-old(root),
+::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+::view-transition-new(root) { z-index: 1; }
+::view-transition-old(root) { z-index: 0; }
