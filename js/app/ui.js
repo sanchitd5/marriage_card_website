@@ -52,6 +52,13 @@ function hasFullscreenSupport() {
   );
 }
 
+function isMobileFullscreenAllowed() {
+  return !!(
+    window.matchMedia('(max-width: 900px)').matches ||
+    window.matchMedia('(pointer: coarse)').matches
+  );
+}
+
 function isFullscreenNow() {
   return !!(document.fullscreenElement || document.webkitFullscreenElement);
 }
@@ -92,14 +99,17 @@ function refreshFullscreenButton(btn) {
 }
 
 export async function attemptAutoFullscreen() {
-  if (!hasFullscreenSupport() || isFullscreenNow()) return;
+  if (!isMobileFullscreenAllowed() || !hasFullscreenSupport() || isFullscreenNow()) return;
   await requestFullscreenMode();
 }
 
 export function initFullscreenToggle() {
   const btn = $('#fullscreen-toggle');
   if (!btn) return;
-  if (!hasFullscreenSupport()) return;
+  if (!isMobileFullscreenAllowed() || !hasFullscreenSupport()) {
+    btn.hidden = true;
+    return;
+  }
 
   btn.hidden = false;
   refreshFullscreenButton(btn);
