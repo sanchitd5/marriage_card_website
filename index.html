@@ -182,6 +182,7 @@
       <button id="seal" class="seal" aria-label="Break the seal and open the invitation">
         <img src="assets/images/art-seal.jpg" alt="" aria-hidden="true">
         <span class="seal-monogram">R<em>&amp;</em>S</span>
+        <span class="seal-ripple" aria-hidden="true"></span>
       </button>
       <p class="gate-hint">Tap the seal to open your invitation</p>
     </div>
@@ -211,7 +212,7 @@
       <!-- ══════════ HERO ══════════ -->
       <header class="hero" id="hero">
         <div class="hero-media" data-speed="0.85">
-          <video id="hero-video" playsinline muted autoplay loop preload="none" poster="assets/images/art-hero.jpg">
+          <video id="hero-video" playsinline muted autoplay preload="none" poster="assets/images/art-hero.jpg">
             <source src="assets/videos/hero-loop.mp4" type="video/mp4">
           </video>
           <img class="hero-poster" src="assets/images/art-hero.jpg" alt="Painted ivory palace courtyard with wisteria and marigold garlands">
@@ -225,7 +226,9 @@
             <span class="hero-name hero-seq">Sanchit</span>
           </h1>
           <p class="hero-date hero-seq">11 <span class="hero-amp">&amp;</span> 12 December 2026 <span class="hero-date-sep">·</span> <span class="hero-date-location">Chandigarh &amp; Ambala</span></p>
-          <p class="hero-tag hero-seq">#SanchitKiRiya</p>
+          <p class="hero-tag hero-seq" id="hero-hashtag">
+            <span class="hero-tag-text" data-tags="#SanchitKiRiya,#RiyaKaSanchit">#SanchitKiRiya</span>
+          </p>
         </div>
         <div class="scroll-cue hero-seq">
           <span class="cue-mouse" aria-hidden="true"><span></span></span>

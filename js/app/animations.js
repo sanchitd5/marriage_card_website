@@ -22,20 +22,20 @@ export function initGsap() {
 
   // one fade-up primitive everywhere (majestic/teatro numbers)
   ScrollTrigger.batch('.fade-up', {
-    start: 'top 88%',
+    start: 'top 82%',
     once: true,
     onEnter: batch => gsap.fromTo(batch,
-      { y: 26, autoAlpha: 0 },
-      { y: 0, autoAlpha: 1, duration: 0.7, stagger: 0.08, ease: 'luxe', overwrite: true }),
+      { y: 48, autoAlpha: 0, scale: 0.97 },
+      { y: 0, autoAlpha: 1, scale: 1, duration: 1.1, stagger: 0.12, ease: 'power3.out', overwrite: true }),
   });
 
   // interlude: portrait eases in and the quote follows, one choreography
   gsap.timeline({
-    defaults: { ease: 'luxe' },
-    scrollTrigger: { trigger: '.interlude-art', start: 'top 85%', once: true },
+    defaults: { ease: 'power3.out' },
+    scrollTrigger: { trigger: '.interlude-art', start: 'top 80%', once: true },
   })
-    .fromTo('.interlude-art', { autoAlpha: 0, y: 44, scale: .97 }, { autoAlpha: 1, y: 0, scale: 1, duration: 1.5 })
-    .fromTo('.interlude-line', { autoAlpha: 0, y: 22 }, { autoAlpha: 1, y: 0, duration: 1 }, '-=.7');
+    .fromTo('.interlude-art', { autoAlpha: 0, y: 60, scale: .96 }, { autoAlpha: 1, y: 0, scale: 1, duration: 1.6 })
+    .fromTo('.interlude-line', { autoAlpha: 0, y: 28 }, { autoAlpha: 1, y: 0, duration: 1.1 }, '-=.8');
 
   // scrolling in does the scratching: fully swept once half the section is in
   let scratched = 0;
@@ -115,12 +115,13 @@ export function initGsap() {
   });
 
   // countdown digits get a slow settle
-  gsap.fromTo('.count-num', { scale: .92 }, {
+  gsap.fromTo('.count-num', { scale: .88, autoAlpha: 0 }, {
     scale: 1,
-    duration: 1.6,
+    autoAlpha: 1,
+    duration: 1.4,
     ease: 'luxe',
-    stagger: .1,
-    scrollTrigger: { trigger: '.count-grid', start: 'top 85%', once: true },
+    stagger: .14,
+    scrollTrigger: { trigger: '.count-grid', start: 'top 80%', once: true },
   });
 
   // One-time golden sparkle reveal and order swap
@@ -207,4 +208,79 @@ export function initGsap() {
         { autoAlpha: 1, y: 0, duration: 0.85, ease: 'power2.out', stagger: 0.13 });
     });
   };
+
+  // ── Seal heartbeat + ripple ring ──────────────────────────────────
+  const sealEl = $('#seal');
+  if (sealEl) {
+    appState.sealPulse = gsap.to(sealEl, {
+      scale: 1.06, duration: 1.2, repeat: -1, yoyo: true, ease: 'sine.inOut',
+    });
+    const rippleEl = sealEl.querySelector('.seal-ripple');
+    if (rippleEl) {
+      appState.sealRipple = gsap.timeline({ repeat: -1 })
+        .fromTo(rippleEl,
+          { scale: 0.92, opacity: 0.9 },
+          { scale: 1.45, opacity: 0, duration: 2.4, ease: 'power1.out' }
+        );
+    }
+    sealEl.addEventListener('mouseenter', () => {
+      if (!sealEl.classList.contains('opened'))
+        gsap.to(sealEl, { scale: 1.1, duration: 0.25, overwrite: 'auto' });
+    });
+    sealEl.addEventListener('mouseleave', () => {
+      if (!sealEl.classList.contains('opened'))
+        gsap.to(sealEl, { scale: 1, duration: 0.25, overwrite: 'auto' });
+    });
+  }
+
+  // ── Scroll cue: mouse dot drop ────────────────────────────────────
+  const mouseDot = $('.cue-mouse span');
+  if (mouseDot) {
+    gsap.timeline({ repeat: -1 })
+      .fromTo(mouseDot, { y: 0, opacity: 1 }, { y: 14, opacity: 0, duration: 1.32, ease: 'power1.inOut' })
+      .set(mouseDot, { y: 0, opacity: 0 })
+      .to(mouseDot, { opacity: 1, duration: 1.056, ease: 'power1.inOut' });
+  }
+
+  // ── Scroll cue: chevron drift (all cue-chevrons groups) ──────────
+  $$('.cue-chevrons').forEach(group => {
+    [...group.querySelectorAll('i')].forEach((ch, i) => {
+      const delay = i * 0.35;
+      gsap.timeline({ repeat: -1, delay })
+        .fromTo(ch, { y: -8 }, { y: 10, duration: 2.2, ease: 'none' });
+      gsap.timeline({ repeat: -1, delay })
+        .fromTo(ch, { opacity: 0 }, { opacity: 0.9, duration: 2.2 * 0.35, ease: 'none' })
+        .to(ch, { opacity: 0, duration: 2.2 * 0.65, ease: 'none' });
+    });
+  });
+
+  // ── Ambient petals (GSAP-driven; hidden automatically when tsParticles loads) ──
+  const petalDurs = [13, 17, 15, 19, 14, 18, 16, 12, 20];
+  const petalDelays = [-2, -9, -5, -12, -7, -3, -10, -6, -14];
+  $$('.petal').forEach((p, i) => {
+    const dur = petalDurs[i] ?? 15;
+    const delay = petalDelays[i] ?? 0;
+    gsap.timeline({ repeat: -1, delay })
+      .set(p, { y: '-10vh', x: 0, rotation: 0, opacity: 0 })
+      .to(p, { opacity: 0.9, duration: dur * 0.1, ease: 'none' })
+      .to(p, { y: '55vh', x: 30, rotation: 180, opacity: 0.75, duration: dur * 0.4, ease: 'sine.inOut' }, '<')
+      .to(p, { y: '115vh', x: -20, rotation: 360, opacity: 0, duration: dur * 0.5, ease: 'sine.in' });
+  });
+
+  // ── Ambient fireflies ─────────────────────────────────────────────
+  const driftDelays = [0, -2, -4];
+  const pulseDelays = [-1, -3, -2];
+  $$('.firefly').forEach((ff, i) => {
+    gsap.timeline({ repeat: -1, delay: driftDelays[i] })
+      .to(ff, { x: 40, y: -30, duration: 1.5, ease: 'sine.inOut' })
+      .to(ff, { x: -20, y: -60, duration: 1.5, ease: 'sine.inOut' })
+      .to(ff, { x: 30, y: -30, duration: 1.5, ease: 'sine.inOut' })
+      .to(ff, { x: 0, y: 0, duration: 1.5, ease: 'sine.inOut' });
+    gsap.set(ff, { filter: 'drop-shadow(0 0 4px hsl(42deg 50% 72%))' });
+    gsap.to(ff, {
+      opacity: 1,
+      filter: 'drop-shadow(0 0 10px hsl(40deg 45% 52%)) drop-shadow(0 0 22px hsl(42deg 50% 72%))',
+      duration: 2.25, ease: 'sine.inOut', yoyo: true, repeat: -1, delay: pulseDelays[i],
+    });
+  });
 }

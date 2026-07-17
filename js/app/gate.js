@@ -55,6 +55,8 @@ export function initGate() {
     opened = true;
     clearTimeout(autoOpen);
     seal.classList.add('opened'); // stop the pulse so the crack animation owns the transform
+    if (appState.sealPulse) { appState.sealPulse.kill(); appState.sealPulse = null; }
+    if (appState.sealRipple) { appState.sealRipple.kill(); appState.sealRipple = null; }
     window.scrollTo(0, 0);
     if (appState.smoother) appState.smoother.scrollTop(0);
     attemptAutoFullscreen();

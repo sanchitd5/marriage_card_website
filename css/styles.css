@@ -151,31 +151,19 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
   margin-inline: auto;
   border-radius: 50%;
   box-shadow: 0 10px 26px -8px hsl(var(--wisteria-deep) / .45);
-  transition: transform .3s var(--ease-luxe);
   -webkit-tap-highlight-color: transparent;
 }
-.seal:hover, .seal:focus-visible { transform: scale(1.06); }
 .seal:focus-visible { outline: 2px solid hsl(var(--wisteria)); outline-offset: 4px; }
-/* invitation to tap: soft heartbeat + expanding gold ring */
-.seal:not(.opened) { animation: sealPulse 2.4s var(--ease-luxe) infinite; }
-.seal::after {
-  content: '';
+/* heartbeat + ripple ring driven by GSAP in animations.js */
+.seal-ripple {
   position: absolute; inset: -5px;
   border-radius: 50%;
   border: 2px solid hsl(var(--gold) / .75);
   pointer-events: none;
-  animation: sealRipple 2.4s ease-out infinite;
+  transform-origin: center;
+  opacity: 0;
 }
-.seal.opened::after { display: none; }
-@keyframes sealPulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.06); }
-}
-@keyframes sealRipple {
-  0% { transform: scale(.92); opacity: .9; }
-  65% { transform: scale(1.45); opacity: 0; }
-  100% { transform: scale(1.45); opacity: 0; }
-}
+.seal.opened .seal-ripple { display: none; }
 .seal img { width: 100%; height: 100%; border-radius: 50%; }
 .seal-monogram {
   position: absolute; inset: 0;
@@ -313,6 +301,9 @@ html[data-theme="dark"] .hero-veil {
   letter-spacing: .22em; text-transform: none;
   color: hsl(var(--gold));
 }
+.hero-tag-text {
+  display: inline-block;
+}
 .scroll-cue { position: relative; z-index: 2; margin: 5vh auto 4vh; display: grid; place-items: center; gap: .3rem; }
 
 /* floating scroll cue — compact circle, same style as music-toggle */
@@ -353,9 +344,8 @@ html[data-theme="dark"] .hero-veil {
   position: absolute; left: 50%; top: 7px;
   width: 3px; height: 8px; margin-left: -1.5px;
   border-radius: 2px; background: hsl(var(--wisteria-deep) / .65);
-  animation: cueDrop 2.4s var(--ease-luxe) infinite;
+  opacity: 1;
 }
-@keyframes cueDrop { 0%,100% { transform: translateY(0); opacity: 1; } 55% { transform: translateY(14px); opacity: 0; } 56% { transform: translateY(0); opacity: 0; } }
 /* touch devices: drifting chevrons say "there is more below" */
 .cue-chevrons { display: grid; place-items: center; width: 34px; height: 34px; }
 .cue-chevrons i {
@@ -364,13 +354,7 @@ html[data-theme="dark"] .hero-veil {
   border-right: 1.5px solid hsl(var(--wisteria-deep) / .75);
   border-bottom: 1.5px solid hsl(var(--wisteria-deep) / .75);
   transform: rotate(45deg);
-  animation: chevronDrift 2.2s var(--ease-luxe) infinite;
-}
-.cue-chevrons i:last-child { animation-delay: .35s; }
-@keyframes chevronDrift {
-  0% { transform: translateY(-8px) rotate(45deg); opacity: 0; }
-  35% { opacity: .9; }
-  100% { transform: translateY(10px) rotate(45deg); opacity: 0; }
+  opacity: 0;
 }
 @media (min-width: 900px) {
   .cue-mouse { display: block; }
@@ -551,58 +535,29 @@ html[data-theme="dark"] .footer { background: hsl(263 28% 7%); }
   position: absolute; top: -4vh;
   width: 12px; height: 9px;
   border-radius: 60% 40% 55% 45%;
-  animation: petalFall linear infinite;
   will-change: transform, opacity;
   opacity: 0;
 }
-.p1 { left: 6%;  background: hsl(var(--marigold) / .8); animation-duration: 13s; animation-delay: -2s; }
-.p2 { left: 17%; background: hsl(var(--wisteria) / .7); animation-duration: 17s; animation-delay: -9s; width: 9px; height: 7px; }
-.p3 { left: 28%; background: hsl(var(--blush));         animation-duration: 15s; animation-delay: -5s; }
-.p4 { left: 39%; background: hsl(var(--marigold) / .65); animation-duration: 19s; animation-delay: -12s; width: 8px; height: 6px; }
-.p5 { left: 52%; background: hsl(var(--wisteria) / .75); animation-duration: 14s; animation-delay: -7s; }
-.p6 { left: 63%; background: hsl(var(--gold-soft));     animation-duration: 18s; animation-delay: -3s; width: 10px; height: 8px; }
-.p7 { left: 74%; background: hsl(var(--blush));         animation-duration: 16s; animation-delay: -10s; }
-.p8 { left: 85%; background: hsl(var(--marigold) / .75); animation-duration: 12s; animation-delay: -6s; width: 9px; height: 7px; }
-.p9 { left: 94%; background: hsl(var(--wisteria) / .6);  animation-duration: 20s; animation-delay: -14s; }
-@keyframes petalFall {
-  0%   { transform: translate3d(0, -10vh, 0) rotate(0); opacity: 0; }
-  10%  { opacity: .9; }
-  50%  { transform: translate3d(30px, 55vh, 0) rotate(180deg); }
-  90%  { opacity: .75; }
-  to   { transform: translate3d(-20px, 115vh, 0) rotate(360deg); opacity: 0; }
-}
+.p1 { left: 6%;  background: hsl(var(--marigold) / .8); }
+.p2 { left: 17%; background: hsl(var(--wisteria) / .7); width: 9px; height: 7px; }
+.p3 { left: 28%; background: hsl(var(--blush)); }
+.p4 { left: 39%; background: hsl(var(--marigold) / .65); width: 8px; height: 6px; }
+.p5 { left: 52%; background: hsl(var(--wisteria) / .75); }
+.p6 { left: 63%; background: hsl(var(--gold-soft)); width: 10px; height: 8px; }
+.p7 { left: 74%; background: hsl(var(--blush)); }
+.p8 { left: 85%; background: hsl(var(--marigold) / .75); width: 9px; height: 7px; }
+.p9 { left: 94%; background: hsl(var(--wisteria) / .6); }
 .firefly {
   position: absolute;
   width: 5px; height: 5px; border-radius: 50%;
   background: hsl(var(--gold-soft));
-  animation: fireflyDrift 6s ease-in-out infinite, fireflyPulse 4.5s ease-in-out infinite;
   will-change: transform, opacity, filter;
+  opacity: 0.25;
 }
-.f1 { left: 12%; top: 68%; animation-delay: 0s, -1s; }
-.f2 { left: 55%; top: 78%; animation-delay: -2s, -3s; }
-.f3 { left: 84%; top: 60%; animation-delay: -4s, -2s; }
-@keyframes fireflyDrift {
-  0% { transform: translateZ(0); }
-  25% { transform: translate3d(40px, -30px, 0); }
-  50% { transform: translate3d(-20px, -60px, 0); }
-  75% { transform: translate3d(30px, -30px, 0); }
-  to { transform: translateZ(0); }
-}
-@keyframes fireflyPulse {
-  0%, to { opacity: .25; filter: drop-shadow(0 0 4px hsl(var(--gold-soft))); }
-  50% { opacity: 1; filter: drop-shadow(0 0 10px hsl(var(--gold))) drop-shadow(0 0 22px hsl(var(--gold-soft))); }
-}
+.f1 { left: 12%; top: 68%; }
+.f2 { left: 55%; top: 78%; }
+.f3 { left: 84%; top: 60%; }
 #tsparticles { position: fixed; inset: 0; pointer-events: none; z-index: 41; }
-
-/* diya flicker accent (teatro timing) for the gold fireflies at night */
-@keyframes diyaFlicker {
-  0% { opacity: 0; } 15% { opacity: .9; } 35% { opacity: .9; }
-  50% { opacity: .3; } 65% { opacity: .9; } 80% { opacity: .3; } 100% { opacity: 0; }
-}
-
-/* Ken Burns fallback when hero video missing / reduced motion off */
-.hero-poster.kenburns { animation: slowZoom 18s ease-out forwards; }
-@keyframes slowZoom { from { transform: scale(1); } to { transform: scale(1.08); } }
 
 /* ═══ REDUCED MOTION ═════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
@@ -613,5 +568,4 @@ html[data-theme="dark"] .footer { background: hsl(263 28% 7%); }
   }
   .ambient, #tsparticles { display: none; }
   .scroll-cue { display: none; }
-  .hero-poster.kenburns { animation: none; }
 }
