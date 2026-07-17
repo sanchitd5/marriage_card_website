@@ -28,7 +28,13 @@ export const bride = {
   grandparents: 'Late Shri Vijay Prakash & Mrs. Sushma Verma',
 };
 
-// Absolute site origin, no trailing slash. Used to build absolute OG/Twitter
-// share URLs and the canonical link. UPDATE THIS to the real deployed domain
-// before sharing invitation links (WhatsApp/Facebook require an absolute URL).
-export const siteUrl = 'https://sanchitkiriya.netlify.app';
+// Absolute site origins, no trailing slash. Used to build absolute OG/Twitter
+// share URLs and the canonical link (WhatsApp/Facebook require an absolute URL).
+// Each side deploys to its own domain; build.js picks by FROM_GROOM_SIDE.
+export const siteUrls = {
+  groom: 'https://sanchitkiriya.netlify.app', // FROM_GROOM_SIDE=true  (default)
+  bride: 'https://riyakasanchit.netlify.app', // FROM_GROOM_SIDE=false
+};
+
+// Back-compat single export (groom origin).
+export const siteUrl = siteUrls.groom;

@@ -29,7 +29,7 @@ export const EVENTS = {
     title: `Wedding of ${NAMES.pairTitle}`,
     start: '20261212T133000Z', end: '20261212T183000Z',
     location: "De'vansh Resort, Ambala Cantt",
-    description: 'The grand affair: baraat, pheras and forever. Directions: ' + MAPS.devansh,
+    description: 'The grand affair: baraat, pheras and forever. Dress code: traditional grandeur. Directions: ' + MAPS.devansh,
   },
 };
 

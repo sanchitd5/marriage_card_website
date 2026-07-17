@@ -2,40 +2,123 @@ import { WEDDING_TS, SONGS, EVENTS, NAMES } from './config.js';
 import { REDUCED, $, $$ } from './dom.js';
 import { appState } from './state.js';
 
+const MUSIC_VOL = 0.65;
+const CROSSFADE = 6;              // seconds of overlap when automix is on
+const AUTOMIX_KEY = 'wedding-automix';
+
+const shuffled = () => {
+  const a = [...SONGS];
+  for (let j = a.length - 1; j > 0; j--) {
+    const k = Math.floor(Math.random() * (j + 1));
+    [a[j], a[k]] = [a[k], a[j]];
+  }
+  return a;
+};
+
+function readAutomixPref() {
+  try {
+    const v = localStorage.getItem(AUTOMIX_KEY);
+    return v === null ? true : v === '1'; // enhanced crossfade on by default
+  } catch (e) { return true; }
+}
+
+// Move to the next track, reshuffling for an endless mix and avoiding an
+// immediate repeat of the track that just played.
+function nextName(m) {
+  m.qi++;
+  if (m.qi >= m.queue.length) {
+    const last = m.queue[m.queue.length - 1];
+    const q = shuffled();
+    if (q.length > 1 && q[0] === last) [q[0], q[1]] = [q[1], q[0]];
+    m.queue = q;
+    m.qi = 0;
+  }
+  return m.queue[m.qi];
+}
+
+function makeAudio(name) {
+  const audio = new Audio(`assets/audio/${name}.mp3`);
+  audio.volume = MUSIC_VOL;
+  audio.preload = 'auto';
+  return audio;
+}
+
+function wireTrack(m, audio, dock) {
+  // Crossfade slightly before the end when automix is on.
+  audio.addEventListener('timeupdate', () => {
+    if (m.audio !== audio || m.fading || !m.automix || m.paused) return;
+    const d = audio.duration;
+    if (!isFinite(d) || d <= 0) return;
+    if (d - audio.currentTime <= CROSSFADE) beginCrossfade(m, audio, dock);
+  });
+  // End-of-track fallback (short clip, or automix off): hard advance.
+  audio.addEventListener('ended', () => {
+    if (m.audio !== audio || m.fading) return;
+    advance(m, dock, false);
+  });
+  audio.addEventListener('error', () => {
+    if (m.audio !== audio) return;
+    if (++m.fails >= m.queue.length) { dock.hidden = true; return; }
+    advance(m, dock, false);
+  }, { once: true });
+}
+
+// Start the next track. fade=true ramps it up while the previous ramps down.
+function advance(m, dock, fade) {
+  const audio = makeAudio(nextName(m));
+  wireTrack(m, audio, dock);
+  if (fade) audio.volume = 0;
+  m.audio = audio;
+  audio.play().then(() => {
+    m.fails = 0;
+    setPlaying(true);
+  }).catch(() => {
+    if (m.audio !== audio) return;
+    setPlaying(false);
+  });
+  return audio;
+}
+
+function beginCrossfade(m, cur, dock) {
+  m.fading = true;
+  const next = advance(m, dock, true); // becomes m.audio, starts at volume 0
+  m.outgoing = cur;
+  const t0 = performance.now();
+  (function ramp(now) {
+    const p = Math.min(1, (now - t0) / (CROSSFADE * 1000));
+    try {
+      cur.volume = MUSIC_VOL * (1 - p);
+      next.volume = MUSIC_VOL * p;
+    } catch (e) { /* volume set can throw if element gone */ }
+    if (p < 1) { requestAnimationFrame(ramp); return; }
+    try { cur.pause(); cur.currentTime = 0; } catch (e) {}
+    if (m.outgoing === cur) m.outgoing = null;
+    m.fading = false;
+  })(t0);
+}
+
 export function startMusic() {
   const dock = $('#music-dock');
   if (!dock) return;
   dock.hidden = false;
 
-  // Pick a random track from all five (uniform Fisher-Yates), then load it;
-  // the rest stay as ordered fallbacks in case a file fails to load.
-  const order = [...SONGS];
-  for (let j = order.length - 1; j > 0; j--) {
-    const k = Math.floor(Math.random() * (j + 1));
-    [order[j], order[k]] = [order[k], order[j]];
+  const m = appState.music;
+  // Already running (re-invoked on a later gesture): just resume playback.
+  if (m.queue) {
+    m.paused = false;
+    if (m.audio) m.audio.play().then(() => setPlaying(true)).catch(() => {});
+    if (m.outgoing) m.outgoing.play().catch(() => {});
+    return;
   }
-  (function tryNext(i) {
-    if (i >= order.length) {
-      dock.hidden = true;
-      return;
-    }
-    const audio = new Audio(`assets/audio/${order[i]}.mp3`);
-    audio.loop = true;
-    audio.volume = 0.65;
-    let advanced = false;
-    audio.addEventListener('error', () => { advanced = true; tryNext(i + 1); }, { once: true });
-    audio.play().then(() => {
-      appState.music.audio = audio;
-      setPlaying(true);
-    }).catch(() => {
-      // Autoplay blocked but the file loaded: keep this audio so the toggle can
-      // start it on a later gesture. A media/load error fires 'error' above and
-      // advances instead, so don't clobber the next track's audio here.
-      if (advanced) return;
-      appState.music.audio = audio;
-      setPlaying(false);
-    });
-  })(0);
+
+  if (m.automix === undefined) m.automix = readAutomixPref();
+  m.queue = shuffled();
+  m.qi = -1;          // nextName() bumps to 0 for the first track
+  m.fails = 0;
+  m.fading = false;
+  m.paused = false;
+  m.outgoing = null;
+  advance(m, dock, false);
 }
 
 function setPlaying(on) {
@@ -50,9 +133,18 @@ export function initMusicToggle() {
   const btn = $('#music-toggle');
   if (!btn) return;
   btn.addEventListener('click', () => {
-    if (!appState.music.audio) return;
-    appState.music.playing ? appState.music.audio.pause() : appState.music.audio.play();
-    setPlaying(!appState.music.playing);
+    const m = appState.music;
+    if (!m.audio) return;
+    if (m.playing) {
+      m.paused = true;
+      m.audio.pause();
+      if (m.outgoing) m.outgoing.pause();
+    } else {
+      m.paused = false;
+      m.audio.play().catch(() => {});
+      if (m.outgoing) m.outgoing.play().catch(() => {});
+    }
+    setPlaying(!m.playing);
   });
 }
 

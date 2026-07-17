@@ -14,7 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { groom, bride, siteUrl } from './site.config.mjs';
+import { groom, bride, siteUrls } from './site.config.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,9 +25,10 @@ export function parseFromGroomSide(rawFlag) {
   return rawFlag === undefined ? true : rawFlag !== 'false';
 }
 
-export function composeNames(fromGroomSide, sides = { groom, bride }, site = siteUrl) {
+export function composeNames(fromGroomSide, sides = { groom, bride }, sites = siteUrls) {
   const a = fromGroomSide ? sides.groom : sides.bride;
   const b = fromGroomSide ? sides.bride : sides.groom;
+  const site = fromGroomSide ? sites.groom : sites.bride;
 
   const pairTitle = `${a.first} & ${b.first}`;
 
@@ -101,6 +102,8 @@ export function buildHtmlTokens(names) {
     FAMILY_SIDE_A: renderFamilySide(names.sideA),
     FAMILY_SIDE_B: renderFamilySide(names.sideB),
     SITE_URL: htmlEscape(names.siteUrl),
+    // Per-side social share card (name order differs); see gen-share-cards.mjs.
+    SHARE_IMG: names.fromGroomSide ? 'invitation-card-share.jpg' : 'invitation-card-share-bride.jpg',
   };
 }
 
