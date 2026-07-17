@@ -6,7 +6,7 @@
 /* ── constants ──────────────────────────────────────────────── */
 const WEDDING_TS = Date.UTC(2026, 11, 12, 13, 30, 0); // 12 Dec 2026, 19:00 IST (edit here)
 // couple's approved pool (assets/audio/*.mp3); one is drawn at random each visit
-const SONGS = ['theme-1', 'theme-2', 'theme-3', 'theme-4'];
+const SONGS = ['theme-1', 'theme-2', 'theme-3', 'theme-4', 'theme-5'];
 const MAPS = {
   radisson: 'https://maps.app.goo.gl/fQhBFytYAZKu4qBB7',
   devansh: 'https://maps.app.goo.gl/RdueUZ2XfNiAnbD18',
@@ -187,7 +187,8 @@ let setGateTheme = () => {};
   };
   setGateTheme(document.documentElement.dataset.theme);
 
-  $('#seal').addEventListener('click', () => {
+  // the whole card opens the invitation; the seal is the visual button
+  $('.gate-card').addEventListener('click', () => {
     if (opened) return;
     opened = true;
     window.scrollTo(0, 0);

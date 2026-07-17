@@ -104,6 +104,18 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
 }
 .display-head em { font-style: italic; color: hsl(var(--gold)); }
 
+/* Hindi accent lines */
+.hindi-line {
+  font-family: "Tiro Devanagari Hindi", "Lora", serif;
+  font-size: 1.05rem;
+  color: hsl(var(--wisteria-deep) / .9);
+  letter-spacing: .02em;
+}
+.countdown .hindi-line { margin-top: -1.6rem; margin-bottom: 2.4rem; }
+.hindi-line--card { font-size: .95rem; color: hsl(var(--gold)); margin-bottom: 1.4rem; }
+.family-blessing { margin-top: 2.2rem; }
+.hindi-line--footer { margin-top: 1rem; color: hsl(42 50% 72% / .9); }
+
 /* ═══ INTRO GATE ═════════════════════════════════════════════ */
 #gate {
   position: fixed; inset: 0; z-index: 60;
@@ -120,6 +132,7 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
 .gate-still--open, .gate-video { opacity: 0; }
 .gate-card {
   position: relative; z-index: 2;
+  cursor: pointer;
   text-align: center;
   padding: 2rem 1.75rem 1.5rem;
   max-width: 24rem;
@@ -262,7 +275,11 @@ html[data-theme="dark"] .hero-veil {
   letter-spacing: .22em; text-transform: none;
   color: hsl(var(--gold));
 }
-.scroll-cue { position: relative; z-index: 2; margin: 5vh auto 4vh; display: grid; place-items: center; }
+.scroll-cue { position: relative; z-index: 2; margin: 5vh auto 4vh; display: grid; place-items: center; gap: .3rem; }
+.cue-label {
+  font-size: .6rem; letter-spacing: .3em; text-transform: uppercase;
+  color: hsl(var(--wisteria-deep) / .6);
+}
 .cue-mouse {
   display: none;
   position: relative;
@@ -314,7 +331,11 @@ html[data-theme="dark"] .hero-veil {
   color: hsl(var(--ink) / .55); margin-top: .5rem;
 }
 .scratch { max-width: 24rem; margin-inline: auto; }
-.scratch-prompt { font-style: italic; font-size: .92rem; color: hsl(var(--ink) / .7); margin-bottom: 1.2rem; }
+.scratch-prompt { font-style: italic; font-size: .92rem; color: hsl(var(--ink) / .7); margin-bottom: .5rem; }
+.scratch-hint {
+  font-size: .68rem; letter-spacing: .18em; text-transform: uppercase;
+  color: hsl(var(--gold)); margin-bottom: 1.2rem;
+}
 .scratch-frame {
   position: relative;
   aspect-ratio: 16 / 9;
