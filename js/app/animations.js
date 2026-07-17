@@ -159,7 +159,21 @@ export function initGsap() {
       delay: Math.random() * 0.5,
     }));
 
-    const nameEls = $$('.hero-name, .hero-amp', el);
+    // Names are captured in their template (FROM_GROOM_SIDE) order. The reveal
+    // flashes the reverse order as a nod to both families, then settles back to
+    // the flag order so the resting hero matches the static/no-JS fallback and
+    // the README "appears first" contract. Reorder targets are explicit (not a
+    // blind reverse) so we always resolve to the FROM_GROOM_SIDE order.
+    const amp = $('.hero-amp', el);
+    const [nameA, nameB] = $$('.hero-name', el); // A = flag-primary side
+    const nameEls = [nameA, amp, nameB].filter(Boolean);
+    const flagOrder = [nameA, amp, nameB].filter(Boolean);
+    const reverseOrder = [nameB, amp, nameA].filter(Boolean);
+    const setOrder = (order) => order.forEach((node) => el.insertBefore(node, cvs));
+    // Re-query current DOM order so the stagger reads left-to-right either way.
+    const revealNames = () => gsap.fromTo($$('.hero-name, .hero-amp', el),
+      { autoAlpha: 0, y: 10 },
+      { autoAlpha: 1, y: 0, duration: 0.85, ease: 'power2.out', stagger: 0.13 });
 
     const tl = gsap.timeline({
       onComplete() {
@@ -203,17 +217,15 @@ export function initGsap() {
       })();
     });
 
+    // 1) fade out the flag order while the sparkle peaks
     tl.to(nameEls, { autoAlpha: 0, duration: 0.4, ease: 'power2.in' }, '+=0.5');
-    tl.add(() => {
-      const kids = [...el.children].filter(c => c !== cvs);
-      kids.reverse().forEach(c => el.insertBefore(c, cvs));
-    }, '+=0.05');
-
-    tl.add(() => {
-      gsap.fromTo($$('.hero-name, .hero-amp', el),
-        { autoAlpha: 0, y: 10 },
-        { autoAlpha: 1, y: 0, duration: 0.85, ease: 'power2.out', stagger: 0.13 });
-    });
+    // 2) flash the reverse order (both families acknowledged)
+    tl.add(() => setOrder(reverseOrder), '+=0.05');
+    tl.add(revealNames);
+    // 3) settle back to the FROM_GROOM_SIDE order after a brief hold
+    tl.to(nameEls, { autoAlpha: 0, duration: 0.4, ease: 'power2.in' }, '+=2.0');
+    tl.add(() => setOrder(flagOrder), '+=0.05');
+    tl.add(revealNames);
   };
 
   // ── Seal heartbeat + ripple ring ──────────────────────────────────
