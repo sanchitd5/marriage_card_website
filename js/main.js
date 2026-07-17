@@ -179,7 +179,7 @@ let setGateTheme = () => {};
     $('.gate-still--open').src = `assets/images/art-gate-open${n}.jpg`;
     video.poster = `assets/images/art-gate-closed${n}.jpg`;
     const src = video.querySelector('source');
-    const want = `assets/videos/gate-reveal${n}.mp4`;
+    const want = `assets/videos/gate-reveal${n || '-day'}.mp4`;
     if (!src.getAttribute('src').endsWith(want)) {
       src.setAttribute('src', want);
       video.load();
@@ -271,13 +271,14 @@ function heroEntrance(instant) {
     return;
   }
   gsap.set('.hero-seq', { opacity: 1 }); // hand control from CSS to the timeline
-  const chars = new SplitText('.hero-name', { type: 'chars' }).chars;
+  // script names animate as whole words: per-letter splitting breaks cursive joins
   gsap.timeline({ defaults: { ease: 'luxe' } })
     .from('.hero .kicker', { y: 26, autoAlpha: 0, duration: 1.3 }, 0.6)
-    .from(chars, { y: 70, autoAlpha: 0, duration: 1.7, stagger: 0.045 }, 0.8)
-    .from('.hero-amp', { scale: 0, autoAlpha: 0, duration: 1.2, ease: 'back.out(1.4)' }, 1.2)
-    .from('.hero-date', { y: 22, autoAlpha: 0, duration: 1.4 }, 1.6)
-    .from('.scroll-cue', { autoAlpha: 0, duration: 1.1 }, 2.3);
+    .from('.hero-name', { y: 50, autoAlpha: 0, scale: .96, duration: 1.7, stagger: 0.25 }, 0.8)
+    .from('.hero-amp', { scale: 0, autoAlpha: 0, duration: 1.2, ease: 'back.out(1.4)' }, 1.4)
+    .from('.hero-date', { y: 22, autoAlpha: 0, duration: 1.4 }, 1.7)
+    .from('.hero-tag', { y: 16, autoAlpha: 0, duration: 1.2 }, 1.95)
+    .from('.scroll-cue', { autoAlpha: 0, duration: 1.1 }, 2.4);
 }
 
 /* ── music: local mp3 preferred, else visible YouTube mini-player ── */

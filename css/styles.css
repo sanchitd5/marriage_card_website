@@ -152,7 +152,7 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
   font-family: "Prata", var(--font-display); font-weight: 400;
-  font-size: 1.35rem; letter-spacing: .02em;
+  font-size: 1.05rem; letter-spacing: .02em;
   color: hsl(28 30% 38% / .85);
   text-shadow: 0 1px 0 hsl(45 60% 92% / .6);
 }
@@ -225,26 +225,27 @@ html[data-theme="dark"] .hero-veil {
 .hero .kicker { max-width: 34rem; margin-inline: auto; text-transform: none; letter-spacing: .12em; font-style: italic; font-size: .95rem; color: hsl(var(--wisteria-deep) / .85); }
 .hero-names {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: .06em;
-  margin-block: 1rem .4rem;
-  font-family: "Prata", var(--font-display);
+  gap: .02em;
+  margin-block: .8rem .4rem;
+  font-family: var(--font-script);
   font-weight: 400;
-  font-size: clamp(3.6rem, 15vw, 5.6rem);
-  line-height: 1.04;
-  letter-spacing: .015em;
+  font-size: clamp(4rem, 17vw, 6.5rem);
+  line-height: 1.12;
+  letter-spacing: 0;
 }
+.hero-name { padding-inline: .12em; /* room for script flourishes */ }
 .hero-amp {
   font-family: "Allura", var(--font-script);
-  font-size: .72em;
+  font-size: .55em;
   line-height: .85;
-  margin-block: .04em .1em;
+  margin-block: 0 .04em;
   color: hsl(var(--gold));
 }
 @media (min-width: 760px) {
   .hero-names {
     flex-direction: row; align-items: center;
-    gap: .2em .22em;
-    font-size: clamp(4rem, 9vw, 7.5rem);
+    gap: .06em .12em;
+    font-size: clamp(4.5rem, 10vw, 8.5rem);
   }
   .hero-amp { transform: translateY(-.04em); margin-block: 0; }
 }
@@ -254,6 +255,13 @@ html[data-theme="dark"] .hero-veil {
   letter-spacing: .14em;
 }
 .hero-date span { color: hsl(var(--gold)); }
+.hero-tag {
+  margin-top: .9rem;
+  font-family: var(--font-body);
+  font-size: .78rem; font-weight: 500;
+  letter-spacing: .22em; text-transform: none;
+  color: hsl(var(--gold));
+}
 .scroll-cue { position: relative; z-index: 2; margin: 5vh auto 4vh; display: grid; place-items: center; }
 .cue-mouse {
   display: none;
@@ -438,6 +446,7 @@ html[data-theme="dark"] .footer { background: hsl(263 28% 7%); }
 .footer-line { font-family: var(--font-display); font-style: italic; font-size: 1.15rem; line-height: 1.65; max-width: 30rem; margin-inline: auto; color: hsl(40 36% 97% / .8); }
 .footer-sign { margin-top: 1.6rem; font-size: .9rem; color: hsl(40 36% 97% / .65); }
 .footer-sign span { font-family: var(--font-script); font-size: 1.7rem; color: hsl(42 50% 72%); display: inline-block; margin-top: .4rem; }
+.footer-tag { margin-top: 1.4rem; font-size: .75rem; font-weight: 500; letter-spacing: .22em; color: hsl(42 50% 72% / .85); }
 
 /* ═══ CSS AMBIENCE (fallback layer under tsParticles) ════════
    Keyframes taken from the bridgerton reference bundle. */
