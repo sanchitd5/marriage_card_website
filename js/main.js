@@ -62,7 +62,7 @@ const $$ = (s, c = document) => [...c.querySelectorAll(s)];
 let smoother = null;
 function initGsap() {
   if (!window.gsap) { document.documentElement.classList.add('reduce-motion'); return; }
-  gsap.registerPlugin(ScrollTrigger, ScrollSmoother, SplitText);
+  gsap.registerPlugin(ScrollTrigger, ScrollSmoother, SplitText, Flip);
   gsap.config({ nullTargetWarn: false });
   // luxury ease from the reference sites: cubic-bezier(.25,1,.5,1)
   gsap.registerEase('luxe', p => 1 - Math.pow(1 - p, 2.6));
@@ -158,6 +158,21 @@ function initGsap() {
     scale: 1, duration: 1.6, ease: 'luxe', stagger: .1,
     scrollTrigger: { trigger: '.count-grid', start: 'top 85%', once: true },
   });
+
+  // nobody comes first: the hero names and the two families gently trade
+  // places every few seconds (Flip animates the real layout positions)
+  function flipSwap(container) {
+    const el = $(container);
+    if (!el) return;
+    const state = Flip.getState(el.children);
+    [...el.children].reverse().forEach(c => el.appendChild(c));
+    Flip.from(state, { duration: 1.4, ease: 'luxe', absolute: true });
+  }
+  setInterval(() => {
+    if (document.getElementById('gate')) return; // wait until the invitation is open
+    flipSwap('.hero-names');
+    flipSwap('.family-grid');
+  }, 6000);
 }
 
 /* ── intro gate ─────────────────────────────────────────────── */
