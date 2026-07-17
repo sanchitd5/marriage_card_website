@@ -1,0 +1,425 @@
+/* Riya & Sanchit · Shubh Vivah — site engine
+   Vanilla JS + GSAP. Everything degrades: no video → still crossfade,
+   no mp3 → YouTube stream, reduced motion → calm static page. */
+'use strict';
+
+/* ── constants ──────────────────────────────────────────────── */
+const WEDDING_TS = Date.UTC(2026, 11, 12, 13, 30, 0); // 12 Dec 2026, 19:00 IST (edit here)
+const YT_PRIMARY = '-tbgigaf0hM';   // "Inaam" — Jasleen Royal
+const YT_FALLBACK = '3IsdDhy8nA8';  // "Sunehra (Acoustic)" — Jai Dhir
+const MAPS = {
+  radisson: 'https://maps.app.goo.gl/fQhBFytYAZKu4qBB7',
+  devansh: 'https://maps.app.goo.gl/RdueUZ2XfNiAnbD18',
+};
+const EVENTS = {
+  haldi: {
+    title: 'Haldi — Riya & Sanchit',
+    start: '20261211T053000Z', end: '20261211T083000Z',
+    location: 'Radisson Hotel Chandigarh Zirakpur',
+    description: 'The first affair of the celebrations. Dress code: shades of yellow. Directions: ' + MAPS.radisson,
+  },
+  cocktail: {
+    title: 'Cocktail & Engagement — Riya & Sanchit',
+    start: '20261211T143000Z', end: '20261211T183000Z',
+    location: 'Radisson Hotel Chandigarh Zirakpur',
+    description: 'An evening of toasts and rings. Dress code: smart formals. Directions: ' + MAPS.radisson,
+  },
+  wedding: {
+    title: 'Wedding of Riya & Sanchit',
+    start: '20261212T133000Z', end: '20261212T183000Z',
+    location: "De'vansh Resort, Ambala Cantt",
+    description: 'The grand affair: baraat, pheras and forever. Dress code: traditional Indian wedding attire. Directions: ' + MAPS.devansh,
+  },
+};
+const GALLERY = [
+  { src: 'photo-01', alt: 'Riya and Sanchit, a quiet moment up close', cls: 'gframe--wide' },
+  { src: 'photo-02', alt: 'A twirl beneath the spiral staircase', cls: 'gframe--tall' },
+  { src: 'photo-03', alt: 'Walking together with a bouquet of roses' },
+  { src: 'photo-04', alt: 'Sanchit on one knee, asking the question' },
+  { src: 'photo-05', alt: 'Laughing together at the engagement' },
+  { src: 'photo-06', alt: 'A playful moment with the groom’s stole' },
+  { src: 'photo-07', alt: 'Gazing at each other before the floral arch' },
+  { src: 'photo-08', alt: 'Poolside, in ivory and gold' },
+  { src: 'photo-09', alt: 'Through the painted temple corridor', cls: 'gframe--tall' },
+  { src: 'photo-10', alt: 'A rooftop embrace at golden hour' },
+  { src: 'photo-11', alt: 'The couple, formally introduced' },
+  { src: 'photo-12', alt: 'Nose to nose, mid-laugh' },
+  { src: 'photo-13', alt: 'Riya stepping out of the temple in red and ivory' },
+  { src: 'photo-14', alt: 'Dancing at the engagement celebration', cls: 'gframe--wide' },
+  { src: 'photo-15', alt: 'Riya, radiant in her lehenga' },
+  { src: 'photo-16', alt: 'Beneath the grand ceiling, holding close' },
+  { src: 'photo-17', alt: 'Roses in hand, on the morning walk' },
+  { src: 'photo-18', alt: 'Together under the old banyan tree' },
+];
+
+const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (s, c = document) => c.querySelector(s);
+const $$ = (s, c = document) => [...c.querySelectorAll(s)];
+
+/* ── gallery DOM (before GSAP batch setup) ──────────────────── */
+(function buildGallery() {
+  const grid = $('#gallery-grid');
+  grid.innerHTML = GALLERY.map((p, i) =>
+    `<figure class="gframe ${p.cls || ''} fade-up">
+       <img src="assets/photos/${p.src}.jpg" alt="${p.alt}" loading="${i < 2 ? 'eager' : 'lazy'}" decoding="async">
+     </figure>`).join('');
+})();
+
+/* ── GSAP setup ─────────────────────────────────────────────── */
+let smoother = null;
+function initGsap() {
+  if (!window.gsap) { document.documentElement.classList.add('reduce-motion'); return; }
+  gsap.registerPlugin(ScrollTrigger, ScrollSmoother, SplitText);
+  gsap.config({ nullTargetWarn: false });
+  // luxury ease from the reference sites: cubic-bezier(.25,1,.5,1)
+  gsap.registerEase('luxe', p => 1 - Math.pow(1 - p, 2.6));
+
+  if (REDUCED) {
+    document.documentElement.classList.add('reduce-motion');
+    return;
+  }
+
+  smoother = ScrollSmoother.create({ smooth: 1.15, effects: true, smoothTouch: false, normalizeScroll: false });
+
+  // one fade-up primitive everywhere (majestic/teatro numbers)
+  ScrollTrigger.batch('.fade-up', {
+    start: 'top 88%',
+    once: true,
+    onEnter: batch => gsap.fromTo(batch,
+      { y: 26, autoAlpha: 0 },
+      { y: 0, autoAlpha: 1, duration: 0.7, stagger: 0.08, ease: 'luxe', overwrite: true }),
+  });
+
+  // curtain-style unveil for the couple portrait (bridgerton clipPath signature)
+  $$('.clip-reveal').forEach(el => {
+    gsap.fromTo(el,
+      { clipPath: 'inset(100% 0 0 0)', autoAlpha: 1 },
+      { clipPath: 'inset(0% 0 0 0)', duration: 1.6, ease: 'luxe',
+        scrollTrigger: { trigger: el, start: 'top 80%', once: true } });
+  });
+
+  // countdown digits get a slow settle
+  gsap.fromTo('.count-num', { scale: .92 }, {
+    scale: 1, duration: 1.6, ease: 'luxe', stagger: .1,
+    scrollTrigger: { trigger: '.count-grid', start: 'top 85%', once: true },
+  });
+}
+
+/* ── intro gate ─────────────────────────────────────────────── */
+(function gate() {
+  const gateEl = $('#gate');
+  const video = $('#gate-video');
+  document.body.style.overflow = 'hidden';
+  let opened = false;
+
+  $('#seal').addEventListener('click', () => {
+    if (opened) return;
+    opened = true;
+    startMusic(); // inside the user gesture: unlocks audio autoplay policy
+
+    if (REDUCED || !window.gsap) { finish(true); return; }
+
+    gsap.timeline()
+      .to('.seal', { rotate: -12, scale: 1.12, duration: .16, ease: 'power2.in' })
+      .to('.seal', { scale: 0, rotate: 32, autoAlpha: 0, duration: .5, ease: 'back.in(1.7)' })
+      .to('.gate-card', { autoAlpha: 0, y: -26, duration: .55, ease: 'power2.inOut' }, '-=.25')
+      .add(playDrapes);
+  });
+
+  function playDrapes() {
+    let usingVideo = false;
+    const tryPlay = video.play();
+    video.addEventListener('ended', () => crossToOpen(.8), { once: true });
+    if (tryPlay && tryPlay.then) {
+      tryPlay.then(() => {
+        usingVideo = true;
+        gsap.to(video, { opacity: 1, duration: .3 });
+      }).catch(() => stillsFallback());
+    } else if (video.error) {
+      stillsFallback();
+    }
+    // safety: if metadata never arrives (missing file), fall back
+    setTimeout(() => { if (!usingVideo && (video.readyState < 2)) stillsFallback(); }, 1200);
+
+    function stillsFallback() {
+      if (usingVideo) return;
+      usingVideo = true; // guard double-entry
+      crossToOpen(1.4);
+    }
+  }
+
+  function crossToOpen(dur) {
+    gsap.timeline()
+      .to('.gate-still--open', { opacity: 1, duration: dur, ease: 'power2.inOut' })
+      .add(() => finish(false), `-=${dur * 0.25}`);
+  }
+
+  function finish(instant) {
+    document.body.style.overflow = '';
+    startHeroVideo();
+    heroEntrance(instant);
+    if (!window.gsap || instant) {
+      gateEl.remove();
+      if (window.ScrollTrigger) ScrollTrigger.refresh();
+      return;
+    }
+    gsap.to(gateEl, {
+      autoAlpha: 0, duration: 1.1, ease: 'power2.inOut', delay: .15,
+      onComplete: () => { gateEl.remove(); ScrollTrigger.refresh(); },
+    });
+  }
+})();
+
+/* ── hero ───────────────────────────────────────────────────── */
+function startHeroVideo() {
+  const v = $('#hero-video');
+  const poster = $('.hero-poster');
+  if (REDUCED) return; // poster only, no autoplaying video
+  v.preload = 'auto';
+  const p = v.play();
+  if (p && p.then) {
+    p.then(() => gsap && gsap.to(v, { opacity: 1, duration: 1.2 }))
+     .catch(() => poster.classList.add('kenburns'));
+  } else {
+    poster.classList.add('kenburns');
+  }
+}
+
+function heroEntrance(instant) {
+  if (instant || REDUCED || !window.gsap) {
+    $$('.hero-seq').forEach(el => { el.style.opacity = 1; });
+    return;
+  }
+  gsap.set('.hero-seq', { opacity: 1 }); // hand control from CSS to the timeline
+  const chars = new SplitText('.hero-name', { type: 'chars' }).chars;
+  gsap.timeline({ defaults: { ease: 'luxe' } })
+    .from('.hero .kicker', { y: 26, autoAlpha: 0, duration: 1.3 }, 0.6)
+    .from(chars, { y: 70, autoAlpha: 0, duration: 1.7, stagger: 0.045 }, 0.8)
+    .from('.hero-amp', { scale: 0, autoAlpha: 0, duration: 1.2, ease: 'back.out(1.4)' }, 1.2)
+    .from('.hero-shubh', { y: 22, autoAlpha: 0, duration: 1.4 }, 1.5)
+    .from('.hero-date', { y: 22, autoAlpha: 0, duration: 1.4 }, 1.65)
+    .from('.scroll-cue', { autoAlpha: 0, duration: 1.1 }, 2.3);
+}
+
+/* ── music: local mp3 preferred, else visible YouTube mini-player ── */
+const music = { mode: null, audio: null, yt: null, playing: false };
+async function startMusic() {
+  $('#music-dock').hidden = false;
+  let hasLocal = false;
+  try {
+    const r = await fetch('assets/audio/theme.mp3', { method: 'HEAD' });
+    hasLocal = r.ok && /audio|octet/.test(r.headers.get('content-type') || 'audio');
+  } catch (_) { /* offline/file: keep false */ }
+  if (hasLocal) startLocalAudio(); else startYouTube();
+}
+function startLocalAudio() {
+  music.mode = 'local';
+  music.audio = new Audio('assets/audio/theme.mp3');
+  music.audio.loop = true;
+  music.audio.volume = 0.65;
+  music.audio.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+}
+function startYouTube() {
+  music.mode = 'yt';
+  $('#yt-holder').classList.add('active');
+  const boot = () => {
+    let triedFallback = false;
+    music.yt = new YT.Player($('#yt-holder').appendChild(document.createElement('div')), {
+      videoId: YT_PRIMARY,
+      playerVars: { autoplay: 1, loop: 1, playlist: YT_PRIMARY, controls: 0, rel: 0, playsinline: 1 },
+      events: {
+        onReady: e => { e.target.setVolume(65); e.target.playVideo(); setPlaying(true); },
+        onError: e => {
+          if (triedFallback) return;
+          triedFallback = true;
+          e.target.loadVideoById(YT_FALLBACK);
+          e.target.cuePlaylist ? null : e.target.playVideo();
+        },
+        onStateChange: e => setPlaying(e.data === YT.PlayerState.PLAYING),
+      },
+    });
+  };
+  if (window.YT && window.YT.Player) boot();
+  else {
+    window.onYouTubeIframeAPIReady = boot;
+    const s = document.createElement('script');
+    s.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(s);
+  }
+}
+function setPlaying(on) {
+  music.playing = on;
+  const btn = $('#music-toggle');
+  btn.setAttribute('aria-pressed', String(on));
+  btn.setAttribute('aria-label', on ? 'Pause the music' : 'Play the music');
+}
+$('#music-toggle').addEventListener('click', () => {
+  if (music.mode === 'local' && music.audio) {
+    music.playing ? music.audio.pause() : music.audio.play();
+    setPlaying(!music.playing);
+  } else if (music.mode === 'yt' && music.yt) {
+    music.playing ? music.yt.pauseVideo() : music.yt.playVideo();
+  }
+});
+
+/* ── countdown (plain 1s interval vs UTC target; shows in viewer's local time implicitly) ── */
+(function countdown() {
+  const els = { d: $('#cd-days'), h: $('#cd-hours'), m: $('#cd-mins'), s: $('#cd-secs') };
+  const pad = n => String(n).padStart(2, '0');
+  function tick() {
+    let diff = Math.max(0, WEDDING_TS - Date.now());
+    const d = Math.floor(diff / 864e5);
+    const h = Math.floor(diff % 864e5 / 36e5);
+    const m = Math.floor(diff % 36e5 / 6e4);
+    const s = Math.floor(diff % 6e4 / 1e3);
+    els.d.textContent = d;
+    els.h.textContent = pad(h);
+    els.m.textContent = pad(m);
+    els.s.textContent = pad(s);
+    if (diff === 0) {
+      clearInterval(timer);
+      $('.countdown .script-head').textContent = 'Today, we say forever';
+    }
+  }
+  const timer = setInterval(tick, 1000);
+  tick();
+})();
+
+/* ── scratch-card date reveal (teatro pattern: destination-out, r30, 50%) ── */
+(function scratch() {
+  const canvas = $('#scratch-canvas');
+  const frame = $('.scratch-frame');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  let revealed = false, painted = false;
+
+  function paintFoil() {
+    const r = frame.getBoundingClientRect();
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    canvas.width = Math.round(r.width * dpr);
+    canvas.height = Math.round(r.height * dpr);
+    const w = canvas.width, h = canvas.height;
+    const g = ctx.createLinearGradient(0, 0, w, h);
+    g.addColorStop(0, '#c9a03e'); g.addColorStop(.25, '#e8cf8a');
+    g.addColorStop(.5, '#b8923a'); g.addColorStop(.75, '#f0dda6'); g.addColorStop(1, '#c9a03e');
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    // foil speckle
+    for (let i = 0; i < w * h / 900; i++) {
+      ctx.fillStyle = Math.random() > .5 ? 'rgba(255,244,214,.28)' : 'rgba(122,90,26,.18)';
+      ctx.fillRect(Math.random() * w, Math.random() * h, 1.5, 1.5);
+    }
+    ctx.font = `500 ${Math.round(h * .09)}px Lora, serif`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(94,70,20,.55)';
+    ctx.letterSpacing = '4px';
+    ctx.fillText('SCRATCH TO REVEAL', w / 2, h / 2 + h * .03);
+    painted = true;
+  }
+
+  function erase(x, y) {
+    const r = canvas.getBoundingClientRect();
+    const sx = canvas.width / r.width, sy = canvas.height / r.height;
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.arc((x - r.left) * sx, (y - r.top) * sy, 30 * sx, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function progress() {
+    const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    let clear = 0, total = 0;
+    for (let i = 3; i < data.length; i += 64) { total++; if (data[i] === 0) clear++; }
+    return clear / total * 100;
+  }
+
+  function reveal() {
+    revealed = true;
+    canvas.style.pointerEvents = 'none';
+    if (window.gsap && !REDUCED) gsap.to(canvas, { autoAlpha: 0, duration: .9, ease: 'power2.out' });
+    else canvas.style.opacity = 0;
+    if (window.confetti && !REDUCED) {
+      const r = frame.getBoundingClientRect();
+      confetti({
+        particleCount: 90, spread: 75, startVelocity: 28, gravity: .8, scalar: .9,
+        origin: { x: (r.left + r.width / 2) / innerWidth, y: (r.top + r.height / 2) / innerHeight },
+        colors: ['#c9a03e', '#e8cf8a', '#a48ec4', '#e9c9c2', '#f7f4ee'],
+      });
+    }
+  }
+
+  let down = false;
+  canvas.addEventListener('pointerdown', e => { down = true; erase(e.clientX, e.clientY); });
+  window.addEventListener('pointermove', e => { if (down && !revealed) erase(e.clientX, e.clientY); });
+  window.addEventListener('pointerup', () => {
+    if (!down || revealed) { down = false; return; }
+    down = false;
+    if (progress() > 50) reveal();
+  });
+  new ResizeObserver(() => { if (!revealed) paintFoil(); }).observe(frame);
+  paintFoil();
+})();
+
+/* ── add-to-calendar: client-side ICS (majestic pattern) ────── */
+function icsFor(ev) {
+  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Riya & Sanchit//Wedding//EN', 'CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT',
+    `UID:${ev.start}-rs-wedding@riyaandsanchit`,
+    `DTSTAMP:${new Date().toISOString().replace(/[-:]|\.\d{3}/g, '')}`,
+    `DTSTART:${ev.start}`, `DTEND:${ev.end}`,
+    `SUMMARY:${ev.title}`,
+    `DESCRIPTION:${ev.description.replace(/,/g, '\\,')}`,
+    `LOCATION:${ev.location.replace(/,/g, '\\,')}`,
+    'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+}
+$$('[data-ics]').forEach(btn => btn.addEventListener('click', () => {
+  const ev = EVENTS[btn.dataset.ics];
+  const blob = new Blob([icsFor(ev)], { type: 'text/calendar' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${btn.dataset.ics}-riya-sanchit.ics`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}));
+
+/* ── ambience: tsParticles petals over CSS fallback ─────────── */
+async function initPetals() {
+  if (REDUCED || !window.tsParticles) return;
+  try {
+    await tsParticles.load({
+      id: 'tsparticles',
+      options: {
+        fullScreen: { enable: false },
+        fpsLimit: 60,
+        detectRetina: true,
+        particles: {
+          number: { value: 14, density: { enable: true, width: 1200 } },
+          color: { value: ['#e8a24b', '#b7a6d9', '#eecfc7', '#dfc27e'] },
+          shape: { type: 'circle' },
+          size: { value: { min: 2.5, max: 5.5 } },
+          opacity: { value: { min: .35, max: .8 } },
+          move: {
+            enable: true, direction: 'bottom', speed: { min: .6, max: 1.6 },
+            drift: { min: -.6, max: .6 }, straight: false, outModes: { default: 'out' },
+          },
+          wobble: { enable: true, distance: 12, speed: { angle: 12, move: 6 } },
+          rotate: { value: { min: 0, max: 360 }, animation: { enable: true, speed: 12 } },
+        },
+      },
+    });
+    $('#ambient').style.display = 'none'; // JS layer active; retire CSS fallback
+  } catch (_) { /* CSS fallback stays visible */ }
+}
+
+/* ── tilt (pointer-fine only) ───────────────────────────────── */
+function initTilt() {
+  if (REDUCED || !window.VanillaTilt || !matchMedia('(pointer: fine)').matches) return;
+  VanillaTilt.init($$('[data-tilt]'), { max: 5, speed: 900, perspective: 900, glare: true, 'max-glare': .1 });
+}
+
+/* ── boot ───────────────────────────────────────────────────── */
+window.addEventListener('DOMContentLoaded', () => {
+  initGsap();
+  initPetals();
+  initTilt();
+});

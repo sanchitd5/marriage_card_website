@@ -1,0 +1,14 @@
+# scraped reference bundles (145 MB, local research only)
+inspiration/
+
+# source photo drops (web-optimized copies live in assets/photos/)
+couple_images/
+image.png
+
+# raw AI generations (web crops live in assets/images/)
+assets/images/gen/
+
+# local tooling
+.claude/
+.playwright-cli/
+.DS_Store

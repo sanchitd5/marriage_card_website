@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Riya &amp; Sanchit — Shubh Vivah · 12 December 2026</title>
+  <meta name="description" content="Dearest friends and family, it is with the greatest pleasure that we announce the wedding of Riya Verma and Sanchit Dang — December 2026, Chandigarh & Ambala.">
+  <meta property="og:title" content="Riya & Sanchit — Shubh Vivah">
+  <meta property="og:description" content="You are cordially invited to the most anticipated affair of the season. 11–12 December 2026.">
+  <meta property="og:image" content="assets/images/art-couple.jpg">
+  <meta name="theme-color" content="#f7f4ee">
+
+  <script>
+    document.documentElement.classList.add('js');
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('reduce-motion');
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪷</text></svg>">
+</head>
+<body>
+
+  <!-- ══════════ INTRO GATE ══════════ -->
+  <div id="gate" aria-label="Wedding invitation envelope. Tap the wax seal to open.">
+    <div class="gate-stage">
+      <img class="gate-still gate-still--closed" src="assets/images/art-gate-closed.jpg" alt="Closed lavender drapes with marigold garland">
+      <img class="gate-still gate-still--open" src="assets/images/art-gate-open.jpg" alt="" aria-hidden="true">
+      <video id="gate-video" class="gate-video" playsinline muted preload="auto" poster="assets/images/art-gate-closed.jpg">
+        <source src="assets/videos/gate-reveal.mp4" type="video/mp4">
+      </video>
+    </div>
+    <div class="gate-card">
+      <p class="gate-kicker">By royal decree &amp; with hearts full of joy</p>
+      <p class="gate-line">Dearest friends and family, a most splendid affair awaits&nbsp;you</p>
+      <button id="seal" class="seal" aria-label="Break the seal and open the invitation">
+        <img src="assets/images/art-seal.jpg" alt="" aria-hidden="true">
+        <span class="seal-monogram">R<em>&amp;</em>S</span>
+      </button>
+      <p class="gate-hint">Tap the seal to break it</p>
+    </div>
+  </div>
+
+  <!-- ══════════ MUSIC DOCK ══════════ -->
+  <div id="music-dock" hidden>
+    <button id="music-toggle" aria-label="Pause the music" aria-pressed="false">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path class="icon-note" d="M9 18V5l12-2v13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="18" cy="16" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+    </button>
+    <div id="yt-holder"></div>
+  </div>
+
+  <div id="smooth-wrapper">
+    <div id="smooth-content">
+
+      <!-- ══════════ HERO ══════════ -->
+      <header class="hero" id="hero">
+        <div class="hero-media" data-speed="0.85">
+          <video id="hero-video" playsinline muted loop preload="none" poster="assets/images/art-hero.jpg">
+            <source src="assets/videos/hero-loop.mp4" type="video/mp4">
+          </video>
+          <img class="hero-poster" src="assets/images/art-hero.jpg" alt="Painted ivory palace courtyard with wisteria and marigold garlands">
+        </div>
+        <div class="hero-veil"></div>
+        <div class="hero-inner">
+          <p class="kicker hero-seq">Dearest friends &amp; family, it is with the greatest pleasure that we announce the union of</p>
+          <h1 class="hero-names">
+            <span class="hero-name hero-seq">Riya</span>
+            <span class="hero-amp hero-seq">&amp;</span>
+            <span class="hero-name hero-seq">Sanchit</span>
+          </h1>
+          <p class="hero-shubh hero-seq">शुभ विवाह</p>
+          <p class="hero-date hero-seq">11 <span>&amp;</span> 12 December 2026 · Chandigarh &amp; Ambala</p>
+        </div>
+        <div class="scroll-cue hero-seq" aria-hidden="true"><span></span></div>
+      </header>
+
+      <!-- ══════════ COUNTDOWN + SCRATCH ══════════ -->
+      <section class="band band--tint countdown" id="countdown">
+        <div class="wrap">
+          <p class="kicker fade-up">The most anticipated affair of the season</p>
+          <h2 class="script-head fade-up">Until we say forever</h2>
+          <div class="count-grid" role="timer" aria-live="off">
+            <div class="count-cell fade-up"><span class="count-num" id="cd-days">–</span><span class="count-label">Days</span></div>
+            <div class="count-cell fade-up"><span class="count-num" id="cd-hours">–</span><span class="count-label">Hours</span></div>
+            <div class="count-cell fade-up"><span class="count-num" id="cd-mins">–</span><span class="count-label">Minutes</span></div>
+            <div class="count-cell fade-up"><span class="count-num" id="cd-secs">–</span><span class="count-label">Seconds</span></div>
+          </div>
+          <div class="scratch fade-up">
+            <p class="scratch-prompt">This author is sworn to secrecy, so you must scratch the gold and see the date with your own eyes</p>
+            <div class="scratch-frame">
+              <div class="scratch-under">
+                <span class="scratch-date">12·12·2026</span>
+                <span class="scratch-sub">seven o'clock in the evening</span>
+              </div>
+              <canvas id="scratch-canvas" aria-label="Scratch-off panel hiding the wedding date"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════════ EVENTS ══════════ -->
+      <section class="band events" id="events">
+        <div class="wrap">
+          <p class="kicker fade-up">The order of the days</p>
+          <h2 class="display-head fade-up">Three celebrations,<br><em>two hearts</em></h2>
+          <div class="event-grid">
+
+            <article class="event-card" data-tilt>
+              <div class="event-art arch"><img src="assets/images/art-haldi.jpg" alt="Painting of hands holding turmeric and marigold petals" loading="lazy"></div>
+              <p class="event-no">The First Affair</p>
+              <h3 class="event-name">Haldi</h3>
+              <p class="event-when"><time datetime="2026-12-11T11:00+05:30">Thursday, 11 December 2026 · 11 o'clock in the morning</time></p>
+              <p class="event-venue">Radisson Hotel Chandigarh Zirakpur</p>
+              <p class="event-dress"><span>Dress code</span> Shades of yellow, if you please</p>
+              <div class="event-actions">
+                <a class="btn-quiet" href="https://maps.app.goo.gl/fQhBFytYAZKu4qBB7" target="_blank" rel="noopener">Get directions</a>
+                <button class="btn-quiet" data-ics="haldi">Add to calendar</button>
+              </div>
+            </article>
+
+            <article class="event-card" data-tilt>
+              <div class="event-art arch"><img src="assets/images/art-cocktail.jpg" alt="Painting of raised glasses on a palace terrace at dusk" loading="lazy"></div>
+              <p class="event-no">The Second Affair</p>
+              <h3 class="event-name">Cocktail &amp; Engagement</h3>
+              <p class="event-when"><time datetime="2026-12-11T20:00+05:30">Thursday, 11 December 2026 · 8 o'clock in the evening</time></p>
+              <p class="event-venue">Radisson Hotel Chandigarh Zirakpur</p>
+              <p class="event-dress"><span>Dress code</span> Smart formals, dazzling as you dare</p>
+              <div class="event-actions">
+                <a class="btn-quiet" href="https://maps.app.goo.gl/fQhBFytYAZKu4qBB7" target="_blank" rel="noopener">Get directions</a>
+                <button class="btn-quiet" data-ics="cocktail">Add to calendar</button>
+              </div>
+            </article>
+
+            <article class="event-card event-card--main" data-tilt>
+              <div class="event-art arch"><img src="assets/images/art-pheras.jpg" alt="Painting of a couple at the pheras beneath a floral mandap" loading="lazy"></div>
+              <p class="event-no">The Grand Affair</p>
+              <h3 class="event-name">The Wedding</h3>
+              <p class="event-when"><time datetime="2026-12-12T19:00+05:30">Friday, 12 December 2026 · 7 o'clock in the evening</time></p>
+              <p class="event-venue">De'vansh Resort, Ambala Cantt</p>
+              <p class="event-dress"><span>Dress code</span> Traditional Indian wedding attire</p>
+              <div class="event-actions">
+                <a class="btn-quiet" href="https://maps.app.goo.gl/RdueUZ2XfNiAnbD18" target="_blank" rel="noopener">Get directions</a>
+                <button class="btn-quiet" data-ics="wedding">Add to calendar</button>
+              </div>
+            </article>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════════ PORTRAIT INTERLUDE ══════════ -->
+      <section class="band band--tint interlude">
+        <div class="wrap wrap--narrow">
+          <div class="interlude-art clip-reveal"><img src="assets/images/art-couple.jpg" alt="Regency-style oil painting of the couple beneath a gilded jharokha arch" loading="lazy"></div>
+          <p class="interlude-line fade-up">“Of all the matches this author has chronicled, none has been so plainly written in the stars.”</p>
+        </div>
+      </section>
+
+      <!-- ══════════ GALLERY ══════════ -->
+      <section class="band gallery" id="gallery">
+        <div class="wrap">
+          <p class="kicker fade-up">A courtship, in portraits</p>
+          <h2 class="display-head fade-up">The story <em>so far</em></h2>
+          <div class="gallery-grid" id="gallery-grid"><!-- populated by js --></div>
+        </div>
+      </section>
+
+      <!-- ══════════ FAMILY ══════════ -->
+      <section class="band band--tint family" id="family">
+        <div class="wrap wrap--narrow">
+          <img class="family-motif fade-up" src="assets/images/art-peacock.jpg" alt="" aria-hidden="true" loading="lazy">
+          <p class="kicker fade-up">With the blessings of</p>
+          <div class="family-grid">
+            <div class="family-side fade-up">
+              <p class="family-role">Parents of the bride</p>
+              <h3 class="family-names">Vishal <em>&amp;</em> Renu Verma</h3>
+            </div>
+            <span class="family-divider fade-up" aria-hidden="true"></span>
+            <div class="family-side fade-up">
+              <p class="family-role">Parents of the groom</p>
+              <h3 class="family-names">Ajay <em>&amp;</em> Geeta Dang</h3>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════════ FOOTER ══════════ -->
+      <footer class="footer">
+        <div class="wrap wrap--narrow">
+          <p class="footer-monogram">R<em>&amp;</em>S</p>
+          <span class="footer-rule" aria-hidden="true"></span>
+          <p class="footer-line">And so, dearest reader, the author shall lay down her pen, for some love stories simply must be witnessed in person. We so look forward to yours.</p>
+          <p class="footer-sign">Yours, in the greatest anticipation,<br><span>Riya &amp; Sanchit</span></p>
+        </div>
+      </footer>
+
+    </div>
+  </div>
+
+  <!-- CSS-only ambience fallback (hidden when JS particles run) -->
+  <div class="ambient" id="ambient" aria-hidden="true">
+    <span class="petal p1"></span><span class="petal p2"></span><span class="petal p3"></span>
+    <span class="petal p4"></span><span class="petal p5"></span><span class="petal p6"></span>
+    <span class="petal p7"></span><span class="petal p8"></span><span class="petal p9"></span>
+    <span class="firefly f1"></span><span class="firefly f2"></span><span class="firefly f3"></span>
+  </div>
+  <div id="tsparticles" aria-hidden="true"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollTrigger.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollSmoother.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/SplitText.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tsparticles/slim@3/tsparticles.slim.bundle.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/vanilla-tilt@1.8.1/dist/vanilla-tilt.min.js" defer></script>
+  <script src="js/main.js" defer></script>
+</body>
+</html>
