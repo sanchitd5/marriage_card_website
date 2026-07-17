@@ -33,14 +33,14 @@ local-audio HEAD check.
   Gemini `gemini-3-pro-image`, see PROMPT.md)
 - `assets/videos/` — veo-3.1 hero loop and gate drape-reveal
 - `assets/photos/` — couple photo gallery
-- `assets/audio/theme.mp3` — background music ("Inaam", Jasleen Royal).
-  If removed, the site falls back to a small visible YouTube mini-player.
-  Note: the couple handles music licensing.
+- `assets/audio/theme-1..4.mp3` — background music pool ("Inaam",
+  "Sunehra (Acoustic)", "Dori", "Taaj"); one is picked at random each
+  visit. Note: the couple handles music licensing.
 
 ## Editing key values
 
 - Countdown target: `WEDDING_TS` at the top of `js/main.js`
-- Music candidates: `YT_PRIMARY` / `YT_FALLBACK` in `js/main.js`
+- Music pool: `SONGS` in `js/main.js` (file names under `assets/audio/`)
 - Event times, links and ICS text: `EVENTS` in `js/main.js` (UTC timestamps)
 
 ## Deploy: Netlify + Route53 domain

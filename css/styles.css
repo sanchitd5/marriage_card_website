@@ -151,8 +151,8 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
 .seal-monogram {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-display); font-weight: 400;
-  font-size: 1.55rem; letter-spacing: .02em;
+  font-family: "Prata", var(--font-display); font-weight: 400;
+  font-size: 1.35rem; letter-spacing: .02em;
   color: hsl(28 30% 38% / .85);
   text-shadow: 0 1px 0 hsl(45 60% 92% / .6);
 }
@@ -190,10 +190,6 @@ html[data-theme="dark"] #theme-toggle .icon-sun { display: block; }
   backdrop-filter: blur(6px);
 }
 #music-toggle[aria-pressed="false"] .icon-note { opacity: .45; }
-/* YouTube ToS: player must stay visible; keep it small but shown */
-#yt-holder { width: 176px; aspect-ratio: 16/9; display: none; box-shadow: var(--shadow-lift); border: 1px solid hsl(var(--gold-soft)); }
-#yt-holder.active { display: block; }
-#yt-holder iframe { width: 100%; height: 100%; display: block; }
 
 /* ═══ HERO ═══════════════════════════════════════════════════ */
 .hero {
@@ -214,21 +210,28 @@ html.reduce-motion .hero-poster { animation: none; }
 .hero-veil {
   position: absolute; inset: 0; z-index: 1;
   background:
-    linear-gradient(180deg, hsl(var(--ivory) / .28) 0%, hsl(var(--ivory) / 0) 30%),
-    linear-gradient(0deg, hsl(var(--ivory) / .92) 0%, hsl(var(--ivory) / .45) 26%, hsl(var(--ivory) / 0) 55%),
-    radial-gradient(ellipse at center 60%, hsl(var(--ivory) / .38) 0%, hsl(var(--ivory) / 0) 65%);
+    linear-gradient(180deg, hsl(40 36% 97% / .28) 0%, hsl(40 36% 97% / 0) 30%),
+    linear-gradient(0deg, hsl(40 36% 97% / .92) 0%, hsl(40 36% 97% / .45) 26%, hsl(40 36% 97% / 0) 55%),
+    radial-gradient(ellipse at center 60%, hsl(40 36% 97% / .38) 0%, hsl(40 36% 97% / 0) 65%);
+}
+/* night: dusk wash so the pale painting can carry light text */
+html[data-theme="dark"] .hero-veil {
+  background:
+    linear-gradient(180deg, hsl(263 24% 11% / .62) 0%, hsl(263 24% 11% / .3) 32%),
+    linear-gradient(0deg, hsl(263 24% 11% / .97) 0%, hsl(263 24% 11% / .6) 28%, hsl(263 24% 11% / .28) 58%),
+    radial-gradient(ellipse at center 58%, hsl(263 28% 9% / .45) 0%, hsl(263 24% 11% / .2) 70%);
 }
 .hero-inner { position: relative; z-index: 2; padding: 18vh 1.25rem 0; width: 100%; }
 .hero .kicker { max-width: 34rem; margin-inline: auto; text-transform: none; letter-spacing: .12em; font-style: italic; font-size: .95rem; color: hsl(var(--wisteria-deep) / .85); }
 .hero-names {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: .04em;
+  gap: .06em;
   margin-block: 1rem .4rem;
-  font-family: var(--font-display);
+  font-family: "Prata", var(--font-display);
   font-weight: 400;
-  font-size: clamp(4.2rem, 17.5vw, 6.5rem);
-  line-height: 1.02;
-  letter-spacing: .02em;
+  font-size: clamp(3.6rem, 15vw, 5.6rem);
+  line-height: 1.04;
+  letter-spacing: .015em;
 }
 .hero-amp {
   font-family: var(--font-script);
@@ -239,8 +242,8 @@ html.reduce-motion .hero-poster { animation: none; }
 @media (min-width: 760px) {
   .hero-names {
     flex-direction: row; align-items: center;
-    gap: .2em .2em;
-    font-size: clamp(4.5rem, 10.5vw, 9rem);
+    gap: .2em .22em;
+    font-size: clamp(4rem, 9vw, 7.5rem);
   }
   .hero-amp { transform: translateY(-.04em); }
 }
@@ -434,7 +437,7 @@ html[data-theme="dark"] .family-motif {
   color: hsl(40 36% 97% / .92);
 }
 html[data-theme="dark"] .footer { background: hsl(263 28% 7%); }
-.footer-monogram { font-family: var(--font-display); font-weight: 300; font-size: 2.6rem; letter-spacing: .06em; }
+.footer-monogram { font-family: "Prata", var(--font-display); font-weight: 400; font-size: 2.4rem; letter-spacing: .06em; }
 .footer-monogram em { font-family: var(--font-script); font-style: normal; font-size: .62em; color: hsl(42 50% 72%); }
 .footer-rule { display: block; width: 72px; height: 1px; margin: 1.4rem auto 1.8rem; background: hsl(42 50% 72% / .7); }
 .footer-line { font-family: var(--font-display); font-style: italic; font-size: 1.15rem; line-height: 1.65; max-width: 30rem; margin-inline: auto; color: hsl(40 36% 97% / .8); }

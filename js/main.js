@@ -5,8 +5,8 @@
 
 /* ── constants ──────────────────────────────────────────────── */
 const WEDDING_TS = Date.UTC(2026, 11, 12, 13, 30, 0); // 12 Dec 2026, 19:00 IST (edit here)
-const YT_PRIMARY = '-tbgigaf0hM';   // "Inaam" — Jasleen Royal
-const YT_FALLBACK = '3IsdDhy8nA8';  // "Sunehra (Acoustic)" — Jai Dhir
+// couple's approved pool (assets/audio/*.mp3); one is drawn at random each visit
+const SONGS = ['theme-1', 'theme-2', 'theme-3', 'theme-4'];
 const MAPS = {
   radisson: 'https://maps.app.goo.gl/fQhBFytYAZKu4qBB7',
   devansh: 'https://maps.app.goo.gl/RdueUZ2XfNiAnbD18',
@@ -93,22 +93,41 @@ function initGsap() {
     .fromTo('.interlude-line', { autoAlpha: 0, y: 22 }, { autoAlpha: 1, y: 0, duration: 1 }, '-=.7');
 
   // scrolling past the scratch card does the scratching (serpentine sweep)
-  let sweepDone = 0;
+  let scratched = 0;
   ScrollTrigger.create({
     trigger: '.scratch-frame',
     start: 'top 78%',
     end: 'top 28%',
     onUpdate(self) {
       if (!scratchAPI.eraseNorm || scratchAPI.revealed()) return;
-      for (let t = sweepDone; t <= self.progress; t += 0.008) {
+      for (let t = scratched; t <= self.progress; t += 0.008) {
         const row = Math.min(3, Math.floor(t * 4));
         const u = (t * 4) % 1;
         scratchAPI.eraseNorm(row % 2 ? 1 - u : u, 0.14 + row * 0.24);
       }
-      sweepDone = Math.max(sweepDone, self.progress);
+      scratched = Math.max(scratched, self.progress);
       if (self.progress > 0.96) scratchAPI.check();
     },
     onLeave: () => scratchAPI.check && scratchAPI.check(),
+  });
+
+  // gentle section snapping: settle on the nearest act when the reader pauses
+  const snapSections = $$('.hero, .band, .footer');
+  let snapTimer = null;
+  function trySnap() {
+    const max = ScrollTrigger.maxScroll(window);
+    const y = window.scrollY; // native position: the smoothed value lags behind
+    let best = null;
+    for (const s of snapSections) {
+      const top = Math.min(s.offsetTop, max);
+      if (best === null || Math.abs(top - y) < Math.abs(best - y)) best = top;
+    }
+    if (best === null || Math.abs(best - y) < 2 || Math.abs(best - y) > innerHeight * 0.5) return;
+    gsap.to(smoother, { scrollTop: best, duration: 0.6, ease: 'power2.out', overwrite: 'auto' });
+  }
+  ScrollTrigger.addEventListener('scrollEnd', () => {
+    clearTimeout(snapTimer);
+    snapTimer = setTimeout(trySnap, 80);
   });
 
   // countdown digits get a slow settle
@@ -131,6 +150,8 @@ function initGsap() {
   $('#seal').addEventListener('click', () => {
     if (opened) return;
     opened = true;
+    window.scrollTo(0, 0);
+    if (smoother) smoother.scrollTop(0);
     startMusic(); // inside the user gesture: unlocks audio autoplay policy
 
     if (REDUCED || !window.gsap) { finish(true); return; }
@@ -221,50 +242,20 @@ function heroEntrance(instant) {
 }
 
 /* ── music: local mp3 preferred, else visible YouTube mini-player ── */
-const music = { mode: null, audio: null, yt: null, playing: false };
-async function startMusic() {
+const music = { audio: null, playing: false };
+function startMusic() {
   $('#music-dock').hidden = false;
-  let hasLocal = false;
-  try {
-    const r = await fetch('assets/audio/theme.mp3', { method: 'HEAD' });
-    hasLocal = r.ok && /audio|octet/.test(r.headers.get('content-type') || 'audio');
-  } catch (_) { /* offline/file: keep false */ }
-  if (hasLocal) startLocalAudio(); else startYouTube();
-}
-function startLocalAudio() {
-  music.mode = 'local';
-  music.audio = new Audio('assets/audio/theme.mp3');
-  music.audio.loop = true;
-  music.audio.volume = 0.65;
-  music.audio.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
-}
-function startYouTube() {
-  music.mode = 'yt';
-  $('#yt-holder').classList.add('active');
-  const boot = () => {
-    let triedFallback = false;
-    music.yt = new YT.Player($('#yt-holder').appendChild(document.createElement('div')), {
-      videoId: YT_PRIMARY,
-      playerVars: { autoplay: 1, loop: 1, playlist: YT_PRIMARY, controls: 0, rel: 0, playsinline: 1 },
-      events: {
-        onReady: e => { e.target.setVolume(65); e.target.playVideo(); setPlaying(true); },
-        onError: e => {
-          if (triedFallback) return;
-          triedFallback = true;
-          e.target.loadVideoById(YT_FALLBACK);
-          e.target.cuePlaylist ? null : e.target.playVideo();
-        },
-        onStateChange: e => setPlaying(e.data === YT.PlayerState.PLAYING),
-      },
-    });
-  };
-  if (window.YT && window.YT.Player) boot();
-  else {
-    window.onYouTubeIframeAPIReady = boot;
-    const s = document.createElement('script');
-    s.src = 'https://www.youtube.com/iframe_api';
-    document.head.appendChild(s);
-  }
+  const order = [...SONGS].sort(() => Math.random() - 0.5); // shuffled once per visit
+  (function tryNext(i) {
+    if (i >= order.length) { $('#music-dock').hidden = true; return; }
+    const audio = new Audio(`assets/audio/${order[i]}.mp3`);
+    audio.loop = true;
+    audio.volume = 0.65;
+    audio.addEventListener('error', () => tryNext(i + 1), { once: true });
+    audio.play().then(() => { music.audio = audio; setPlaying(true); })
+      .catch(() => setPlaying(false));
+    music.audio = audio;
+  })(0);
 }
 function setPlaying(on) {
   music.playing = on;
@@ -273,12 +264,9 @@ function setPlaying(on) {
   btn.setAttribute('aria-label', on ? 'Pause the music' : 'Play the music');
 }
 $('#music-toggle').addEventListener('click', () => {
-  if (music.mode === 'local' && music.audio) {
-    music.playing ? music.audio.pause() : music.audio.play();
-    setPlaying(!music.playing);
-  } else if (music.mode === 'yt' && music.yt) {
-    music.playing ? music.yt.pauseVideo() : music.yt.playVideo();
-  }
+  if (!music.audio) return;
+  music.playing ? music.audio.pause() : music.audio.play();
+  setPlaying(!music.playing);
 });
 
 /* ── countdown (plain 1s interval vs UTC target; shows in viewer's local time implicitly) ── */
