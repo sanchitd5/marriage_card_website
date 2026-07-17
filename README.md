@@ -33,9 +33,9 @@ local-audio HEAD check.
   Gemini `gemini-3-pro-image`, see PROMPT.md)
 - `assets/videos/` — veo-3.1 hero loop and gate drape-reveal
 - `assets/photos/` — couple photo gallery
-- `assets/audio/theme-1..5.mp3` — background music pool ("Inaam",
-  "Sunehra (Acoustic)", "Dori", "Taaj", "Laavan"); one is picked at
-  random each visit. Note: the couple handles music licensing.
+- `assets/audio/theme-1..4.mp3` — background music pool ("Inaam",
+  "Sunehra (Acoustic)", "Dori", "Taaj"); one is picked at random each
+  visit. Note: the couple handles music licensing.
 
 ## Editing key values
 
