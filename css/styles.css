@@ -477,9 +477,13 @@ html[data-theme="dark"] .hero-veil {
 .gallery-grid {
   display: grid; gap: clamp(.8rem, 2vw, 1.4rem);
   grid-template-columns: repeat(2, 1fr);
+  grid-auto-flow: row dense;
   text-align: initial;
 }
-@media (min-width: 760px) { .gallery-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 760px) {
+  .gallery-grid { grid-template-columns: repeat(3, 1fr); }
+  .gallery-grid > .gframe:last-child { grid-column: span 2; }
+}
 .gframe {
   margin: 0;
   background: hsl(var(--ivory));
