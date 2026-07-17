@@ -30,35 +30,12 @@ export function startHeroVideo() {
   v.playsInline = true;
   v.preload = 'auto';
 
-  // Ping-pong loop: play → reverse → play → …
-  // We must wait for 'seeked' before each step; rapid currentTime writes without
-  // waiting are silently dropped by the browser, making reverse appear frozen.
-  const STEP = 1 / 24; // seconds per frame at 24fps reverse speed
-  let reversing = false;
-
-  const onSeeked = () => {
-    if (!reversing) return;
-    const next = v.currentTime - STEP;
-    if (next <= 0) {
-      reversing = false;
-      v.removeEventListener('seeked', onSeeked);
-      v.currentTime = 0;
-      v.play();
-    } else {
-      v.currentTime = next;
-    }
-  };
-
-  const startReverse = () => {
-    reversing = true;
-    v.addEventListener('seeked', onSeeked);
-    // Kick off the first seek
-    v.currentTime = Math.max(0, v.currentTime - STEP);
-  };
-
-  v.addEventListener('ended', () => {
-    startReverse();
-  });
+  // The hero asset is a baked boomerang (forward + reversed frames), so a plain
+  // native loop gives the ping-pong effect with zero runtime reverse-seeking.
+  // The old approach stepped currentTime backwards frame-by-frame; the clip has
+  // a single keyframe, so every step re-decoded the whole GOP — smooth on
+  // desktop, badly janky on phones. Native loop plays forward only: no seeks.
+  v.loop = true;
 
   const p = v.play();
   if (p && p.then) {
