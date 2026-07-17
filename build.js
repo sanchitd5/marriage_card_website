@@ -14,7 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { groom, bride } from './site.config.mjs';
+import { groom, bride, siteUrl } from './site.config.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,7 +25,7 @@ export function parseFromGroomSide(rawFlag) {
   return rawFlag === undefined ? true : rawFlag !== 'false';
 }
 
-export function composeNames(fromGroomSide, sides = { groom, bride }) {
+export function composeNames(fromGroomSide, sides = { groom, bride }, site = siteUrl) {
   const a = fromGroomSide ? sides.groom : sides.bride;
   const b = fromGroomSide ? sides.bride : sides.groom;
 
@@ -44,6 +44,7 @@ export function composeNames(fromGroomSide, sides = { groom, bride }) {
     tagSecondary: b.hashtag,
     pairTitle,
     fromGroomSide,
+    siteUrl: site,
     sideA: { role: a.role, parents: a.parents, grandparents: a.grandparents },
     sideB: { role: b.role, parents: b.parents, grandparents: b.grandparents },
   };
@@ -61,13 +62,21 @@ export function htmlEscape(str) {
     .replace(/'/g, '&#39;');
 }
 
+// Long "A & B" names read better split at the ampersand onto two balanced
+// lines, with the "&" leading the second line. Short names stay on one line.
+function formatCouple(raw) {
+  const esc = htmlEscape(raw);
+  // only break long "A & B" strings; short names stay on one line
+  return raw.length > 24 ? esc.replace(/ &amp; /, '<br>&amp; ') : esc;
+}
+
 export function renderFamilySide(side) {
   return [
     '<div class="family-side fade-up">',
     `          <p class="family-role">Grand Parents of the ${htmlEscape(side.role)}</p>`,
-    `          <h3 class="family-names">${htmlEscape(side.grandparents)}</h3>`,
+    `          <h3 class="family-names">${formatCouple(side.grandparents)}</h3>`,
     `          <p class="family-role">Parents of the ${htmlEscape(side.role)}</p>`,
-    `          <h3 class="family-names">${htmlEscape(side.parents)}</h3>`,
+    `          <h3 class="family-names">${formatCouple(side.parents)}</h3>`,
     '        </div>',
   ].join('\n        ');
 }
@@ -91,6 +100,7 @@ export function buildHtmlTokens(names) {
     PAIR_TITLE_RAW: names.pairTitle, // for meta content where "&" is fine
     FAMILY_SIDE_A: renderFamilySide(names.sideA),
     FAMILY_SIDE_B: renderFamilySide(names.sideB),
+    SITE_URL: htmlEscape(names.siteUrl),
   };
 }
 

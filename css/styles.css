@@ -497,19 +497,36 @@ html[data-theme="dark"] .family-motif {
   border: 1px solid hsl(var(--gold-soft));
   filter: brightness(.94);
 }
-/* both families side by side at every size: parallel, no precedence */
+/* families stacked top-to-bottom: one block, then the other */
 .family-grid {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: clamp(.9rem, 4vw, 3.5rem);
-  margin-top: 1rem;
+  gap: clamp(1.6rem, 5vw, 2.8rem);
+  margin-top: 1.4rem;
 }
-.family-side { min-width: 0; }
+/* each side is its own stacked block, centred */
+.family-side {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
 .family-role { font-size: .55rem; letter-spacing: .15em; text-transform: uppercase; white-space: nowrap; color: hsl(var(--wisteria)); margin-bottom: .5rem; }
-.family-names { font-family: var(--font-display); font-weight: 400; font-size: clamp(1.15rem, 4vw, 2.1rem); line-height: 1.3; }
+/* breathing room between the grandparents block and the parents label */
+.family-names + .family-role { margin-top: 1.5rem; }
+.family-names { font-family: var(--font-display); font-weight: 400; font-size: clamp(1.15rem, 4vw, 2.1rem); line-height: 1.35; }
 .family-names em { font-family: var(--font-script); font-style: normal; font-size: .72em; color: hsl(var(--gold)); }
-.family-divider { width: 1px; height: 56px; background: hsl(var(--gold)); }
+/* horizontal separator between the two stacked family blocks */
+.family-divider {
+  height: 1px;
+  width: clamp(120px, 40%, 260px);
+  background: linear-gradient(to right,
+    transparent,
+    hsl(var(--gold)) 18%,
+    hsl(var(--gold)) 82%,
+    transparent);
+}
 /* single-name variant: span all grid columns and centre */
 .family-grid > .family-names { grid-column: 1 / -1; text-align: center; font-size: clamp(1.4rem, 5vw, 2.4rem); }
 

@@ -5,20 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>{{PAIR_TITLE}} — Shubh Vivah · 12 December 2026</title>
   <meta name="description" content="Dearest friends and family, it is with the greatest pleasure that we announce the wedding of {{FULL_A}} and {{FULL_B}} — December 2026, Chandigarh & Ambala.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{{SITE_URL}}/">
+  <meta property="og:locale" content="en_IN">
   <meta property="og:title" content="{{PAIR_TITLE_RAW}} — Shubh Vivah">
   <meta property="og:description" content="You are cordially invited to the most anticipated affair of the season. 11–12 December 2026.">
-  <meta property="og:image" content="assets/images/invitation-card-share.png">
+  <meta property="og:image" content="{{SITE_URL}}/assets/images/invitation-card-share.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="Invitation card for {{FIRST_A}} and {{FIRST_B}}'s wedding celebration on 11–12 December 2026.">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="{{PAIR_TITLE_RAW}} — Shubh Vivah">
   <meta name="twitter:description" content="You are cordially invited to the most anticipated affair of the season. 11–12 December 2026.">
-  <meta name="twitter:image" content="assets/images/invitation-card-share.png">
+  <meta name="twitter:image" content="{{SITE_URL}}/assets/images/invitation-card-share.jpg">
   <meta name="theme-color" content="#f7f4ee">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="{{PAIR_TITLE}}">
   <link rel="manifest" href="manifest.webmanifest">
+  <link rel="canonical" href="{{SITE_URL}}/">
 
   <style>
     #theme-boot-loader { display: none; }
@@ -150,7 +156,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Allura&family=Prata&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪷</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪷%3C/text%3E%3C/svg%3E">
 </head>
 <body>
   <div id="theme-boot-loader" aria-live="polite" aria-label="Loading invitation theme">
@@ -162,7 +168,7 @@
   <script src="js/app/boot-loader.js"></script>
 
   <!-- ══════════ INTRO GATE ══════════ -->
-  <div id="gate" aria-label="Wedding invitation envelope. Tap the wax seal to open.">
+  <div id="gate" role="dialog" aria-modal="true" aria-label="Wedding invitation envelope. Tap the wax seal to open.">
     <div class="gate-stage">
       <picture>
         <source media="(min-width: 768px)" srcset="assets/images/art-gate-closed-wide.jpg">
@@ -172,7 +178,7 @@
         <source media="(min-width: 768px)" srcset="assets/images/art-gate-open-wide.jpg">
         <img class="gate-still gate-still--open" src="assets/images/art-gate-open.jpg" alt="" aria-hidden="true">
       </picture>
-      <video id="gate-video" class="gate-video" playsinline muted preload="auto" poster="assets/images/art-gate-closed.jpg">
+      <video id="gate-video" class="gate-video" playsinline muted preload="metadata" poster="assets/images/art-gate-closed.jpg">
         <source src="assets/videos/gate-reveal-day.mp4" type="video/mp4">
       </video>
     </div>
@@ -220,7 +226,7 @@
         <div class="hero-veil"></div>
         <div class="hero-inner">
           <p class="kicker hero-seq">Dearest friends &amp; family, it is with the greatest pleasure that we announce the union of</p>
-          <h1 class="hero-names">
+          <h1 class="hero-names" tabindex="-1">
             <span class="hero-name hero-seq">{{FIRST_A}}</span>
             <span class="hero-amp hero-seq">&amp;</span>
             <span class="hero-name hero-seq">{{FIRST_B}}</span>

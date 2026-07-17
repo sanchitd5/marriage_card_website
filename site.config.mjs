@@ -27,3 +27,8 @@ export const bride = {
   parents: 'Vishal & Renu Verma',
   grandparents: 'Late Shri Vijay Prakash & Mrs. Sushma Verma',
 };
+
+// Absolute site origin, no trailing slash. Used to build absolute OG/Twitter
+// share URLs and the canonical link. UPDATE THIS to the real deployed domain
+// before sharing invitation links (WhatsApp/Facebook require an absolute URL).
+export const siteUrl = 'https://sanchitkiriya.netlify.app';
