@@ -236,8 +236,7 @@ function heroEntrance(instant) {
     .from('.hero .kicker', { y: 26, autoAlpha: 0, duration: 1.3 }, 0.6)
     .from(chars, { y: 70, autoAlpha: 0, duration: 1.7, stagger: 0.045 }, 0.8)
     .from('.hero-amp', { scale: 0, autoAlpha: 0, duration: 1.2, ease: 'back.out(1.4)' }, 1.2)
-    .from('.hero-shubh', { y: 22, autoAlpha: 0, duration: 1.4 }, 1.5)
-    .from('.hero-date', { y: 22, autoAlpha: 0, duration: 1.4 }, 1.65)
+    .from('.hero-date', { y: 22, autoAlpha: 0, duration: 1.4 }, 1.6)
     .from('.scroll-cue', { autoAlpha: 0, duration: 1.1 }, 2.3);
 }
 

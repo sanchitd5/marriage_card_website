@@ -234,9 +234,10 @@ html[data-theme="dark"] .hero-veil {
   letter-spacing: .015em;
 }
 .hero-amp {
-  font-family: var(--font-script);
-  font-size: .5em;
-  line-height: 1;
+  font-family: "Allura", var(--font-script);
+  font-size: .72em;
+  line-height: .85;
+  margin-block: .04em .1em;
   color: hsl(var(--gold));
 }
 @media (min-width: 760px) {
@@ -245,13 +246,7 @@ html[data-theme="dark"] .hero-veil {
     gap: .2em .22em;
     font-size: clamp(4rem, 9vw, 7.5rem);
   }
-  .hero-amp { transform: translateY(-.04em); }
-}
-.hero-shubh {
-  font-family: var(--font-script);
-  font-size: clamp(1.5rem, 5vw, 2.3rem);
-  color: hsl(var(--gold));
-  margin-block: .6rem;
+  .hero-amp { transform: translateY(-.04em); margin-block: 0; }
 }
 .hero-date {
   font-family: var(--font-display); font-weight: 400;
