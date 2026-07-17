@@ -69,46 +69,24 @@
   }
 
   function waitForBackgroundMusic() {
-    var tracks = [
-      'assets/audio/theme-1.mp3',
-      'assets/audio/theme-2.mp3',
-      'assets/audio/theme-3.mp3',
-      'assets/audio/theme-4.mp3',
-      'assets/audio/theme-5.mp3',
-    ];
-
-    // Consider music ready when at least one track can be loaded.
+    // Probe a single track's metadata so the loader reflects "music can start"
+    // without eagerly downloading all five. Playback (ui.js startMusic) fetches
+    // its own shuffled track later. Errors resolve too, to never trap the loader.
     return new Promise(function (resolve) {
-      if (!tracks.length) {
-        resolve();
-        return;
-      }
-
       var settled = false;
-      var pending = tracks.length;
-
       function finish() {
         if (settled) return;
         settled = true;
         resolve();
       }
-
-      tracks.forEach(function (src) {
-        var audio = new Audio();
-        audio.preload = 'auto';
-
-        function ok() { finish(); }
-        function fail() {
-          pending -= 1;
-          if (pending <= 0) finish();
-        }
-
-        audio.addEventListener('canplaythrough', ok, { once: true });
-        audio.addEventListener('loadeddata', ok, { once: true });
-        audio.addEventListener('error', fail, { once: true });
-        audio.src = src;
-        try { audio.load(); } catch (e) { fail(); }
-      });
+      var track = 'assets/audio/theme-' + (Math.floor(Math.random() * 5) + 1) + '.mp3';
+      var audio = new Audio();
+      audio.preload = 'metadata';
+      audio.addEventListener('loadedmetadata', finish, { once: true });
+      audio.addEventListener('canplaythrough', finish, { once: true });
+      audio.addEventListener('error', finish, { once: true });
+      audio.src = track;
+      try { audio.load(); } catch (e) { finish(); }
     });
   }
 

@@ -29,6 +29,7 @@ export function initGate() {
     const w  = isWide() ? '-wide' : '';
     const closedImg = $('.gate-still--closed');
     const openImg   = $('.gate-still--open');
+    if (!closedImg || !openImg) return;
     closedImg.src = `assets/images/art-gate-closed${n}${w}.jpg`;
     openImg.src   = `assets/images/art-gate-open${n}${w}.jpg`;
     // also update the <source> inside the <picture> wrappers
@@ -38,8 +39,9 @@ export function initGate() {
     if (openSrc)   openSrc.srcset   = `assets/images/art-gate-open${n}-wide.jpg`;
     video.poster = `assets/images/art-gate-closed${n}${w}.jpg`;
     const src = video.querySelector('source');
+    if (!src) return;
     const want = `assets/videos/gate-reveal${n || '-day'}${w}.mp4`;
-    if (!src.getAttribute('src').endsWith(want)) {
+    if (!(src.getAttribute('src') || '').endsWith(want)) {
       src.setAttribute('src', want);
       video.load();
     }
@@ -131,7 +133,7 @@ export function initGate() {
       autoAlpha: 0, scale: 1.05, transformOrigin: '50% 42%', duration: 1.5, ease: 'power2.inOut',
       onComplete: () => {
         gateEl.remove();
-        ScrollTrigger.refresh();
+        if (window.ScrollTrigger) ScrollTrigger.refresh();
       },
     });
   }

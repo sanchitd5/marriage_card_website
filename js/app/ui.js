@@ -7,7 +7,13 @@ export function startMusic() {
   if (!dock) return;
   dock.hidden = false;
 
-  const order = [...SONGS].sort(() => Math.random() - 0.5); // shuffled once per visit
+  // Pick a random track from all five (uniform Fisher-Yates), then load it;
+  // the rest stay as ordered fallbacks in case a file fails to load.
+  const order = [...SONGS];
+  for (let j = order.length - 1; j > 0; j--) {
+    const k = Math.floor(Math.random() * (j + 1));
+    [order[j], order[k]] = [order[k], order[j]];
+  }
   (function tryNext(i) {
     if (i >= order.length) {
       dock.hidden = true;
@@ -16,12 +22,19 @@ export function startMusic() {
     const audio = new Audio(`assets/audio/${order[i]}.mp3`);
     audio.loop = true;
     audio.volume = 0.65;
-    audio.addEventListener('error', () => tryNext(i + 1), { once: true });
+    let advanced = false;
+    audio.addEventListener('error', () => { advanced = true; tryNext(i + 1); }, { once: true });
     audio.play().then(() => {
       appState.music.audio = audio;
       setPlaying(true);
-    }).catch(() => setPlaying(false));
-    appState.music.audio = audio;
+    }).catch(() => {
+      // Autoplay blocked but the file loaded: keep this audio so the toggle can
+      // start it on a later gesture. A media/load error fires 'error' above and
+      // advances instead, so don't clobber the next track's audio here.
+      if (advanced) return;
+      appState.music.audio = audio;
+      setPlaying(false);
+    });
   })(0);
 }
 
@@ -150,6 +163,28 @@ export function initCountdown() {
   tick();
 }
 
+// RFC 5545 TEXT escaping: backslash, semicolon, comma, and newlines.
+function icsEscape(text) {
+  return String(text)
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\r?\n/g, '\\n');
+}
+
+// Fold content lines longer than 75 chars (CRLF + single leading space).
+function icsFold(line) {
+  if (line.length <= 75) return line;
+  const parts = [line.slice(0, 75)];
+  let rest = line.slice(75);
+  while (rest.length > 74) {
+    parts.push(' ' + rest.slice(0, 74));
+    rest = rest.slice(74);
+  }
+  if (rest.length) parts.push(' ' + rest);
+  return parts.join('\r\n');
+}
+
 function icsFor(ev) {
   const slug = `${NAMES.firstA}-${NAMES.firstB}`.toLowerCase();
   const slugNoDash = slug.replace(/-/g, '');
@@ -158,10 +193,10 @@ function icsFor(ev) {
     `UID:${ev.start}-${slug}-wedding@${slugNoDash}`,
     `DTSTAMP:${new Date().toISOString().replace(/[-:]|\.\d{3}/g, '')}`,
     `DTSTART:${ev.start}`, `DTEND:${ev.end}`,
-    `SUMMARY:${ev.title}`,
-    `DESCRIPTION:${ev.description.replace(/,/g, '\\,')}`,
-    `LOCATION:${ev.location.replace(/,/g, '\\,')}`,
-    'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+    `SUMMARY:${icsEscape(ev.title)}`,
+    `DESCRIPTION:${icsEscape(ev.description)}`,
+    `LOCATION:${icsEscape(ev.location)}`,
+    'END:VEVENT', 'END:VCALENDAR'].map(icsFold).join('\r\n');
 }
 
 export function initCalendarButtons() {

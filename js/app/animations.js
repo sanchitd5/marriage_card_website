@@ -6,6 +6,13 @@ export function initGsap() {
     document.documentElement.classList.add('reduce-motion');
     return;
   }
+  // Each scroll/text plugin ships from its own CDN script. If any failed to
+  // load, bail to reduced-motion instead of throwing on a bare global below
+  // (which would also abort initPetals/initTilt in the same DOMContentLoaded).
+  if (!window.ScrollTrigger || !window.ScrollSmoother || !window.SplitText || !window.Flip) {
+    document.documentElement.classList.add('reduce-motion');
+    return;
+  }
 
   gsap.registerPlugin(ScrollTrigger, ScrollSmoother, SplitText, Flip);
   gsap.config({ nullTargetWarn: false });
