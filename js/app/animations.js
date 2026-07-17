@@ -1,0 +1,210 @@
+import { REDUCED, $, $$ } from './dom.js';
+import { appState } from './state.js';
+
+export function initGsap() {
+  if (!window.gsap) {
+    document.documentElement.classList.add('reduce-motion');
+    return;
+  }
+
+  gsap.registerPlugin(ScrollTrigger, ScrollSmoother, SplitText, Flip);
+  gsap.config({ nullTargetWarn: false });
+  // luxury ease from the reference sites: cubic-bezier(.25,1,.5,1)
+  gsap.registerEase('luxe', p => 1 - Math.pow(1 - p, 2.6));
+
+  if (REDUCED) {
+    document.documentElement.classList.add('reduce-motion');
+    return;
+  }
+
+  appState.smoother = ScrollSmoother.create({ smooth: 1.15, effects: true, smoothTouch: false, normalizeScroll: false });
+  if (document.getElementById('gate')) appState.smoother.scrollTop(0);
+
+  // one fade-up primitive everywhere (majestic/teatro numbers)
+  ScrollTrigger.batch('.fade-up', {
+    start: 'top 88%',
+    once: true,
+    onEnter: batch => gsap.fromTo(batch,
+      { y: 26, autoAlpha: 0 },
+      { y: 0, autoAlpha: 1, duration: 0.7, stagger: 0.08, ease: 'luxe', overwrite: true }),
+  });
+
+  // interlude: portrait eases in and the quote follows, one choreography
+  gsap.timeline({
+    defaults: { ease: 'luxe' },
+    scrollTrigger: { trigger: '.interlude-art', start: 'top 85%', once: true },
+  })
+    .fromTo('.interlude-art', { autoAlpha: 0, y: 44, scale: .97 }, { autoAlpha: 1, y: 0, scale: 1, duration: 1.5 })
+    .fromTo('.interlude-line', { autoAlpha: 0, y: 22 }, { autoAlpha: 1, y: 0, duration: 1 }, '-=.7');
+
+  // scrolling in does the scratching: fully swept once half the section is in
+  let scratched = 0;
+  function sweepTo(p) {
+    if (document.getElementById('gate')) return; // no pre-scratching behind the gate
+    if (!appState.scratchAPI.eraseNorm || appState.scratchAPI.revealed() || p <= scratched) return;
+    for (let t = scratched; t <= p; t += 0.008) {
+      const row = Math.min(3, Math.floor(t * 4));
+      const u = (t * 4) % 1;
+      appState.scratchAPI.eraseNorm(row % 2 ? 1 - u : u, 0.14 + row * 0.24);
+    }
+    scratched = p;
+    if (p > 0.96) appState.scratchAPI.check();
+  }
+
+  let sweepPlayed = false;
+  function playSweep() {
+    if (sweepPlayed || document.getElementById('gate') || appState.scratchAPI.revealed()) return;
+    sweepPlayed = true;
+    const state = { p: 0 };
+    gsap.to(state, {
+      p: 1,
+      duration: 1.8,
+      ease: 'power1.inOut',
+      delay: 0.35,
+      onUpdate: () => sweepTo(state.p),
+    });
+  }
+
+  ScrollTrigger.create({
+    trigger: '#countdown',
+    start: 'top 60%',
+    onEnter: playSweep,
+    onEnterBack: playSweep,
+  });
+
+  // a repaint (resize) wipes the canvas; redo the sweep up to where we were
+  appState.scratchAPI.onRepaint = () => {
+    const p = scratched;
+    scratched = 0;
+    sweepTo(p);
+  };
+
+  // gentle section snapping, mobile/tablet only
+  const snapSections = $$('.hero, .band, .footer');
+  let snapTimer = null;
+  let pointerBusy = false;
+  let lastScrollY = window.scrollY;
+  let scrollDir = 0; // +1 = down, -1 = up
+
+  window.addEventListener('scroll', () => {
+    const y = window.scrollY;
+    scrollDir = y > lastScrollY ? 1 : -1;
+    lastScrollY = y;
+  }, { passive: true });
+
+  window.addEventListener('pointerdown', () => { pointerBusy = true; }, { capture: true });
+  window.addEventListener('pointerup', () => { pointerBusy = false; }, { capture: true });
+  window.addEventListener('pointercancel', () => { pointerBusy = false; }, { capture: true });
+
+  function trySnap() {
+    if (pointerBusy || scrollDir > 0 || !matchMedia('(max-width: 899px)').matches) return;
+    const max = ScrollTrigger.maxScroll(window);
+    const y = window.scrollY; // native position: the smoothed value lags behind
+    let best = null;
+    for (const s of snapSections) {
+      const top = Math.min(s.offsetTop, max);
+      if (best === null || Math.abs(top - y) < Math.abs(best - y)) best = top;
+    }
+    if (best === null || Math.abs(best - y) < 2 || Math.abs(best - y) > innerHeight * 0.35) return;
+    gsap.to(appState.smoother, { scrollTop: best, duration: 0.55, ease: 'power2.out', overwrite: 'auto' });
+  }
+
+  ScrollTrigger.addEventListener('scrollEnd', () => {
+    clearTimeout(snapTimer);
+    snapTimer = setTimeout(trySnap, 250);
+  });
+
+  // countdown digits get a slow settle
+  gsap.fromTo('.count-num', { scale: .92 }, {
+    scale: 1,
+    duration: 1.6,
+    ease: 'luxe',
+    stagger: .1,
+    scrollTrigger: { trigger: '.count-grid', start: 'top 85%', once: true },
+  });
+
+  // One-time golden sparkle reveal and order swap
+  appState.doSparkleReveal = function doSparkleReveal() {
+    const el = $('.hero-names');
+    if (!el || el.dataset.sparkled) return;
+    el.dataset.sparkled = '1';
+
+    // Lock container height to prevent layout shift while names are invisible
+    el.style.minHeight = el.offsetHeight + 'px';
+    el.style.position = 'relative';
+
+    const cvs = document.createElement('canvas');
+    cvs.width = el.offsetWidth || 360;
+    cvs.height = el.offsetHeight || 130;
+    cvs.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5;';
+    el.appendChild(cvs);
+    const ctx = cvs.getContext('2d');
+
+    const GOLDS = ['#f5c518', '#ffd700', '#ffe080', '#e8950a', '#c88a10', '#fff0a0'];
+    const pts = Array.from({ length: 60 }, () => ({
+      x: Math.random() * cvs.width,
+      y: Math.random() * cvs.height,
+      r: Math.random() * 2.8 + 0.7,
+      vx: (Math.random() - 0.5) * 1.8,
+      vy: (Math.random() - 0.5) * 1.8 - 0.6,
+      col: GOLDS[Math.floor(Math.random() * GOLDS.length)],
+      delay: Math.random() * 0.5,
+    }));
+
+    const nameEls = $$('.hero-name, .hero-amp', el);
+
+    const tl = gsap.timeline({
+      onComplete() {
+        cvs.remove();
+        el.style.position = '';
+        el.style.minHeight = '';
+      }
+    });
+
+    tl.add(() => {
+      let f = 0;
+      const TOTAL = 75;
+      (function tick() {
+        ctx.clearRect(0, 0, cvs.width, cvs.height);
+        const prog = f / TOTAL;
+        pts.forEach(p => {
+          const lp = Math.max(0, (prog - p.delay) / (1 - p.delay + 0.001));
+          if (!lp) return;
+          const a = lp < 0.5 ? lp * 2 : 2 - lp * 2;
+          const px = p.x + p.vx * f * 0.55;
+          const py = p.y + p.vy * f * 0.55;
+          ctx.save();
+          ctx.globalAlpha = a * 0.9;
+          ctx.fillStyle = p.col;
+          ctx.shadowColor = '#ffd700';
+          ctx.shadowBlur = 8;
+          ctx.beginPath();
+          for (let i = 0; i < 8; i++) {
+            const angle = i * Math.PI / 4 - Math.PI / 2;
+            const rad = i % 2 === 0 ? p.r : p.r * 0.38;
+            if (i === 0) ctx.moveTo(px + rad * Math.cos(angle), py + rad * Math.sin(angle));
+            else ctx.lineTo(px + rad * Math.cos(angle), py + rad * Math.sin(angle));
+          }
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        });
+        f++;
+        if (f <= TOTAL) requestAnimationFrame(tick);
+        else ctx.clearRect(0, 0, cvs.width, cvs.height);
+      })();
+    });
+
+    tl.to(nameEls, { autoAlpha: 0, duration: 0.4, ease: 'power2.in' }, '+=0.5');
+    tl.add(() => {
+      const kids = [...el.children].filter(c => c !== cvs);
+      kids.reverse().forEach(c => el.insertBefore(c, cvs));
+    }, '+=0.05');
+
+    tl.add(() => {
+      gsap.fromTo($$('.hero-name, .hero-amp', el),
+        { autoAlpha: 0, y: 10 },
+        { autoAlpha: 1, y: 0, duration: 0.85, ease: 'power2.out', stagger: 0.13 });
+    });
+  };
+}
