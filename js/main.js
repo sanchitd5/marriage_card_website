@@ -92,29 +92,44 @@ function initGsap() {
     .fromTo('.interlude-art', { autoAlpha: 0, y: 44, scale: .97 }, { autoAlpha: 1, y: 0, scale: 1, duration: 1.5 })
     .fromTo('.interlude-line', { autoAlpha: 0, y: 22 }, { autoAlpha: 1, y: 0, duration: 1 }, '-=.7');
 
-  // scrolling past the scratch card does the scratching (serpentine sweep)
+  // scrolling in does the scratching: fully swept once half the section is in
   let scratched = 0;
-  ScrollTrigger.create({
-    trigger: '.scratch-frame',
-    start: 'top 78%',
-    end: 'top 28%',
-    onUpdate(self) {
-      if (!scratchAPI.eraseNorm || scratchAPI.revealed()) return;
-      for (let t = scratched; t <= self.progress; t += 0.008) {
-        const row = Math.min(3, Math.floor(t * 4));
-        const u = (t * 4) % 1;
-        scratchAPI.eraseNorm(row % 2 ? 1 - u : u, 0.14 + row * 0.24);
-      }
-      scratched = Math.max(scratched, self.progress);
-      if (self.progress > 0.96) scratchAPI.check();
-    },
-    onLeave: () => scratchAPI.check && scratchAPI.check(),
+  function sweepTo(p) {
+    if (document.getElementById('gate')) return; // no pre-scratching behind the gate
+    if (!scratchAPI.eraseNorm || scratchAPI.revealed() || p <= scratched) return;
+    for (let t = scratched; t <= p; t += 0.008) {
+      const row = Math.min(3, Math.floor(t * 4));
+      const u = (t * 4) % 1;
+      scratchAPI.eraseNorm(row % 2 ? 1 - u : u, 0.14 + row * 0.24);
+    }
+    scratched = p;
+    if (p > 0.96) scratchAPI.check();
+  }
+  const sweepST = ScrollTrigger.create({
+    trigger: '#countdown',
+    start: 'top bottom',
+    end: 'top 50%',
+    onUpdate: self => sweepTo(self.progress),
+    // fast scrolls (and snap tweens) can jump past the end between ticks
+    onLeave: () => sweepTo(1),
   });
+  // a repaint (resize) wipes the canvas; redo the sweep up to where we were
+  scratchAPI.onRepaint = () => {
+    const p = scratched;
+    scratched = 0;
+    sweepTo(Math.max(p, sweepST.progress));
+  };
 
-  // gentle section snapping: settle on the nearest act when the reader pauses
+  // gentle section snapping, mobile/tablet only (where sections are full-screen);
+  // waits for a real pause and never fights an active touch or scratch
   const snapSections = $$('.hero, .band, .footer');
   let snapTimer = null;
+  let pointerBusy = false;
+  window.addEventListener('pointerdown', () => { pointerBusy = true; }, { capture: true });
+  window.addEventListener('pointerup', () => { pointerBusy = false; }, { capture: true });
+  window.addEventListener('pointercancel', () => { pointerBusy = false; }, { capture: true });
   function trySnap() {
+    if (pointerBusy || !matchMedia('(max-width: 899px)').matches) return;
     const max = ScrollTrigger.maxScroll(window);
     const y = window.scrollY; // native position: the smoothed value lags behind
     let best = null;
@@ -122,12 +137,12 @@ function initGsap() {
       const top = Math.min(s.offsetTop, max);
       if (best === null || Math.abs(top - y) < Math.abs(best - y)) best = top;
     }
-    if (best === null || Math.abs(best - y) < 2 || Math.abs(best - y) > innerHeight * 0.5) return;
-    gsap.to(smoother, { scrollTop: best, duration: 0.6, ease: 'power2.out', overwrite: 'auto' });
+    if (best === null || Math.abs(best - y) < 2 || Math.abs(best - y) > innerHeight * 0.35) return;
+    gsap.to(smoother, { scrollTop: best, duration: 0.55, ease: 'power2.out', overwrite: 'auto' });
   }
   ScrollTrigger.addEventListener('scrollEnd', () => {
     clearTimeout(snapTimer);
-    snapTimer = setTimeout(trySnap, 80);
+    snapTimer = setTimeout(trySnap, 250);
   });
 
   // countdown digits get a slow settle
@@ -299,12 +314,15 @@ const scratchAPI = {};
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   let revealed = false, painted = false;
 
+  let lastW = 0, lastH = 0;
   function paintFoil() {
     const r = frame.getBoundingClientRect();
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    canvas.width = Math.round(r.width * dpr);
-    canvas.height = Math.round(r.height * dpr);
-    const w = canvas.width, h = canvas.height;
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (w === lastW && h === lastH) return; // same size: keep the scratches
+    lastW = w; lastH = h;
+    canvas.width = w;
+    canvas.height = h;
     const g = ctx.createLinearGradient(0, 0, w, h);
     g.addColorStop(0, '#c9a03e'); g.addColorStop(.25, '#e8cf8a');
     g.addColorStop(.5, '#b8923a'); g.addColorStop(.75, '#f0dda6'); g.addColorStop(1, '#c9a03e');
@@ -322,12 +340,14 @@ const scratchAPI = {};
     ctx.letterSpacing = '4px';
     ctx.fillText('SCRATCH TO REVEAL', w / 2, h / 2 + h * .03);
     painted = true;
+    if (scratchAPI.onRepaint) scratchAPI.onRepaint();
   }
 
   function erase(x, y) {
     const r = canvas.getBoundingClientRect();
     const sx = canvas.width / r.width, sy = canvas.height / r.height;
     ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = '#000'; // must be opaque: destination-out erases by source alpha
     ctx.beginPath();
     ctx.arc((x - r.left) * sx, (y - r.top) * sy, 30 * sx, 0, Math.PI * 2);
     ctx.fill();
@@ -369,6 +389,7 @@ const scratchAPI = {};
   // hooks for the scroll-driven auto-scratch in initGsap
   scratchAPI.eraseNorm = (nx, ny) => {
     ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = '#000'; // must be opaque: destination-out erases by source alpha
     ctx.beginPath();
     ctx.arc(nx * canvas.width, ny * canvas.height, canvas.height * 0.16, 0, Math.PI * 2);
     ctx.fill();
