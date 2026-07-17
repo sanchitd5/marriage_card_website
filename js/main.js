@@ -161,6 +161,7 @@ function initGsap() {
 }
 
 /* ── intro gate ─────────────────────────────────────────────── */
+let setGateTheme = () => {};
 (function gate() {
   const gateEl = $('#gate');
   const video = $('#gate-video');
@@ -169,6 +170,22 @@ function initGsap() {
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   window.scrollTo(0, 0);
   let opened = false;
+
+  // night mode gets its own candlelit gate art and reveal video
+  setGateTheme = theme => {
+    if (opened) return;
+    const n = theme === 'dark' ? '-night' : '';
+    $('.gate-still--closed').src = `assets/images/art-gate-closed${n}.jpg`;
+    $('.gate-still--open').src = `assets/images/art-gate-open${n}.jpg`;
+    video.poster = `assets/images/art-gate-closed${n}.jpg`;
+    const src = video.querySelector('source');
+    const want = `assets/videos/gate-reveal${n}.mp4`;
+    if (!src.getAttribute('src').endsWith(want)) {
+      src.setAttribute('src', want);
+      video.load();
+    }
+  };
+  setGateTheme(document.documentElement.dataset.theme);
 
   $('#seal').addEventListener('click', () => {
     if (opened) return;
@@ -461,16 +478,18 @@ async function initPetals() {
 (function theme() {
   const btn = $('#theme-toggle');
   const meta = document.querySelector('meta[name="theme-color"]');
-  function apply(t) {
+  function apply(t, persist) {
     document.documentElement.dataset.theme = t;
-    localStorage.setItem('theme', t);
+    if (persist) localStorage.setItem('theme', t);
     btn.setAttribute('aria-pressed', String(t === 'dark'));
     btn.setAttribute('aria-label', t === 'dark' ? 'Switch to day mode' : 'Switch to night mode');
     if (meta) meta.content = t === 'dark' ? '#191322' : '#f7f4ee';
+    setGateTheme(t);
   }
-  apply(document.documentElement.dataset.theme || 'light');
+  // reflect whatever the head script decided (stored choice or local sun)
+  apply(document.documentElement.dataset.theme || 'light', false);
   btn.addEventListener('click', () =>
-    apply(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'));
+    apply(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark', true));
 })();
 
 /* ── tilt (pointer-fine only) ───────────────────────────────── */

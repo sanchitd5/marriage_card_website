@@ -14,8 +14,62 @@
     document.documentElement.classList.add('js');
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('reduce-motion');
     (function () {
-      var t = localStorage.getItem('theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-      document.documentElement.dataset.theme = t;
+      // manual choice wins; otherwise follow the viewer's local sun:
+      // dark from sunset to sunrise, computed from coordinates guessed
+      // off the IANA timezone (no geolocation prompt).
+      var stored = localStorage.getItem('theme');
+      document.documentElement.dataset.theme = stored || (isNightNow() ? 'dark' : 'light');
+
+      function isNightNow() {
+        try {
+          var ZONES = {
+            'Asia/Kolkata': [23, 80], 'Asia/Karachi': [24.9, 67], 'Asia/Dhaka': [23.8, 90.4],
+            'Asia/Kathmandu': [27.7, 85.3], 'Asia/Colombo': [6.9, 79.9], 'Asia/Dubai': [25.3, 55.3],
+            'Asia/Riyadh': [24.7, 46.7], 'Asia/Qatar': [25.3, 51.5], 'Asia/Singapore': [1.35, 103.8],
+            'Asia/Kuala_Lumpur': [3.1, 101.7], 'Asia/Bangkok': [13.8, 100.5], 'Asia/Hong_Kong': [22.3, 114.2],
+            'Asia/Shanghai': [31.2, 121.5], 'Asia/Tokyo': [35.7, 139.7], 'Asia/Seoul': [37.6, 127],
+            'Asia/Manila': [14.6, 121], 'Asia/Jakarta': [-6.2, 106.8], 'Asia/Jerusalem': [32.1, 34.8],
+            'Europe/London': [51.5, -0.1], 'Europe/Dublin': [53.3, -6.3], 'Europe/Paris': [48.9, 2.4],
+            'Europe/Berlin': [52.5, 13.4], 'Europe/Amsterdam': [52.4, 4.9], 'Europe/Brussels': [50.8, 4.4],
+            'Europe/Zurich': [47.4, 8.5], 'Europe/Madrid': [40.4, -3.7], 'Europe/Rome': [41.9, 12.5],
+            'Europe/Lisbon': [38.7, -9.1], 'Europe/Warsaw': [52.2, 21], 'Europe/Stockholm': [59.3, 18.1],
+            'Europe/Moscow': [55.8, 37.6], 'Europe/Istanbul': [41, 29], 'Africa/Cairo': [30, 31.2],
+            'Africa/Johannesburg': [-26.2, 28], 'Africa/Nairobi': [-1.3, 36.8],
+            'America/New_York': [40.7, -74], 'America/Toronto': [43.7, -79.4], 'America/Chicago': [41.9, -87.6],
+            'America/Denver': [39.7, -105], 'America/Phoenix': [33.4, -112.1], 'America/Los_Angeles': [34.1, -118.2],
+            'America/Vancouver': [49.3, -123.1], 'America/Mexico_City': [19.4, -99.1], 'America/Sao_Paulo': [-23.5, -46.6],
+            'America/Buenos_Aires': [-34.6, -58.4], 'Australia/Sydney': [-33.9, 151.2], 'Australia/Melbourne': [-37.8, 145],
+            'Australia/Perth': [-31.9, 115.9], 'Australia/Brisbane': [-27.5, 153], 'Pacific/Auckland': [-36.8, 174.8],
+          };
+          var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          var c = ZONES[tz] || [23, -new Date().getTimezoneOffset() / 60 * 15];
+          var lat = c[0] * Math.PI / 180, lon = c[1];
+          var now = new Date();
+          var doy = Math.floor((now - new Date(Date.UTC(now.getUTCFullYear(), 0, 0))) / 864e5);
+          var g = 2 * Math.PI / 365 * (doy - 1 + (now.getUTCHours() - 12) / 24);
+          var eq = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g)
+                   - 0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+          var decl = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g)
+                   - 0.006758 * Math.cos(2 * g) + 0.000907 * Math.sin(2 * g)
+                   - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+          var cosHa = (Math.cos(90.833 * Math.PI / 180) - Math.sin(lat) * Math.sin(decl))
+                    / (Math.cos(lat) * Math.cos(decl));
+          if (cosHa < -1 || cosHa > 1) { // polar day/night: fall back to clock
+            var h = now.getHours();
+            return h < 6 || h >= 19;
+          }
+          var ha = Math.acos(cosHa) * 180 / Math.PI;
+          var utcNowMin = now.getUTCHours() * 60 + now.getUTCMinutes();
+          var sunriseUtc = 720 - 4 * (lon + ha) - eq;
+          var sunsetUtc = 720 - 4 * (lon - ha) - eq;
+          var mod = function (m) { return ((m % 1440) + 1440) % 1440; };
+          var afterSunset = mod(utcNowMin - sunsetUtc) < mod(sunriseUtc - sunsetUtc);
+          return afterSunset;
+        } catch (e) {
+          var hh = new Date().getHours();
+          return hh < 6 || hh >= 19;
+        }
+      }
     })();
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
