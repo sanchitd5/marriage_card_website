@@ -391,14 +391,7 @@ const scratchAPI = {};
     canvas.style.pointerEvents = 'none';
     if (window.gsap && !REDUCED) gsap.to(canvas, { autoAlpha: 0, duration: .9, ease: 'power2.out' });
     else canvas.style.opacity = 0;
-    if (window.confetti && !REDUCED) {
-      const r = frame.getBoundingClientRect();
-      confetti({
-        particleCount: 90, spread: 75, startVelocity: 28, gravity: .8, scalar: .9,
-        origin: { x: (r.left + r.width / 2) / innerWidth, y: (r.top + r.height / 2) / innerHeight },
-        colors: ['#c9a03e', '#e8cf8a', '#a48ec4', '#e9c9c2', '#f7f4ee'],
-      });
-    }
+    if (window.confetti && !REDUCED) petalRain();
   }
 
   let down = false;
@@ -423,6 +416,25 @@ const scratchAPI = {};
   scratchAPI.check = () => { if (!revealed && progress() > 50) reveal(); };
   scratchAPI.revealed = () => revealed;
 })();
+
+/* ── celebration: red and lavender rose petals falling from the top ── */
+let petalShape = null;
+function petalRain() {
+  petalShape = petalShape || confetti.shapeFromPath({ path: 'M5 0C8.5 2 9.5 7 5 13C.5 7 1.5 2 5 0' });
+  const colors = ['#b3273e', '#d94b60', '#b7a6d9', '#cfc3e6'];
+  for (let wave = 0; wave < 3; wave++) {
+    setTimeout(() => {
+      for (const x of [0.12, 0.38, 0.62, 0.88]) {
+        confetti({
+          particleCount: 12, angle: 270, spread: 55, startVelocity: 10,
+          gravity: 0.5, drift: (Math.random() - 0.5) * 1.4, ticks: 500, scalar: 1.6,
+          shapes: [petalShape], colors, origin: { x, y: -0.08 },
+          disableForReducedMotion: true,
+        });
+      }
+    }, wave * 380);
+  }
+}
 
 /* ── add-to-calendar: client-side ICS (majestic pattern) ────── */
 function icsFor(ev) {
