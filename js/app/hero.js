@@ -2,6 +2,11 @@ import { REDUCED, $, $$ } from './dom.js';
 import { appState } from './state.js';
 import { videoSuffix } from './net.js';
 
+// Start the hero video playing (muted, looping) and mark it visible. It runs in
+// the background BEHIND the still-opaque gate from page load, so when the gate
+// reveal fades out it uncovers an already-live, warm clip — no decode handoff,
+// no poster flash, no lag at the transition. Idempotent: safe to call again on
+// the seal gesture to satisfy gesture-gated autoplay.
 export function startHeroVideo() {
   const v = $('#hero-video');
   const poster = $('.hero-poster');
@@ -11,20 +16,9 @@ export function startHeroVideo() {
     return; // poster only, no autoplaying video
   }
 
-  const reveal = () => {
+  const show = () => {
     poster.classList.remove('is-visible', 'kenburns');
-    if (window.gsap) window.gsap.to(v, { opacity: 1, duration: 1.2 });
-    else v.style.opacity = '1';
-  };
-
-  const armInteractionRetry = () => {
-    const retry = () => {
-      const rp = v.play();
-      if (rp && rp.then) rp.then(reveal).catch(() => {});
-      else reveal();
-    };
-    window.addEventListener('pointerdown', retry, { once: true, passive: true });
-    window.addEventListener('keydown', retry, { once: true });
+    if (window.gsap) window.gsap.set(v, { opacity: 1 }); else v.style.opacity = '1';
   };
 
   // pick the connection-appropriate rendition before loading
@@ -48,16 +42,24 @@ export function startHeroVideo() {
   // desktop, badly janky on phones. Native loop plays forward only: no seeks.
   v.loop = true;
 
+  if (!v.paused && v.currentTime > 0) { show(); return; } // already running
+
   const p = v.play();
   if (p && p.then) {
-    p.then(reveal)
-      .catch(() => {
-        poster.classList.add('is-visible');
-        if (window.gsap) gsap.to(poster, { scale: 1.08, duration: 18, ease: 'power1.out', transformOrigin: 'center center' });
-        armInteractionRetry();
-      });
+    p.then(show).catch(() => {
+      // Autoplay blocked (e.g. no gesture yet): show the poster and retry on the
+      // first interaction — the seal tap also re-invokes this to recover.
+      poster.classList.add('is-visible');
+      const retry = () => {
+        const rp = v.play();
+        if (rp && rp.then) rp.then(show).catch(() => {});
+        else show();
+      };
+      window.addEventListener('pointerdown', retry, { once: true, passive: true });
+      window.addEventListener('keydown', retry, { once: true });
+    });
   } else {
-    reveal();
+    show();
   }
 }
 

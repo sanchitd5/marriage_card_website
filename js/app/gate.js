@@ -49,6 +49,11 @@ export function initGate() {
   };
   appState.setGateTheme(document.documentElement.dataset.theme);
 
+  // Start the hero video playing in the background immediately, behind the still
+  // opaque gate. When the gate reveal fades out it uncovers an already-live clip
+  // (no decode handoff at the transition = no end lag).
+  startHeroVideo();
+
   // if the seal goes untapped, the invitation opens itself
   // (auto-open is not a user gesture, so music will wait for the toggle)
   const autoOpen = setTimeout(() => gateCard.click(), 8000);
@@ -64,6 +69,7 @@ export function initGate() {
     if (appState.smoother) appState.smoother.scrollTop(0);
     attemptAutoFullscreen();
     startMusic(); // inside the user gesture: unlocks audio autoplay policy
+    startHeroVideo(); // gesture-backed retry in case background autoplay was blocked
 
     if (REDUCED || !window.gsap) {
       finish(true);
@@ -78,60 +84,67 @@ export function initGate() {
   });
 
   function playDrapes() {
-    let usingVideo = false;
+    let ending = false;
+    const FADE = 1.3;          // gate fade duration
+    const LEAD = 1.6;          // begin fading this many seconds before the clip ends
     const tryPlay = video.play();
-    video.addEventListener('ended', () => crossToOpen(.8), { once: true });
+
+    // Fade the WHOLE gate out a bit before the reveal video actually ends, so it
+    // dissolves onto the already-playing hero underneath (never shows the reveal
+    // clip's frozen final frame).
+    const beginEnd = () => {
+      if (ending) return;
+      ending = true;
+      finish(false);
+    };
+    const armFade = () => {
+      const dur = video.duration;
+      if (isFinite(dur) && dur > 0) {
+        const onTime = () => {
+          if (video.currentTime >= dur - LEAD) {
+            video.removeEventListener('timeupdate', onTime);
+            beginEnd();
+          }
+        };
+        video.addEventListener('timeupdate', onTime);
+      }
+    };
 
     if (tryPlay && tryPlay.then) {
       tryPlay.then(() => {
-        usingVideo = true;
-        // Keep the closed-gate still fully visible as an underlay while the
-        // video plays — this masks any first-frame mismatch completely.
-        // We only fade the still out near the very end of the video.
         gsap.set('.gate-still--closed', { opacity: 1 });
         gsap.to(video, { opacity: 1, duration: .3 });
-        // Fade out the closed still ~0.8s before the video ends so the
-        // open-still crossfade takes over cleanly.
-        const fadeDur = 0.8;
-        const delay = Math.max(0, (video.duration || 8) - fadeDur - 0.2);
-        gsap.to('.gate-still--closed', { opacity: 0, duration: fadeDur, delay });
-      }).catch(() => stillsFallback());
+        if (isFinite(video.duration) && video.duration > 0) armFade();
+        else video.addEventListener('loadedmetadata', armFade, { once: true });
+      }).catch(beginEnd);
     } else if (video.error) {
-      stillsFallback();
+      beginEnd();
     }
 
-    // safety: if metadata never arrives (missing file), fall back
-    setTimeout(() => {
-      if (!usingVideo && (video.readyState < 2)) stillsFallback();
-    }, 1200);
+    // fallbacks: natural end, and missing/unplayable file
+    video.addEventListener('ended', beginEnd, { once: true });
+    setTimeout(() => { if (!ending && video.readyState < 2) beginEnd(); }, 1500);
 
-    function stillsFallback() {
-      if (usingVideo) return;
-      usingVideo = true; // guard double-entry
-      crossToOpen(1.4);
-    }
-  }
-
-  function crossToOpen(dur) {
-    gsap.timeline()
-      .to('.gate-still--open', { opacity: 1, duration: dur, ease: 'power2.inOut' })
-      .add(() => finish(false), `-=${dur * 0.55}`);
+    // expose fade duration to finish()
+    finish.fadeDur = FADE;
   }
 
   function finish(instant) {
     document.body.style.overflow = '';
     if (appState.smoother) appState.smoother.scrollTop(0); else window.scrollTo(0, 0);
-    startHeroVideo();
+    startHeroVideo(); // ensure the background hero is live (idempotent)
     heroEntrance(instant);
+
     if (!window.gsap || instant) {
       gateEl.remove();
       if (window.ScrollTrigger) ScrollTrigger.refresh();
       return;
     }
-    // dissolve through the drapes: gate drifts closer while the hero settles back
-    gsap.fromTo('#hero-video, .hero-poster', { scale: 1.07 }, { scale: 1, duration: 2.6, ease: 'luxe' });
+
+    // Pure fade: the gate dissolves out over the hero video already playing
+    // behind it. No second video starts here, so nothing to stutter.
     gsap.to(gateEl, {
-      autoAlpha: 0, scale: 1.05, transformOrigin: '50% 42%', duration: 1.5, ease: 'power2.inOut',
+      autoAlpha: 0, duration: finish.fadeDur || 1.3, ease: 'power2.inOut',
       onComplete: () => {
         gateEl.remove();
         if (window.ScrollTrigger) ScrollTrigger.refresh();
