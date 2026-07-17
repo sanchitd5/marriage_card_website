@@ -105,19 +105,27 @@ function initGsap() {
     scratched = p;
     if (p > 0.96) scratchAPI.check();
   }
-  const sweepST = ScrollTrigger.create({
+  // the sweep plays as a visible moment once the card scrolls into view
+  // (scroll-scrubbed erasing always finished mid-snap, before it could be seen)
+  let sweepPlayed = false;
+  function playSweep() {
+    if (sweepPlayed || document.getElementById('gate') || scratchAPI.revealed()) return;
+    sweepPlayed = true;
+    const state = { p: 0 };
+    gsap.to(state, { p: 1, duration: 1.8, ease: 'power1.inOut', delay: 0.35,
+      onUpdate: () => sweepTo(state.p) });
+  }
+  ScrollTrigger.create({
     trigger: '#countdown',
-    start: 'top bottom',
-    end: 'top 50%',
-    onUpdate: self => sweepTo(self.progress),
-    // fast scrolls (and snap tweens) can jump past the end between ticks
-    onLeave: () => sweepTo(1),
+    start: 'top 60%',
+    onEnter: playSweep,
+    onEnterBack: playSweep,
   });
   // a repaint (resize) wipes the canvas; redo the sweep up to where we were
   scratchAPI.onRepaint = () => {
     const p = scratched;
     scratched = 0;
-    sweepTo(Math.max(p, sweepST.progress));
+    sweepTo(p);
   };
 
   // gentle section snapping, mobile/tablet only (where sections are full-screen);
