@@ -6,7 +6,8 @@
   "description": "Static wedding invitation site with a tiny build step for name orientation.",
   "scripts": {
     "build": "node build.js",
-    "build:bride": "FROM_GROOM_SIDE=false node build.js"
+    "build:bride": "FROM_GROOM_SIDE=false node build.js",
+    "test": "node --test \"test/**/*.test.mjs\""
   },
   "engines": {
     "node": ">=18"

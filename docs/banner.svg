@@ -1,0 +1,149 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" width="1200" height="400" role="img" aria-label="Sanchit and Riya — Shubh Vivah, 11 and 12 December 2026">
+  <title>Sanchit &amp; Riya — Shubh Vivah</title>
+
+  <defs>
+    <!-- Ivory palace backdrop -->
+    <radialGradient id="bgGoldGlow" cx="18%" cy="16%" r="60%">
+      <stop offset="0%" stop-color="#e8c874" stop-opacity="0.35"/>
+      <stop offset="55%" stop-color="#e8c874" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bgLavGlow" cx="84%" cy="86%" r="60%">
+      <stop offset="0%" stop-color="#b9a7d6" stop-opacity="0.4"/>
+      <stop offset="55%" stop-color="#b9a7d6" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bgBase" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f9f6f0"/>
+      <stop offset="100%" stop-color="#ece2d3"/>
+    </linearGradient>
+
+    <!-- Shimmering gold for the names -->
+    <linearGradient id="goldSheen" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#b8862f"/>
+      <stop offset="0.35" stop-color="#e6c163"/>
+      <stop offset="0.5" stop-color="#fbeeb8"/>
+      <stop offset="0.65" stop-color="#e6c163"/>
+      <stop offset="1" stop-color="#b8862f"/>
+      <animateTransform attributeName="gradientTransform" type="translate"
+        values="-1 0; 1 0; -1 0" dur="6s" repeatCount="indefinite"/>
+    </linearGradient>
+
+    <linearGradient id="goldLine" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#c9a24b" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#c9a24b"/>
+      <stop offset="1" stop-color="#c9a24b" stop-opacity="0"/>
+    </linearGradient>
+
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2.4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <style>
+      .frame {
+        fill: none; stroke: #c9a24b;
+        stroke-dasharray: 3120; stroke-dashoffset: 3120;
+        animation: draw 2.6s cubic-bezier(.6,.02,.2,1) forwards;
+      }
+      .frameInner { animation-delay: .35s; opacity: .55; }
+      @keyframes draw { to { stroke-dashoffset: 0; } }
+
+      .kicker { opacity: 0; animation: fade 1.2s ease .9s forwards; }
+      .name   { opacity: 0; transform: translateY(14px); animation: rise 1.3s cubic-bezier(.2,.7,.2,1) forwards; }
+      .nameA  { animation-delay: 1.05s; }
+      .amp    { animation-delay: 1.25s; transform-origin: 600px 205px; }
+      .nameB  { animation-delay: 1.45s; }
+      .meta   { opacity: 0; animation: fade 1.2s ease 1.8s forwards; }
+      .metaB  { animation-delay: 2.05s; }
+      @keyframes fade { to { opacity: 1; } }
+      @keyframes rise { to { opacity: 1; transform: translateY(0); } }
+
+      .divLine { stroke-dasharray: 460; stroke-dashoffset: 460; animation: draw 1.6s ease 1.7s forwards; }
+      .lotus   { opacity: 0; transform-origin: 600px 250px; animation: pop 1s cubic-bezier(.2,1.4,.4,1) 2.1s forwards; }
+      @keyframes pop { 0%{opacity:0;transform:scale(.2) rotate(-40deg)} 100%{opacity:1;transform:scale(1) rotate(0)} }
+
+      .amp { animation-name: rise, ampPulse; animation-duration: 1.3s, 3.4s;
+             animation-timing-function: cubic-bezier(.2,.7,.2,1), ease-in-out;
+             animation-iteration-count: 1, infinite;
+             animation-delay: 1.25s, 2.6s; }
+      @keyframes ampPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+
+      .petal { opacity: 0; animation: float 8s linear infinite; }
+      @keyframes float {
+        0%   { opacity: 0; transform: translate(0, 30px) rotate(0deg); }
+        12%  { opacity: .85; }
+        88%  { opacity: .5; }
+        100% { opacity: 0; transform: translate(14px, -300px) rotate(160deg); }
+      }
+      .spark { opacity: 0; animation: twinkle 3.2s ease-in-out infinite; }
+      @keyframes twinkle { 0%,100%{opacity:0;transform:scale(.4)} 50%{opacity:1;transform:scale(1)} }
+
+      @media (prefers-reduced-motion: reduce) {
+        .frame,.kicker,.name,.amp,.meta,.divLine,.lotus{animation:none;opacity:1;transform:none;stroke-dashoffset:0}
+        .petal,.spark{animation:none;opacity:0}
+      }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect x="8" y="8" width="1184" height="384" rx="20" fill="url(#bgBase)"/>
+  <rect x="8" y="8" width="1184" height="384" rx="20" fill="url(#bgGoldGlow)"/>
+  <rect x="8" y="8" width="1184" height="384" rx="20" fill="url(#bgLavGlow)"/>
+
+  <!-- Ornamental double frame -->
+  <rect class="frame" x="26" y="26" width="1148" height="348" rx="16" stroke-width="2"/>
+  <rect class="frame frameInner" x="42" y="42" width="1116" height="316" rx="10" stroke-width="1"/>
+
+  <!-- Corner flourishes -->
+  <g stroke="#c9a24b" stroke-width="1.5" fill="none" opacity=".8" class="kicker">
+    <path d="M56 78 q0 -22 22 -22"/><path d="M64 86 q0 -14 14 -14"/>
+    <path d="M1144 78 q0 -22 -22 -22"/><path d="M1136 86 q0 -14 -14 -14"/>
+    <path d="M56 322 q0 22 22 22"/><path d="M64 314 q0 14 14 14"/>
+    <path d="M1144 322 q0 22 -22 22"/><path d="M1136 314 q0 14 -14 14"/>
+  </g>
+
+  <!-- Twinkling sparkles -->
+  <g fill="#e8c874">
+    <path class="spark" style="animation-delay:.4s"  transform="translate(230 150)" d="M0 -8 L2 -2 8 0 2 2 0 8 -2 2 -8 0 -2 -2 Z"/>
+    <path class="spark" style="animation-delay:1.9s" transform="translate(980 130)" d="M0 -7 L1.7 -1.7 7 0 1.7 1.7 0 7 -1.7 1.7 -7 0 -1.7 -1.7 Z"/>
+    <path class="spark" style="animation-delay:1.1s" transform="translate(300 300)" d="M0 -6 L1.5 -1.5 6 0 1.5 1.5 0 6 -1.5 1.5 -6 0 -1.5 -1.5 Z"/>
+    <path class="spark" style="animation-delay:2.4s" transform="translate(910 305)" d="M0 -6 L1.5 -1.5 6 0 1.5 1.5 0 6 -1.5 1.5 -6 0 -1.5 -1.5 Z"/>
+  </g>
+
+  <!-- Rising marigold petals -->
+  <g>
+    <ellipse class="petal" style="animation-delay:0s"   cx="170" cy="360" rx="6" ry="9" fill="#f0a93b"/>
+    <ellipse class="petal" style="animation-delay:1.6s" cx="1040" cy="360" rx="5" ry="8" fill="#e8912e"/>
+    <ellipse class="petal" style="animation-delay:3.1s" cx="360" cy="360" rx="6" ry="9" fill="#f0a93b"/>
+    <ellipse class="petal" style="animation-delay:4.4s" cx="860" cy="360" rx="5" ry="8" fill="#e8912e"/>
+    <ellipse class="petal" style="animation-delay:2.2s" cx="600" cy="360" rx="6" ry="9" fill="#f4b74f"/>
+    <ellipse class="petal" style="animation-delay:5.5s" cx="1120" cy="360" rx="5" ry="8" fill="#f0a93b"/>
+  </g>
+
+  <!-- Kicker -->
+  <text class="kicker" x="600" y="112" text-anchor="middle"
+        font-family="Georgia, 'Times New Roman', serif" font-size="22"
+        letter-spacing="14" fill="#8a6a3a">S H U B H &#160; V I V A H</text>
+
+  <!-- Names -->
+  <g font-family="Georgia, 'Times New Roman', serif" font-style="italic" fill="url(#goldSheen)" filter="url(#softGlow)">
+    <text class="name nameA" x="470" y="230" text-anchor="end"  font-size="96">Sanchit</text>
+    <text class="name amp"   x="600" y="230" text-anchor="middle" font-size="104" fill="#c9a24b">&amp;</text>
+    <text class="name nameB" x="730" y="230" text-anchor="start" font-size="96">Riya</text>
+  </g>
+
+  <!-- Divider + lotus motif -->
+  <line class="divLine" x1="370" y1="262" x2="830" y2="262" stroke="url(#goldLine)" stroke-width="1.6"/>
+  <g class="lotus" fill="none" stroke="#c9a24b" stroke-width="1.5">
+    <path d="M600 250 q-9 12 0 22 q9 -10 0 -22Z" fill="#e8c874" fill-opacity=".5"/>
+    <path d="M586 254 q-4 12 8 16 M614 254 q4 12 -8 16"/>
+    <circle cx="600" cy="262" r="2.5" fill="#c9a24b" stroke="none"/>
+  </g>
+
+  <!-- Date + location -->
+  <text class="meta" x="600" y="316" text-anchor="middle"
+        font-family="Georgia, 'Times New Roman', serif" font-size="26"
+        letter-spacing="6" fill="#5e4c38">11 &#183; 12 December 2026</text>
+  <text class="meta metaB" x="600" y="346" text-anchor="middle"
+        font-family="Georgia, 'Times New Roman', serif" font-style="italic" font-size="18"
+        letter-spacing="3" fill="#8a6a3a">Chandigarh &#160;&amp;&#160; Ambala</text>
+</svg>
