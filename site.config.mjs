@@ -13,7 +13,7 @@ export const groom = {
   hashtag: '#SanchitKiRiya',
   role: 'groom',
   parents: 'Ajay & Geeta Dang',
-  grandparents: 'Lt. Shri Subhash Chander & Mrs. Raj Rani Dang',
+  grandparents: 'Late Shri Subhash Chander & Mrs. Raj Rani Dang',
 };
 
 export const bride = {
@@ -25,5 +25,5 @@ export const bride = {
   hashtag: '#RiyaKaSanchit',
   role: 'bride', 
   parents: 'Vishal & Renu Verma',
-  grandparents: 'Lt. Shri Vijay Prakash & Mrs. Sushma Verma',
+  grandparents: 'Late Shri Vijay Prakash & Mrs. Sushma Verma',
 };
