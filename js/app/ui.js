@@ -1,4 +1,4 @@
-import { WEDDING_TS, SONGS, EVENTS } from './config.js';
+import { WEDDING_TS, SONGS, EVENTS, NAMES } from './config.js';
 import { REDUCED, $, $$ } from './dom.js';
 import { appState } from './state.js';
 
@@ -151,9 +151,11 @@ export function initCountdown() {
 }
 
 function icsFor(ev) {
-  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Riya & Sanchit//Wedding//EN', 'CALSCALE:GREGORIAN',
+  const slug = `${NAMES.firstA}-${NAMES.firstB}`.toLowerCase();
+  const slugNoDash = slug.replace(/-/g, '');
+  return ['BEGIN:VCALENDAR', 'VERSION:2.0', `PRODID:-//${NAMES.pairTitle}//Wedding//EN`, 'CALSCALE:GREGORIAN',
     'BEGIN:VEVENT',
-    `UID:${ev.start}-rs-wedding@riyaandsanchit`,
+    `UID:${ev.start}-${slug}-wedding@${slugNoDash}`,
     `DTSTAMP:${new Date().toISOString().replace(/[-:]|\.\d{3}/g, '')}`,
     `DTSTART:${ev.start}`, `DTEND:${ev.end}`,
     `SUMMARY:${ev.title}`,
@@ -169,7 +171,7 @@ export function initCalendarButtons() {
     const blob = new Blob([icsFor(ev)], { type: 'text/calendar' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `${btn.dataset.ics}-riya-sanchit.ics`;
+    a.download = `${btn.dataset.ics}-${NAMES.firstA}-${NAMES.firstB}.ics`.toLowerCase();
     document.body.appendChild(a);
     a.click();
     a.remove();

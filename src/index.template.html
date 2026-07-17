@@ -3,21 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Riya &amp; Sanchit — Shubh Vivah · 12 December 2026</title>
-  <meta name="description" content="Dearest friends and family, it is with the greatest pleasure that we announce the wedding of Riya Verma and Sanchit Dang — December 2026, Chandigarh & Ambala.">
-  <meta property="og:title" content="Riya & Sanchit — Shubh Vivah">
+  <title>{{PAIR_TITLE}} — Shubh Vivah · 12 December 2026</title>
+  <meta name="description" content="Dearest friends and family, it is with the greatest pleasure that we announce the wedding of {{FULL_A}} and {{FULL_B}} — December 2026, Chandigarh & Ambala.">
+  <meta property="og:title" content="{{PAIR_TITLE_RAW}} — Shubh Vivah">
   <meta property="og:description" content="You are cordially invited to the most anticipated affair of the season. 11–12 December 2026.">
   <meta property="og:image" content="assets/images/invitation-card-share.png">
-  <meta property="og:image:alt" content="Invitation card for Riya and Sanchit's wedding celebration on 11–12 December 2026.">
+  <meta property="og:image:alt" content="Invitation card for {{FIRST_A}} and {{FIRST_B}}'s wedding celebration on 11–12 December 2026.">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Riya & Sanchit — Shubh Vivah">
+  <meta name="twitter:title" content="{{PAIR_TITLE_RAW}} — Shubh Vivah">
   <meta name="twitter:description" content="You are cordially invited to the most anticipated affair of the season. 11–12 December 2026.">
   <meta name="twitter:image" content="assets/images/invitation-card-share.png">
   <meta name="theme-color" content="#f7f4ee">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Riya &amp; Sanchit">
+  <meta name="apple-mobile-web-app-title" content="{{PAIR_TITLE}}">
   <link rel="manifest" href="manifest.webmanifest">
 
   <style>
@@ -221,13 +221,13 @@
         <div class="hero-inner">
           <p class="kicker hero-seq">Dearest friends &amp; family, it is with the greatest pleasure that we announce the union of</p>
           <h1 class="hero-names">
-            <span class="hero-name hero-seq">Riya</span>
+            <span class="hero-name hero-seq">{{FIRST_A}}</span>
             <span class="hero-amp hero-seq">&amp;</span>
-            <span class="hero-name hero-seq">Sanchit</span>
+            <span class="hero-name hero-seq">{{FIRST_B}}</span>
           </h1>
           <p class="hero-date hero-seq">11 <span class="hero-amp">&amp;</span> 12 December 2026 <span class="hero-date-sep">·</span> <span class="hero-date-location">Chandigarh &amp; Ambala</span></p>
           <p class="hero-tag hero-seq" id="hero-hashtag">
-            <span class="hero-tag-text" data-tags="#SanchitKiRiya,#RiyaKaSanchit">#SanchitKiRiya</span>
+            <span class="hero-tag-text" data-tags="{{TAG_PRIMARY}},{{TAG_SECONDARY}}">{{TAG_PRIMARY}}</span>
           </p>
         </div>
         <div class="scroll-cue hero-seq">
@@ -334,7 +334,9 @@
           <img class="family-motif fade-up" src="assets/images/art-peacock.jpg" alt="" aria-hidden="true" loading="lazy">
           <p class="kicker fade-up">With the blessings of</p>
           <div class="family-grid">
-            <h3 class="family-names fade-up">Dang <em>&amp;</em> Verma Family</h3>
+            {{FAMILY_SIDE_A}}
+            <span class="family-divider fade-up" aria-hidden="true"></span>
+            {{FAMILY_SIDE_B}}
           </div>
           <p class="family-blessing fade-up">Your blessings are the only gift we seek</p>
         </div>
@@ -343,11 +345,11 @@
       <!-- ══════════ FOOTER ══════════ -->
       <footer class="footer">
         <div class="wrap wrap--narrow">
-          <p class="footer-monogram">R<em>&amp;</em>S</p>
+          <p class="footer-monogram">{{INITIAL_A}}<em>&amp;</em>{{INITIAL_B}}</p>
           <span class="footer-rule" aria-hidden="true"></span>
           <p class="footer-line">Some love stories cannot merely be told, they must be witnessed. We would be honoured to have you with us.</p>
-          <p class="footer-sign">Yours, in the greatest anticipation,<br><span>Riya &amp; Sanchit</span></p>
-          <p class="footer-tag">#SanchitKiRiya</p>
+          <p class="footer-sign">Yours, in the greatest anticipation,<br><span>{{FIRST_A}} &amp; {{FIRST_B}}</span></p>
+          <p class="footer-tag">{{HASHTAG}}</p>
         </div>
       </footer>
 

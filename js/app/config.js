@@ -1,3 +1,7 @@
+import { NAMES } from './couple.mjs';
+
+export { NAMES };
+
 export const WEDDING_TS = Date.UTC(2026, 11, 12, 13, 30, 0); // 12 Dec 2026, 19:00 IST (edit here)
 
 // couple's approved pool (assets/audio/*.mp3); one is drawn at random each visit
@@ -10,19 +14,19 @@ export const MAPS = {
 
 export const EVENTS = {
   haldi: {
-    title: 'Haldi — Riya & Sanchit',
+    title: `Haldi — ${NAMES.pairTitle}`,
     start: '20261211T053000Z', end: '20261211T083000Z',
     location: 'Radisson Hotel Chandigarh Zirakpur',
     description: 'The first affair of the celebrations. Dress code: shades of yellow. Directions: ' + MAPS.radisson,
   },
   cocktail: {
-    title: 'Cocktail & Engagement — Riya & Sanchit',
+    title: `Cocktail & Engagement — ${NAMES.pairTitle}`,
     start: '20261211T143000Z', end: '20261211T183000Z',
     location: 'Radisson Hotel Chandigarh Zirakpur',
     description: 'An evening of toasts and rings. Dress code: dazzling as you dare. Directions: ' + MAPS.radisson,
   },
   wedding: {
-    title: 'Wedding of Riya & Sanchit',
+    title: `Wedding of ${NAMES.pairTitle}`,
     start: '20261212T133000Z', end: '20261212T183000Z',
     location: "De'vansh Resort, Ambala Cantt",
     description: 'The grand affair: baraat, pheras and forever. Directions: ' + MAPS.devansh,

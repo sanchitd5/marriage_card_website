@@ -1,6 +1,7 @@
-# Riya & Sanchit wedding invitation — static site, no build step
+# Riya & Sanchit wedding invitation — Node build flips names per FROM_GROOM_SIDE.
 [build]
-  publish = "."
+  command = "node build.js"
+  publish = "dist"
 
 [[headers]]
   for = "/assets/*"

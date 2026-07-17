@@ -1,0 +1,14 @@
+{
+  "name": "marriage-card-website",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Static wedding invitation site with a tiny build step for name orientation.",
+  "scripts": {
+    "build": "node build.js",
+    "build:bride": "FROM_GROOM_SIDE=false node build.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

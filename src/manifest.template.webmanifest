@@ -1,6 +1,6 @@
 {
-  "name": "Riya & Sanchit - Shubh Vivah",
-  "short_name": "Riya & Sanchit",
+  "name": "{{PAIR_TITLE}} - Shubh Vivah",
+  "short_name": "{{PAIR_TITLE}}",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#f7f4ee",
