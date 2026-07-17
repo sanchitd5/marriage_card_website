@@ -191,6 +191,7 @@ let setGateTheme = () => {};
   $('.gate-card').addEventListener('click', () => {
     if (opened) return;
     opened = true;
+    $('#seal').classList.add('opened'); // stop the pulse so the crack animation owns the transform
     window.scrollTo(0, 0);
     if (smoother) smoother.scrollTop(0);
     startMusic(); // inside the user gesture: unlocks audio autoplay policy

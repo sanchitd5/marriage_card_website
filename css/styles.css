@@ -156,6 +156,26 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
 }
 .seal:hover, .seal:focus-visible { transform: scale(1.06); }
 .seal:focus-visible { outline: 2px solid hsl(var(--wisteria)); outline-offset: 4px; }
+/* invitation to tap: soft heartbeat + expanding gold ring */
+.seal:not(.opened) { animation: sealPulse 2.4s var(--ease-luxe) infinite; }
+.seal::after {
+  content: '';
+  position: absolute; inset: -5px;
+  border-radius: 50%;
+  border: 2px solid hsl(var(--gold) / .75);
+  pointer-events: none;
+  animation: sealRipple 2.4s ease-out infinite;
+}
+.seal.opened::after { display: none; }
+@keyframes sealPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+@keyframes sealRipple {
+  0% { transform: scale(.92); opacity: .9; }
+  65% { transform: scale(1.45); opacity: 0; }
+  100% { transform: scale(1.45); opacity: 0; }
+}
 .seal img { width: 100%; height: 100%; border-radius: 50%; }
 .seal-monogram {
   position: absolute; inset: 0;
