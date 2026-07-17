@@ -19,15 +19,26 @@ export function initGate() {
 
   let opened = false;
 
+  // wide (≥768px) breakpoint: serve 16:9 landscape assets for tablet/desktop
+  const isWide = () => window.matchMedia('(min-width: 768px)').matches;
+
   // night mode gets its own candlelit gate art and reveal video
   appState.setGateTheme = theme => {
     if (opened) return;
-    const n = theme === 'dark' ? '-night' : '';
-    $('.gate-still--closed').src = `assets/images/art-gate-closed${n}.jpg`;
-    $('.gate-still--open').src = `assets/images/art-gate-open${n}.jpg`;
-    video.poster = `assets/images/art-gate-closed${n}.jpg`;
+    const n  = theme === 'dark' ? '-night' : '';
+    const w  = isWide() ? '-wide' : '';
+    const closedImg = $('.gate-still--closed');
+    const openImg   = $('.gate-still--open');
+    closedImg.src = `assets/images/art-gate-closed${n}${w}.jpg`;
+    openImg.src   = `assets/images/art-gate-open${n}${w}.jpg`;
+    // also update the <source> inside the <picture> wrappers
+    const closedSrc = closedImg.closest('picture')?.querySelector('source');
+    const openSrc   = openImg.closest('picture')?.querySelector('source');
+    if (closedSrc) closedSrc.srcset = `assets/images/art-gate-closed${n}-wide.jpg`;
+    if (openSrc)   openSrc.srcset   = `assets/images/art-gate-open${n}-wide.jpg`;
+    video.poster = `assets/images/art-gate-closed${n}${w}.jpg`;
     const src = video.querySelector('source');
-    const want = `assets/videos/gate-reveal${n || '-day'}.mp4`;
+    const want = `assets/videos/gate-reveal${n || '-day'}${w}.mp4`;
     if (!src.getAttribute('src').endsWith(want)) {
       src.setAttribute('src', want);
       video.load();
@@ -69,7 +80,16 @@ export function initGate() {
     if (tryPlay && tryPlay.then) {
       tryPlay.then(() => {
         usingVideo = true;
+        // Keep the closed-gate still fully visible as an underlay while the
+        // video plays — this masks any first-frame mismatch completely.
+        // We only fade the still out near the very end of the video.
+        gsap.set('.gate-still--closed', { opacity: 1 });
         gsap.to(video, { opacity: 1, duration: .3 });
+        // Fade out the closed still ~0.8s before the video ends so the
+        // open-still crossfade takes over cleanly.
+        const fadeDur = 0.8;
+        const delay = Math.max(0, (video.duration || 8) - fadeDur - 0.2);
+        gsap.to('.gate-still--closed', { opacity: 0, duration: fadeDur, delay });
       }).catch(() => stillsFallback());
     } else if (video.error) {
       stillsFallback();

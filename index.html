@@ -92,8 +92,14 @@
   <!-- ══════════ INTRO GATE ══════════ -->
   <div id="gate" aria-label="Wedding invitation envelope. Tap the wax seal to open.">
     <div class="gate-stage">
-      <img class="gate-still gate-still--closed" src="assets/images/art-gate-closed.jpg" alt="Closed lavender drapes with marigold garland">
-      <img class="gate-still gate-still--open" src="assets/images/art-gate-open.jpg" alt="" aria-hidden="true">
+      <picture>
+        <source media="(min-width: 768px)" srcset="assets/images/art-gate-closed-wide.jpg">
+        <img class="gate-still gate-still--closed" src="assets/images/art-gate-closed.jpg" alt="Closed lavender drapes with marigold garland">
+      </picture>
+      <picture>
+        <source media="(min-width: 768px)" srcset="assets/images/art-gate-open-wide.jpg">
+        <img class="gate-still gate-still--open" src="assets/images/art-gate-open.jpg" alt="" aria-hidden="true">
+      </picture>
       <video id="gate-video" class="gate-video" playsinline muted preload="auto" poster="assets/images/art-gate-closed.jpg">
         <source src="assets/videos/gate-reveal-day.mp4" type="video/mp4">
       </video>
