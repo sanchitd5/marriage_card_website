@@ -117,12 +117,6 @@ export function initGate() {
       .add(() => finish(false), `-=${dur * 0.55}`);
   }
 
-  function focusHero() {
-    // Hand focus to the hero heading so keyboard users don't get dumped at <body>.
-    const h = document.querySelector('.hero-names');
-    if (h && typeof h.focus === 'function') h.focus({ preventScroll: true });
-  }
-
   function finish(instant) {
     document.body.style.overflow = '';
     if (appState.smoother) appState.smoother.scrollTop(0); else window.scrollTo(0, 0);
@@ -130,7 +124,6 @@ export function initGate() {
     heroEntrance(instant);
     if (!window.gsap || instant) {
       gateEl.remove();
-      focusHero();
       if (window.ScrollTrigger) ScrollTrigger.refresh();
       return;
     }
@@ -140,7 +133,6 @@ export function initGate() {
       autoAlpha: 0, scale: 1.05, transformOrigin: '50% 42%', duration: 1.5, ease: 'power2.inOut',
       onComplete: () => {
         gateEl.remove();
-        focusHero();
         if (window.ScrollTrigger) ScrollTrigger.refresh();
       },
     });
