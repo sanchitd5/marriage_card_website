@@ -13,6 +13,10 @@
   <script>
     document.documentElement.classList.add('js');
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('reduce-motion');
+    (function () {
+      var t = localStorage.getItem('theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.dataset.theme = t;
+    })();
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -41,6 +45,12 @@
       <p class="gate-hint">Tap the seal to break it</p>
     </div>
   </div>
+
+  <!-- ══════════ THEME TOGGLE ══════════ -->
+  <button id="theme-toggle" aria-label="Switch to night mode" aria-pressed="false">
+    <svg class="icon-moon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+    <svg class="icon-sun" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.2 5.2l1.9 1.9M16.9 16.9l1.9 1.9M18.8 5.2l-1.9 1.9M7.1 16.9l-1.9 1.9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+  </button>
 
   <!-- ══════════ MUSIC DOCK ══════════ -->
   <div id="music-dock" hidden>
@@ -72,7 +82,10 @@
           <p class="hero-shubh hero-seq">शुभ विवाह</p>
           <p class="hero-date hero-seq">11 <span>&amp;</span> 12 December 2026 · Chandigarh &amp; Ambala</p>
         </div>
-        <div class="scroll-cue hero-seq" aria-hidden="true"><span></span></div>
+        <div class="scroll-cue hero-seq" aria-hidden="true">
+          <span class="cue-mouse"><span></span></span>
+          <span class="cue-chevrons"><i></i><i></i></span>
+        </div>
       </header>
 
       <!-- ══════════ COUNTDOWN + SCRATCH ══════════ -->
@@ -112,7 +125,7 @@
               <h3 class="event-name">Haldi</h3>
               <p class="event-when"><time datetime="2026-12-11T11:00+05:30">Thursday, 11 December 2026 · 11 o'clock in the morning</time></p>
               <p class="event-venue">Radisson Hotel Chandigarh Zirakpur</p>
-              <p class="event-dress"><span>Dress code</span> Shades of yellow, if you please</p>
+              <p class="event-dress"><span>Dress code</span> Shades of yellow</p>
               <div class="event-actions">
                 <a class="btn-quiet" href="https://maps.app.goo.gl/fQhBFytYAZKu4qBB7" target="_blank" rel="noopener">Get directions</a>
                 <button class="btn-quiet" data-ics="haldi">Add to calendar</button>
@@ -125,7 +138,7 @@
               <h3 class="event-name">Cocktail &amp; Engagement</h3>
               <p class="event-when"><time datetime="2026-12-11T20:00+05:30">Thursday, 11 December 2026 · 8 o'clock in the evening</time></p>
               <p class="event-venue">Radisson Hotel Chandigarh Zirakpur</p>
-              <p class="event-dress"><span>Dress code</span> Smart formals, dazzling as you dare</p>
+              <p class="event-dress"><span>Dress code</span> Dazzling as you dare</p>
               <div class="event-actions">
                 <a class="btn-quiet" href="https://maps.app.goo.gl/fQhBFytYAZKu4qBB7" target="_blank" rel="noopener">Get directions</a>
                 <button class="btn-quiet" data-ics="cocktail">Add to calendar</button>
@@ -138,7 +151,6 @@
               <h3 class="event-name">The Wedding</h3>
               <p class="event-when"><time datetime="2026-12-12T19:00+05:30">Friday, 12 December 2026 · 7 o'clock in the evening</time></p>
               <p class="event-venue">De'vansh Resort, Ambala Cantt</p>
-              <p class="event-dress"><span>Dress code</span> Traditional Indian wedding attire</p>
               <div class="event-actions">
                 <a class="btn-quiet" href="https://maps.app.goo.gl/RdueUZ2XfNiAnbD18" target="_blank" rel="noopener">Get directions</a>
                 <button class="btn-quiet" data-ics="wedding">Add to calendar</button>
@@ -152,8 +164,8 @@
       <!-- ══════════ PORTRAIT INTERLUDE ══════════ -->
       <section class="band band--tint interlude">
         <div class="wrap wrap--narrow">
-          <div class="interlude-art clip-reveal"><img src="assets/images/art-couple.jpg" alt="Regency-style oil painting of the couple beneath a gilded jharokha arch" loading="lazy"></div>
-          <p class="interlude-line fade-up">“Of all the matches this author has chronicled, none has been so plainly written in the stars.”</p>
+          <div class="interlude-art"><img src="assets/images/art-couple.jpg" alt="Regency-style oil painting of the couple beneath a gilded jharokha arch" loading="lazy"></div>
+          <p class="interlude-line">“Of all the matches this author has chronicled, none has been so plainly written in the stars.”</p>
         </div>
       </section>
 

@@ -22,34 +22,27 @@ const EVENTS = {
     title: 'Cocktail & Engagement — Riya & Sanchit',
     start: '20261211T143000Z', end: '20261211T183000Z',
     location: 'Radisson Hotel Chandigarh Zirakpur',
-    description: 'An evening of toasts and rings. Dress code: smart formals. Directions: ' + MAPS.radisson,
+    description: 'An evening of toasts and rings. Dress code: dazzling as you dare. Directions: ' + MAPS.radisson,
   },
   wedding: {
     title: 'Wedding of Riya & Sanchit',
     start: '20261212T133000Z', end: '20261212T183000Z',
     location: "De'vansh Resort, Ambala Cantt",
-    description: 'The grand affair: baraat, pheras and forever. Dress code: traditional Indian wedding attire. Directions: ' + MAPS.devansh,
+    description: 'The grand affair: baraat, pheras and forever. Directions: ' + MAPS.devansh,
   },
 };
 const GALLERY = [
-  { src: 'photo-01', alt: 'Riya and Sanchit, a quiet moment up close', cls: 'gframe--wide' },
-  { src: 'photo-02', alt: 'A twirl beneath the spiral staircase', cls: 'gframe--tall' },
-  { src: 'photo-03', alt: 'Walking together with a bouquet of roses' },
+  { src: 'photo-01', alt: 'A quiet forehead kiss before the floral arch', cls: 'gframe--tall' },
+  { src: 'photo-02', alt: 'A twirl beneath the spiral staircase' },
   { src: 'photo-04', alt: 'Sanchit on one knee, asking the question' },
   { src: 'photo-05', alt: 'Laughing together at the engagement' },
   { src: 'photo-06', alt: 'A playful moment with the groom’s stole' },
-  { src: 'photo-07', alt: 'Gazing at each other before the floral arch' },
-  { src: 'photo-08', alt: 'Poolside, in ivory and gold' },
-  { src: 'photo-09', alt: 'Through the painted temple corridor', cls: 'gframe--tall' },
+  { src: 'photo-08', alt: 'Poolside, in ivory and gold', cls: 'gframe--tall' },
   { src: 'photo-10', alt: 'A rooftop embrace at golden hour' },
-  { src: 'photo-11', alt: 'The couple, formally introduced' },
   { src: 'photo-12', alt: 'Nose to nose, mid-laugh' },
-  { src: 'photo-13', alt: 'Riya stepping out of the temple in red and ivory' },
   { src: 'photo-14', alt: 'Dancing at the engagement celebration', cls: 'gframe--wide' },
-  { src: 'photo-15', alt: 'Riya, radiant in her lehenga' },
   { src: 'photo-16', alt: 'Beneath the grand ceiling, holding close' },
   { src: 'photo-17', alt: 'Roses in hand, on the morning walk' },
-  { src: 'photo-18', alt: 'Together under the old banyan tree' },
 ];
 
 const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -80,6 +73,7 @@ function initGsap() {
   }
 
   smoother = ScrollSmoother.create({ smooth: 1.15, effects: true, smoothTouch: false, normalizeScroll: false });
+  if (document.getElementById('gate')) smoother.scrollTop(0);
 
   // one fade-up primitive everywhere (majestic/teatro numbers)
   ScrollTrigger.batch('.fade-up', {
@@ -90,12 +84,31 @@ function initGsap() {
       { y: 0, autoAlpha: 1, duration: 0.7, stagger: 0.08, ease: 'luxe', overwrite: true }),
   });
 
-  // curtain-style unveil for the couple portrait (bridgerton clipPath signature)
-  $$('.clip-reveal').forEach(el => {
-    gsap.fromTo(el,
-      { clipPath: 'inset(100% 0 0 0)', autoAlpha: 1 },
-      { clipPath: 'inset(0% 0 0 0)', duration: 1.6, ease: 'luxe',
-        scrollTrigger: { trigger: el, start: 'top 80%', once: true } });
+  // interlude: portrait eases in and the quote follows, one choreography
+  gsap.timeline({
+    defaults: { ease: 'luxe' },
+    scrollTrigger: { trigger: '.interlude-art', start: 'top 85%', once: true },
+  })
+    .fromTo('.interlude-art', { autoAlpha: 0, y: 44, scale: .97 }, { autoAlpha: 1, y: 0, scale: 1, duration: 1.5 })
+    .fromTo('.interlude-line', { autoAlpha: 0, y: 22 }, { autoAlpha: 1, y: 0, duration: 1 }, '-=.7');
+
+  // scrolling past the scratch card does the scratching (serpentine sweep)
+  let sweepDone = 0;
+  ScrollTrigger.create({
+    trigger: '.scratch-frame',
+    start: 'top 78%',
+    end: 'top 28%',
+    onUpdate(self) {
+      if (!scratchAPI.eraseNorm || scratchAPI.revealed()) return;
+      for (let t = sweepDone; t <= self.progress; t += 0.008) {
+        const row = Math.min(3, Math.floor(t * 4));
+        const u = (t * 4) % 1;
+        scratchAPI.eraseNorm(row % 2 ? 1 - u : u, 0.14 + row * 0.24);
+      }
+      sweepDone = Math.max(sweepDone, self.progress);
+      if (self.progress > 0.96) scratchAPI.check();
+    },
+    onLeave: () => scratchAPI.check && scratchAPI.check(),
   });
 
   // countdown digits get a slow settle
@@ -110,6 +123,9 @@ function initGsap() {
   const gateEl = $('#gate');
   const video = $('#gate-video');
   document.body.style.overflow = 'hidden';
+  // the invitation always opens from the top of the story
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  window.scrollTo(0, 0);
   let opened = false;
 
   $('#seal').addEventListener('click', () => {
@@ -151,11 +167,12 @@ function initGsap() {
   function crossToOpen(dur) {
     gsap.timeline()
       .to('.gate-still--open', { opacity: 1, duration: dur, ease: 'power2.inOut' })
-      .add(() => finish(false), `-=${dur * 0.25}`);
+      .add(() => finish(false), `-=${dur * 0.55}`);
   }
 
   function finish(instant) {
     document.body.style.overflow = '';
+    if (smoother) smoother.scrollTop(0); else window.scrollTo(0, 0);
     startHeroVideo();
     heroEntrance(instant);
     if (!window.gsap || instant) {
@@ -163,8 +180,10 @@ function initGsap() {
       if (window.ScrollTrigger) ScrollTrigger.refresh();
       return;
     }
+    // dissolve through the drapes: gate drifts closer while the hero settles back
+    gsap.fromTo('#hero-video, .hero-poster', { scale: 1.07 }, { scale: 1, duration: 2.6, ease: 'luxe' });
     gsap.to(gateEl, {
-      autoAlpha: 0, duration: 1.1, ease: 'power2.inOut', delay: .15,
+      autoAlpha: 0, scale: 1.05, transformOrigin: '50% 42%', duration: 1.5, ease: 'power2.inOut',
       onComplete: () => { gateEl.remove(); ScrollTrigger.refresh(); },
     });
   }
@@ -286,6 +305,7 @@ $('#music-toggle').addEventListener('click', () => {
 })();
 
 /* ── scratch-card date reveal (teatro pattern: destination-out, r30, 50%) ── */
+const scratchAPI = {};
 (function scratch() {
   const canvas = $('#scratch-canvas');
   const frame = $('.scratch-frame');
@@ -358,6 +378,16 @@ $('#music-toggle').addEventListener('click', () => {
   });
   new ResizeObserver(() => { if (!revealed) paintFoil(); }).observe(frame);
   paintFoil();
+
+  // hooks for the scroll-driven auto-scratch in initGsap
+  scratchAPI.eraseNorm = (nx, ny) => {
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.arc(nx * canvas.width, ny * canvas.height, canvas.height * 0.16, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  scratchAPI.check = () => { if (!revealed && progress() > 50) reveal(); };
+  scratchAPI.revealed = () => revealed;
 })();
 
 /* ── add-to-calendar: client-side ICS (majestic pattern) ────── */
@@ -410,6 +440,22 @@ async function initPetals() {
     $('#ambient').style.display = 'none'; // JS layer active; retire CSS fallback
   } catch (_) { /* CSS fallback stays visible */ }
 }
+
+/* ── day / night mode ───────────────────────────────────────── */
+(function theme() {
+  const btn = $('#theme-toggle');
+  const meta = document.querySelector('meta[name="theme-color"]');
+  function apply(t) {
+    document.documentElement.dataset.theme = t;
+    localStorage.setItem('theme', t);
+    btn.setAttribute('aria-pressed', String(t === 'dark'));
+    btn.setAttribute('aria-label', t === 'dark' ? 'Switch to day mode' : 'Switch to night mode');
+    if (meta) meta.content = t === 'dark' ? '#191322' : '#f7f4ee';
+  }
+  apply(document.documentElement.dataset.theme || 'light');
+  btn.addEventListener('click', () =>
+    apply(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'));
+})();
 
 /* ── tilt (pointer-fine only) ───────────────────────────────── */
 function initTilt() {
