@@ -76,7 +76,6 @@ export function initLightshow() {
   const cores = navigator.hardwareConcurrency || 4;
   const mem = navigator.deviceMemory || 4;
   let tier = (cores >= 8 && mem >= 8) ? 2 : (cores >= 4 && mem >= 4) ? 1 : 0;
-  if (typeof window !== 'undefined' && window.__lsTest) tier = 2; // verify hook: force tier, skip governor
   const TIERS = {
     2: { dpr: 1.5, motes: 1300 },
     1: { dpr: 1.0, motes: 800 },
@@ -274,21 +273,20 @@ export function initLightshow() {
       const pivot = new THREE.Group(); pivot.add(inner); pivot.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(inner);
       const h = box.getSize(new THREE.Vector3()).y || 1;
-      inner.position.sub(box.getCenter(new THREE.Vector3()));
+      inner.position.sub(box.getCenter(new THREE.Vector3())); // centre geometry at the pivot origin
       pivot.scale.setScalar((DANCER_H_FRAC * vh) / h);
-      inner.rotation.y = sd < 0 ? 0.4 : -0.4;                  // angle toward centre
+      pivot.rotation.y = sd < 0 ? 0.4 : -0.4;                  // spin around the model CENTRE (pivot), not an offset
       const grp = new THREE.Group(); grp.add(pivot);
       grp.position.set(sd * X, 0, -DANCER_D);                  // vertically centred → full model shows
       grp.visible = false;
       scene.add(grp);
-      dancers.push({ grp, inst: inner, mats, side: sd, k: 0, baseY: 0 });
+      dancers.push({ grp, inst: inner, spin: pivot, mats, side: sd, k: 0, baseY: 0 });
     }
   }
 
   // ---- FPS governor: measure real frame times, degrade or floor ----
   let sampleStart = 0, sampleFrames = 0, sampleAcc = 0, measuring = true;
   function govern(dt) {
-    if (window.__lsTest) { measuring = false; return; }
     if (!measuring) return;
     sampleAcc += dt; sampleFrames++;
     if (sampleAcc < 2) return;               // measure ~2s per scene
@@ -366,7 +364,6 @@ export function initLightshow() {
     if (appState.ignited) ensureMecha();
     let dancerK = 0;
     if (dancers.length) {
-      if (appState.forceDrop) { lastDrop = now; dropSide = -dropSide; appState.forceDrop = false; }
       // a drop = an onset while energy is high, with a cooldown so it's an event
       if (burst && e > 0.6 && (now - lastDrop) > 7) { lastDrop = now; dropSide = -dropSide; }
       const ts = now - lastDrop; // seconds since the last drop
@@ -378,7 +375,7 @@ export function initLightshow() {
         d.grp.visible = d.k > 0.01;
         for (const mm of d.mats) mm.opacity = Math.min(1, d.k);
         if (d.grp.visible) {
-          d.inst.rotation.y += 0.02 + e * 0.05;                            // turn/show off
+          d.spin.rotation.y += 0.02 + e * 0.05;                            // turn/show off (spins in place)
           d.grp.position.y = d.baseY + Math.sin(now * 3 + d.side) * 0.35 * d.k; // bob
           d.grp.rotation.z = Math.sin(now * 2 + d.side) * 0.05 * d.k;           // sway
         }
@@ -423,8 +420,6 @@ export function initLightshow() {
   } catch (e) { floor(); return; }
   window.addEventListener('resize', onResize, { passive: true });
   document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); else start(); });
-
-  state.dbgDancers = () => dancers.map((d) => ({ k: +(d.k || 0).toFixed(2), vis: d.grp.visible, pos: [+d.grp.position.x.toFixed(1), +d.grp.position.y.toFixed(1), +d.grp.position.z.toFixed(1)], sc: +(d.inst.parent ? d.inst.parent.scale.x : -1).toFixed(4), op: +((d.mats[0] ? d.mats[0].opacity : -1)).toFixed(2), tier }));
 
   const amb = $('#ambient'); if (amb) amb.style.display = 'none'; // JS show live → retire CSS fog
   raf = requestAnimationFrame(frame);
