@@ -152,24 +152,10 @@ export function initLightshow() {
     scene.add(glowCore);
 
     // Dancers: a few luminous figures at depth, silhouetted against the glow.
-    // Count scales with the device tier (0 on the weakest). They stay invisible
-    // until ignition (the tap), then fade in and dance.
+    // The drop dancer (mecha glTF) is instanced once it has loaded; on a
+    // governor rebuild it re-instances from the cached template.
     dancers = [];
-    const DANCE_N = tier === 2 ? 3 : tier === 1 ? 2 : 0;
-    // close enough to survive the exp fog (they should read as figures IN the
-    // haze, not be erased by it), low and to the sides so they frame the names.
-    const spread = [-9.5, 9, -5.5];
-    const zs = [-17, -19, -27];
-    for (let i = 0; i < DANCE_N; i++) {
-      const f = makeFigure();
-      const s = 1.0 + (i % 2) * 0.22;
-      f.group.scale.set(s, s, s);
-      f.baseY = -3.6 * s;
-      f.group.position.set(spread[i], f.baseY, zs[i]);
-      f.phase = i * 2.1;
-      scene.add(f.group);
-      dancers.push(f);
-    }
+    if (mechaTemplate) addDancers();
   }
 
   // place a mote on a tunnel ring at a given depth
@@ -205,34 +191,56 @@ export function initLightshow() {
     const t = new THREE.CanvasTexture(c); t.needsUpdate = true; return t;
   }
 
-  // A stylized luminous dancer — a light-FIGURE in the haze (Anyma register),
-  // built procedurally from primitives (no rigged glTF). Additive so it reads as
-  // a glowing silhouette, not a solid mannequin. Joints are animatable; the
-  // figure sways/dances to the beat. Swap in a license-clear rigged glTF later
-  // for a photoreal figure without touching the rest of the show.
-  function makeFigure() {
-    // fog:false so the figures read clearly as dancers instead of being erased
-    // by the tunnel's exp fog at depth.
-    const mat = new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
-    const limb = (len, r0, r1) => new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, len, 7, 1, true), mat);
-    const g = new THREE.Group();
-    const torso = limb(2.2, 0.26, 0.42); torso.position.y = 2.3; g.add(torso);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), mat); head.position.y = 3.85; g.add(head);
-    const arm = (side) => {
-      const pivot = new THREE.Group(); pivot.position.set(side * 0.5, 3.3, 0);
-      const upper = limb(1.5, 0.14, 0.12); upper.position.y = -0.75; pivot.add(upper);
-      const elbow = new THREE.Group(); elbow.position.y = -1.5; pivot.add(elbow);
-      const fore = limb(1.3, 0.11, 0.09); fore.position.y = -0.65; elbow.add(fore);
-      g.add(pivot); return { pivot, elbow };
-    };
-    const leg = (side) => {
-      const pivot = new THREE.Group(); pivot.position.set(side * 0.22, 1.2, 0);
-      const thigh = limb(1.5, 0.17, 0.14); thigh.position.y = -0.75; pivot.add(thigh);
-      const knee = new THREE.Group(); knee.position.y = -1.5; pivot.add(knee);
-      const shin = limb(1.4, 0.13, 0.1); shin.position.y = -0.7; knee.add(shin);
-      g.add(pivot); return { pivot, knee };
-    };
-    return { group: g, mat, torso, armL: arm(-1), armR: arm(1), legL: leg(-1), legR: leg(1) };
+  // ── Drop dancer: the cyber mecha (glTF/Draco), shown ONLY on big drops ──
+  // Lazy-loaded after ignition (never for reduced-motion or tier-0 devices). A
+  // studio env + lights make its chrome/metal read. Placed on the SIDES so the
+  // centre stays clear for content. It fades in on a drop, dances, fades out —
+  // and dims the haze while it's up, so it "replaces" the ambient show.
+  let mechaTemplate = null, mechaLoading = false, lastDrop = -999, dropSide = 1;
+  function ensureMecha() {
+    if (mechaLoading || mechaTemplate || tier === 0 || !THREE.GLTFLoader || !renderer) return;
+    mechaLoading = true;
+    try {
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      scene.environment = pmrem.fromScene(new THREE.RoomEnvironment(), 0.04).texture;
+    } catch (e) { /* env optional */ }
+    const dir = new THREE.DirectionalLight(0x9fe8ff, 2.4); dir.position.set(3, 6, 4); scene.add(dir);
+    scene.add(new THREE.AmbientLight(0x22303c, 0.6));
+    try {
+      const draco = new THREE.DRACOLoader();
+      draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+      const loader = new THREE.GLTFLoader(); loader.setDRACOLoader(draco);
+      loader.load('assets/scene/mecha.glb', (g) => {
+        const o = g.scene;
+        let box = new THREE.Box3().setFromObject(o);
+        const sph = box.getBoundingSphere(new THREE.Sphere());
+        o.scale.setScalar(3.6 / (sph.radius || 1));
+        box = new THREE.Box3().setFromObject(o);
+        o.position.sub(box.getCenter(new THREE.Vector3())); // centre at local origin
+        mechaTemplate = o;
+        addDancers();
+        state.mechaReady = true;
+      }, undefined, () => { mechaLoading = false; });
+    } catch (e) { mechaLoading = false; }
+  }
+  // Instance the mecha on the side(s). Two sides on the strongest tier, one else.
+  function addDancers() {
+    if (!mechaTemplate || !scene) return;
+    dancers = [];
+    const sides = tier === 2 ? [-1, 1] : [1];
+    for (const sd of sides) {
+      const inst = mechaTemplate.clone(true);
+      const mats = [];
+      inst.traverse((m) => {
+        if (m.isMesh && m.material) { m.material = m.material.clone(); m.material.transparent = true; m.material.opacity = 0; mats.push(m.material); }
+      });
+      const grp = new THREE.Group(); grp.add(inst);
+      grp.position.set(sd * 9.5, -1.5, -13);
+      inst.rotation.y = sd < 0 ? 0.4 : -0.4; // angle toward centre
+      grp.visible = false;
+      scene.add(grp);
+      dancers.push({ grp, inst, mats, side: sd, k: 0 });
+    }
   }
 
   // ---- FPS governor: measure real frame times, degrade or floor ----
@@ -263,7 +271,7 @@ export function initLightshow() {
     if (bokeh) { bokeh.geometry.dispose(); bokeh.material.dispose(); }
     if (glow) glow.material.dispose();
     if (glowCore) glowCore.material.dispose();
-    for (const f of dancers) { f.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); f.mat.dispose(); }
+    for (const d of dancers) { d.grp.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); for (const mm of d.mats) mm.dispose(); }
     dancers = [];
     if (renderer) { renderer.dispose(); }
     scene = motes = bokeh = glow = glowCore = null;
@@ -310,30 +318,41 @@ export function initLightshow() {
     }
     motes.geometry.attributes.position.needsUpdate = true;
     motes.material.size = 0.4 + e * 0.5;
-    motes.material.opacity = 0.4 + e * 0.5;
+
+    // ── DROP DANCER: the mecha appears ONLY on a big drop, on the side ──
+    if (appState.ignited) ensureMecha();
+    let dancerK = 0;
+    if (dancers.length) {
+      if (appState.forceDrop) { lastDrop = now; dropSide = -dropSide; appState.forceDrop = false; }
+      // a drop = an onset while energy is high, with a cooldown so it's an event
+      if (burst && e > 0.6 && (now - lastDrop) > 7) { lastDrop = now; dropSide = -dropSide; }
+      const ts = now - lastDrop; // seconds since the last drop
+      for (const d of dancers) {
+        const mine = dancers.length === 1 || d.side === dropSide;
+        // envelope over the ~5.5s drop window: fade in, hold, fade out
+        const target = (mine && ts < 5.5) ? (ts < 0.5 ? ts / 0.5 : Math.min(1, Math.max(0, 5.5 - ts))) : 0;
+        d.k += (target - d.k) * 0.14;
+        d.grp.visible = d.k > 0.01;
+        for (const mm of d.mats) mm.opacity = Math.min(1, d.k);
+        if (d.grp.visible) {
+          d.inst.rotation.y += 0.02 + e * 0.05;                       // turn/show off
+          d.grp.position.y = -1.5 + Math.sin(now * 3 + d.side) * 0.4 * d.k; // bob
+          d.grp.rotation.z = Math.sin(now * 2 + d.side) * 0.05 * d.k;       // sway
+        }
+        dancerK = Math.max(dancerK, d.k);
+      }
+    }
+    // while a dancer is up, the haze recedes so the figure "replaces" the show
+    const haze = 1 - 0.55 * dancerK;
+    motes.material.opacity = (0.4 + e * 0.5) * haze;
 
     // accent glow: rate-limit brightness change (flash safety backstop)
     const targetGlow = 0.2 + e * 0.6 + beat * 0.12;
     glowBright += Math.max(-0.05, Math.min(0.05, targetGlow - glowBright)); // ≤0.05/frame
-    glow.material.opacity = glowBright * 0.7 * (0.35 + 0.65 * ignite);
+    glow.material.opacity = glowBright * 0.7 * (0.35 + 0.65 * ignite) * haze;
     glowCore.material.opacity = (0.3 + glowBright * 0.5) * (0.3 + 0.7 * ignite);
     glow.position.z = glowCore.position.z = -72 + Math.sin(now * 0.2) * 6;
     glow.material.rotation += 0.002;
-
-    // dancers: invisible until ignition, then fade in and dance harder on drops
-    for (const f of dancers) {
-      f.mat.opacity = Math.min(0.85, ignite * (0.5 + e * 0.4));
-      const t2 = now * (1.05 + e * 0.7) + f.phase;
-      const amp = 0.25 + e * 0.9 + beat * 0.5;
-      f.group.rotation.z = Math.sin(t2 * 0.9) * 0.12 * ignite;
-      f.group.position.y = f.baseY + Math.abs(Math.sin(t2)) * 0.4 * ignite;
-      f.armL.pivot.rotation.z = 0.5 + Math.sin(t2) * amp;
-      f.armR.pivot.rotation.z = -0.5 - Math.sin(t2 + 0.6) * amp;
-      f.armL.elbow.rotation.z = -0.4 - Math.max(0, Math.sin(t2)) * 0.6;
-      f.armR.elbow.rotation.z = 0.4 + Math.max(0, Math.sin(t2 + 0.6)) * 0.6;
-      f.legL.pivot.rotation.x = Math.sin(t2) * 0.16 * amp;
-      f.legR.pivot.rotation.x = -Math.sin(t2) * 0.16 * amp;
-    }
 
     // subtle camera parallax + fog breathing
     camera.position.x = Math.sin(now * 0.13) * 0.7;

@@ -268,6 +268,8 @@ function runBuild() {
   const copyFilter = (src) => {
     const parts = src.split(path.sep);
     if (parts.includes('gen')) return false;
+    // The 3D scene asset (dancer model) is a techno-only asset.
+    if (theme !== 'techno' && parts.includes('scene')) return false;
     if (theme === 'techno') {
       // No Regency palace footage in the techno build (LOCKED).
       if (parts.includes('videos')) return false;

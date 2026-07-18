@@ -456,8 +456,12 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/Flip.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/vanilla-tilt@1.8.1/dist/vanilla-tilt.min.js" defer></script>
-  <!-- three.js (CDN <script>, like GSAP) drives the Path-A WebGL backdrop. -->
+  <!-- three.js (CDN <script>, like GSAP) drives the Path-A WebGL backdrop, plus
+       loaders for the drop-triggered 3D dancer (glTF + Draco + a studio env). -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
+  <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/GLTFLoader.js" defer></script>
+  <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/DRACOLoader.js" defer></script>
+  <script src="https://unpkg.com/three@0.128.0/examples/js/environments/RoomEnvironment.js" defer></script>
   <script type="module" src="js/main.js"></script>
 </body>
 </html>
