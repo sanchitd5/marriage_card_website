@@ -3,20 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>{{PAIR_TITLE}} — Shubh Vivah · 12 December 2026</title>
-  <meta name="description" content="Dearest friends and family, it is with the greatest pleasure that we announce the wedding of {{FULL_A}} and {{FULL_B}} — December 2026, Chandigarh & Ambala.">
+  <title>{{PAIR_TITLE}} — Shubh Vivah{{TITLE_DATE}}</title>
+  <meta name="description" content="Dearest friends and family, it is with the greatest pleasure that we announce the wedding of {{FULL_A}} and {{FULL_B}} — {{MONTH_YEAR}}{{META_LOCATION}}.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="{{SITE_URL}}/">
   <meta property="og:locale" content="en_IN">
   <meta property="og:title" content="{{PAIR_TITLE_RAW}} — Shubh Vivah">
-  <meta property="og:description" content="You are cordially invited to the most anticipated affair of the season. 11–12 December 2026.">
+  <meta property="og:description" content="You are cordially invited to the most anticipated affair of the season. {{DATE_RANGE}}.">
   <meta property="og:image" content="{{SITE_URL}}/assets/images/{{SHARE_IMG}}">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Invitation card for {{FIRST_A}} and {{FIRST_B}}'s wedding celebration on 11–12 December 2026.">
+  <meta property="og:image:alt" content="Invitation card for {{FIRST_A}} and {{FIRST_B}}'s wedding celebration, {{DATE_RANGE}}.">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="{{PAIR_TITLE_RAW}} — Shubh Vivah">
-  <meta name="twitter:description" content="You are cordially invited to the most anticipated affair of the season. 11–12 December 2026.">
+  <meta name="twitter:description" content="You are cordially invited to the most anticipated affair of the season. {{DATE_RANGE}}.">
   <meta name="twitter:image" content="{{SITE_URL}}/assets/images/{{SHARE_IMG}}">
   <meta name="theme-color" content="#f7f4ee">
   <meta name="mobile-web-app-capable" content="yes">
@@ -249,7 +249,7 @@
             <span class="hero-amp hero-seq">&amp;</span>
             <span class="hero-name hero-seq">{{FIRST_B}}</span>
           </h1>
-          <p class="hero-date hero-seq">11 <span class="hero-amp">&amp;</span> 12 December 2026 <span class="hero-date-sep">·</span> <span class="hero-date-location">Chandigarh &amp; Ambala</span></p>
+          <p class="hero-date hero-seq">{{HERO_LINE}}</p>
           <p class="hero-tag hero-seq" id="hero-hashtag">
             <span class="hero-tag-text" data-tags="{{TAG_PRIMARY}},{{TAG_SECONDARY}}">{{TAG_PRIMARY}}</span>
           </p>
@@ -277,8 +277,8 @@
             <p class="scratch-hint">A gentle scratch of your fingertip will do</p>
             <div class="scratch-frame">
               <div class="scratch-under">
-                <span class="scratch-date">12·12·2026</span>
-                <span class="scratch-sub">seven o'clock in the evening</span>
+                <span class="scratch-date">{{SCRATCH_DATE}}</span>
+                <span class="scratch-sub">{{SCRATCH_SUB}}</span>
               </div>
               <canvas id="scratch-canvas" aria-label="Scratch-off panel hiding the wedding date"></canvas>
             </div>
@@ -297,11 +297,11 @@
               <div class="event-art arch"><img src="assets/images/art-haldi.jpg" alt="Painting of hands holding turmeric and marigold petals" loading="lazy"></div>
               <p class="event-no">The First Affair</p>
               <h3 class="event-name">Haldi</h3>
-              <p class="event-when"><time datetime="2026-12-11T11:00+05:30">Friday, 11 December 2026 · 11 o'clock in the morning</time></p>
-              <p class="event-venue">Radisson Hotel Chandigarh Zirakpur</p>
+              <p class="event-when"><time datetime="{{EVENT_HALDI_DT}}">{{EVENT_HALDI_WHEN}}</time></p>
+              <p class="event-venue">{{EVENT_HALDI_VENUE}}</p>
               <p class="event-dress"><span>Dress code</span> Shades of yellow</p>
               <div class="event-actions">
-                <a class="btn-quiet" href="https://maps.app.goo.gl/fQhBFytYAZKu4qBB7" target="_blank" rel="noopener">Get directions</a>
+                <a class="btn-quiet" href="{{EVENT_HALDI_MAP}}" target="_blank" rel="noopener" {{REVEAL_ONLY}}>Get directions</a>
                 <button class="btn-quiet" data-ics="haldi">Add to calendar</button>
               </div>
             </article>
@@ -310,11 +310,11 @@
               <div class="event-art arch"><img src="assets/images/art-cocktail.jpg" alt="Painting of raised glasses on a palace terrace at dusk" loading="lazy"></div>
               <p class="event-no">The Second Affair</p>
               <h3 class="event-name">Cocktail &amp; Engagement</h3>
-              <p class="event-when"><time datetime="2026-12-11T20:00+05:30">Friday, 11 December 2026 · 8 o'clock in the evening</time></p>
-              <p class="event-venue">Radisson Hotel Chandigarh Zirakpur</p>
+              <p class="event-when"><time datetime="{{EVENT_COCKTAIL_DT}}">{{EVENT_COCKTAIL_WHEN}}</time></p>
+              <p class="event-venue">{{EVENT_COCKTAIL_VENUE}}</p>
               <p class="event-dress"><span>Dress code</span> Dazzling as you dare</p>
               <div class="event-actions">
-                <a class="btn-quiet" href="https://maps.app.goo.gl/fQhBFytYAZKu4qBB7" target="_blank" rel="noopener">Get directions</a>
+                <a class="btn-quiet" href="{{EVENT_COCKTAIL_MAP}}" target="_blank" rel="noopener" {{REVEAL_ONLY}}>Get directions</a>
                 <button class="btn-quiet" data-ics="cocktail">Add to calendar</button>
               </div>
             </article>
@@ -323,11 +323,11 @@
               <div class="event-art arch"><img src="assets/images/art-pheras.jpg" alt="Painting of a couple at the pheras beneath a floral mandap" loading="lazy"></div>
               <p class="event-no">The Grand Affair</p>
               <h3 class="event-name">The Wedding</h3>
-              <p class="event-when"><time datetime="2026-12-12T19:00+05:30">Saturday, 12 December 2026 · 7 o'clock in the evening</time></p>
-              <p class="event-venue">De'vansh Resort, Ambala Cantt</p>
+              <p class="event-when"><time datetime="{{EVENT_WEDDING_DT}}">{{EVENT_WEDDING_WHEN}}</time></p>
+              <p class="event-venue">{{EVENT_WEDDING_VENUE}}</p>
               <p class="event-dress"><span>Dress code</span> Traditional grandeur</p>
               <div class="event-actions">
-                <a class="btn-quiet" href="https://maps.app.goo.gl/RdueUZ2XfNiAnbD18" target="_blank" rel="noopener">Get directions</a>
+                <a class="btn-quiet" href="{{EVENT_WEDDING_MAP}}" target="_blank" rel="noopener" {{REVEAL_ONLY}}>Get directions</a>
                 <button class="btn-quiet" data-ics="wedding">Add to calendar</button>
               </div>
             </article>

@@ -235,6 +235,27 @@ export function initCountdown() {
   if (!els.d || !els.h || !els.m || !els.s) return;
 
   const pad = n => String(n).padStart(2, '0');
+
+  // Reveal gated off: there is no real target and a truthful countdown would
+  // leak the date. Keep the cells ALIVE with a gentle once-a-second shimmer of
+  // NON-alphanumeric glyphs (no digits → never reads as a broken timer), to
+  // build anticipation. Reduced-motion → a calm static glyph.
+  if (!WEDDING_TS) {
+    const GLYPHS = ['✦', '✧', '·', '•'];
+    const cells = [els.d, els.h, els.m, els.s];
+    if (REDUCED) {
+      cells.forEach(el => { el.textContent = '✦'; });
+      return;
+    }
+    let i = 0;
+    const shimmer = () => {
+      cells.forEach((el, offset) => { el.textContent = GLYPHS[(i + offset) % GLYPHS.length]; });
+      i++;
+    };
+    shimmer();
+    setInterval(shimmer, 1000);
+    return;
+  }
   function tick() {
     const diff = Math.max(0, WEDDING_TS - Date.now());
     const d = Math.floor(diff / 864e5);
@@ -292,18 +313,21 @@ function icsFor(ev) {
 }
 
 export function initCalendarButtons() {
-  $$('[data-ics]').forEach(btn => btn.addEventListener('click', () => {
+  $$('[data-ics]').forEach(btn => {
     const ev = EVENTS[btn.dataset.ics];
-    if (!ev) return;
-    const blob = new Blob([icsFor(ev)], { type: 'text/calendar' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${btn.dataset.ics}-${NAMES.firstA}-${NAMES.firstB}.ics`.toLowerCase();
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-  }));
+    // No date yet (reveal gated) → hide the calendar button; nothing to add.
+    if (!ev || !ev.start) { btn.hidden = true; return; }
+    btn.addEventListener('click', () => {
+      const blob = new Blob([icsFor(ev)], { type: 'text/calendar' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${btn.dataset.ics}-${NAMES.firstA}-${NAMES.firstB}.ics`.toLowerCase();
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    });
+  });
 }
 
 export async function initPetals() {

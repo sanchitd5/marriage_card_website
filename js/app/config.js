@@ -1,34 +1,32 @@
-import { NAMES, SONGS } from './couple.mjs';
+import { NAMES, SONGS, WEDDING_TS, REVEAL_DATE, EVENT_DATES, EVENT_VENUES } from './couple.mjs';
 
 // SONGS is auto-discovered from assets/audio/theme-N.mp3 at build time.
-export { NAMES, SONGS };
+// WEDDING_TS / EVENT_DATES / EVENT_VENUES are build-gated: null while
+// site.config revealDate is false, so NO date- or venue-identifying value
+// ships in this (verbatim-copied) module until the reveal.
+export { NAMES, SONGS, WEDDING_TS, REVEAL_DATE };
 
-export const WEDDING_TS = Date.UTC(2026, 11, 12, 13, 30, 0); // 12 Dec 2026, 19:00 IST (edit here)
+const D = EVENT_DATES || {};
+const V = EVENT_VENUES || {};
 
-export const MAPS = {
-  radisson: 'https://maps.app.goo.gl/fQhBFytYAZKu4qBB7',
-  devansh: 'https://maps.app.goo.gl/RdueUZ2XfNiAnbD18',
+// Only non-identifying copy (blurb + dress code) lives here; venue name, map
+// link and dates come from the generated module and are absent while hidden.
+const BLURB = {
+  haldi: 'The first affair of the celebrations. Dress code: shades of yellow.',
+  cocktail: 'An evening of toasts and rings. Dress code: dazzling as you dare.',
+  wedding: 'The grand affair: baraat, pheras and forever. Dress code: traditional grandeur.',
 };
-
+const mkEvent = (key, title) => ({
+  title,
+  ...(D[key] || {}),
+  ...(V[key]
+    ? { location: V[key].location, description: `${BLURB[key]} Directions: ${V[key].map}` }
+    : {}),
+});
 export const EVENTS = {
-  haldi: {
-    title: `Haldi — ${NAMES.pairTitle}`,
-    start: '20261211T053000Z', end: '20261211T083000Z',
-    location: 'Radisson Hotel Chandigarh Zirakpur',
-    description: 'The first affair of the celebrations. Dress code: shades of yellow. Directions: ' + MAPS.radisson,
-  },
-  cocktail: {
-    title: `Cocktail & Engagement — ${NAMES.pairTitle}`,
-    start: '20261211T143000Z', end: '20261211T183000Z',
-    location: 'Radisson Hotel Chandigarh Zirakpur',
-    description: 'An evening of toasts and rings. Dress code: dazzling as you dare. Directions: ' + MAPS.radisson,
-  },
-  wedding: {
-    title: `Wedding of ${NAMES.pairTitle}`,
-    start: '20261212T133000Z', end: '20261212T183000Z',
-    location: "De'vansh Resort, Ambala Cantt",
-    description: 'The grand affair: baraat, pheras and forever. Dress code: traditional grandeur. Directions: ' + MAPS.devansh,
-  },
+  haldi: mkEvent('haldi', `Haldi — ${NAMES.pairTitle}`),
+  cocktail: mkEvent('cocktail', `Cocktail & Engagement — ${NAMES.pairTitle}`),
+  wedding: mkEvent('wedding', `Wedding of ${NAMES.pairTitle}`),
 };
 
 export const GALLERY = [
