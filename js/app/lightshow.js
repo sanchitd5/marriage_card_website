@@ -225,7 +225,7 @@ export function initLightshow() {
   // z = depth into the tunnel (more negative = deeper/farther). y = vertical
   // offset in world units (+up/-down). x is the horizontal offset in world units:
   // xDesktop puts it out to the side on wide screens, xMobile on phones (0 = centre).
-  const DANCER = { size: 0.12, z: -45, y: 0, xDesktop: 9, xMobile: 0 };
+  const DANCER = { size: 0.12, z: -450, y: 0, xDesktop: 9, xMobile: 0 };
   let mechaRawH = 1;            // model's un-scaled height (for the fit)
   let mechaCenter = null;       // model's raw bounding-box centre
   function ensureMecha() {
