@@ -351,7 +351,7 @@ export function initLightshow() {
   }
 
   // ---- main loop ----
-  let smoothE = 0.3, glowBright = 0.4, ignite = 0, beat = 0;
+  let smoothE = 0.3, glowBright = 0.4, ignite = 0, beat = 0, dropLevel = 0;
   const rootStyle = document.documentElement.style;
   let last = 0;
   function frame(ts) {
@@ -381,6 +381,13 @@ export function initLightshow() {
     // expose to the DOM for beat-reactive UI (small-area glow only → flash-safe)
     rootStyle.setProperty('--energy', e.toFixed(3));
     rootStyle.setProperty('--beat', beat.toFixed(3));
+
+    // drop level: rises during loud/high-energy sections, spikes on hard beats,
+    // eases out in the quiet — drives the MilkDrop viz (appears only on drops)
+    const dropTarget = e > 0.58 ? 1 : 0;
+    dropLevel += (dropTarget - dropLevel) * (dropTarget > dropLevel ? 0.12 : 0.03); // fast in, slow out
+    dropLevel = Math.max(dropLevel, beat * ignite * 0.9);
+    state.drop = dropLevel;
 
     // advance motes toward camera; recycle past the near plane
     const depth = motes.userData.depth;

@@ -13,6 +13,7 @@ import { appState } from './state.js';
 
 const PRESET_SECONDS = 14;   // change preset every N seconds
 const BLEND = 5.5;           // preset crossfade seconds
+const MAX_OPACITY = 0.6;     // opacity at a full drop (it only shows on hard drops)
 
 export function initMilkdrop() {
   if (REDUCED) return;
@@ -56,14 +57,20 @@ export function initMilkdrop() {
       pi = (pi + 1) % presets.length;
       try { viz.loadPreset(presets[pi], BLEND); } catch (e) {}
     }, PRESET_SECONDS * 1000);
-    canvas.classList.add('is-live');
     startLoop();
   }
 
   function startLoop() {
     if (running || !viz) return;
     running = true;
-    (function loop() { if (!running) return; try { viz.render(); } catch (e) {} raf = requestAnimationFrame(loop); })();
+    (function loop() {
+      if (!running) return;
+      try { viz.render(); } catch (e) {}
+      // appear only on hard drops: opacity follows the light show's drop level
+      const d = (appState.lightshow && appState.lightshow.drop) || 0;
+      canvas.style.opacity = (MAX_OPACITY * d).toFixed(3);
+      raf = requestAnimationFrame(loop);
+    })();
   }
   function stopLoop() { running = false; cancelAnimationFrame(raf); }
 

@@ -326,11 +326,10 @@ html[data-theme="dark"] #theme-toggle .icon-sun { display: block; }
    palette so the colourful presets stay on-brand; fades in once live. */
 #milkdrop {
   position: fixed; inset: 0; z-index: 0; width: 100%; height: 100%; pointer-events: none;
-  opacity: 0; transition: opacity 1.4s ease;
+  opacity: 0; /* driven per-frame by the drop level in milkdrop.js */
   filter: saturate(0.5) hue-rotate(140deg) contrast(1.05) brightness(0.7);
   mix-blend-mode: screen;
 }
-#milkdrop.is-live { opacity: 0.5; }
 #lightshow { position: fixed; inset: 0; z-index: 0; width: 100%; height: 100%; pointer-events: none; }
 .ls-vignette {
   position: fixed; inset: 0; z-index: 1; pointer-events: none;
