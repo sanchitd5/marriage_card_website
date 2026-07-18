@@ -10,7 +10,8 @@ import {
   parseFromGroomSide,
   composeNames,
   htmlEscape,
-  renderFamilySide,
+  joinFamilies,
+  buildFamilyBlessing,
   buildHtmlTokens,
   buildManifestTokens,
   applyTokens,
@@ -25,13 +26,11 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const fx = {
   groom: {
     first: 'A$1', full: 'A Full', initial: 'A', surname: 'AS',
-    hashtag: '#a', role: 'groom', parents: 'P & Q',
-    paternalGrandparents: 'G <one>', maternalGrandparents: 'G <mat-a>',
+    hashtag: '#a', role: 'groom', families: ['Fam <one>', 'Fam Two'],
   },
   bride: {
     first: 'B', full: 'B Full', initial: 'B', surname: 'BS',
-    hashtag: '#b', role: 'bride', parents: 'R & S',
-    paternalGrandparents: "G'two", maternalGrandparents: "G'mat-b",
+    hashtag: '#b', role: 'bride', families: [],
   },
 };
 
@@ -88,35 +87,47 @@ test('htmlEscape: escapes & first so it does not double-encode', () => {
   assert.equal(htmlEscape('<'), '&lt;');
 });
 
-// ---- renderFamilySide -------------------------------------------------
-test('renderFamilySide: primary side shows both grandparent sets + parents', () => {
-  const html = renderFamilySide(
-    { role: 'groom', parents: 'P & Q', paternalGrandparents: 'G <one>', maternalGrandparents: 'G two' },
-    { primary: true },
-  );
-  assert.match(html, /Grand Parents of the groom/);
-  assert.match(html, /Parents of the groom/);
-  assert.match(html, /P &amp; Q/);
-  assert.match(html, /G &lt;one&gt;/); // paternal, escaped
-  assert.match(html, /G two/); // maternal
-  assert.match(html, /class="family-side fade-up"/);
+// ---- joinFamilies / buildFamilyBlessing -------------------------------
+test('joinFamilies: single surname → "the X family" (singular)', () => {
+  assert.equal(joinFamilies(['Verma']), 'the <span class="fq-fam">Verma</span> family');
 });
-test('renderFamilySide: secondary side is parents-only (no grandparents)', () => {
-  const html = renderFamilySide({
-    role: 'bride', parents: 'R & S', paternalGrandparents: 'GP', maternalGrandparents: 'GM',
-  });
-  assert.match(html, /Parents of the bride/);
-  assert.match(html, /R &amp; S/);
-  assert.doesNotMatch(html, /Grand Parents of the bride/);
-  assert.doesNotMatch(html, /GP|GM/);
+test('joinFamilies: n surnames → comma list + "&" before last, plural, no Oxford comma', () => {
+  const out = joinFamilies(['Dang', 'Bhalla', 'Arora', 'Batra']);
+  assert.match(out, /Dang, Bhalla, Arora &amp; Batra/);
+  assert.doesNotMatch(out, /Arora, &amp;/); // no serial comma before the ampersand
+  assert.match(out, /<\/span> families$/); // plural noun
 });
-test('renderFamilySide: placeholder grandparent set is skipped', () => {
-  const html = renderFamilySide(
-    { role: 'groom', parents: 'P & Q', paternalGrandparents: 'Real GP', maternalGrandparents: 'Names to be added' },
-    { primary: true },
+test('joinFamilies: two surnames → "X & Y families" (no comma)', () => {
+  assert.match(joinFamilies(['Dang', 'Bhalla']), /Dang &amp; Bhalla<\/span> families/);
+});
+test('joinFamilies: skips tbd/empty, escapes, respects limit', () => {
+  assert.equal(joinFamilies([]), null);
+  assert.equal(joinFamilies([{ tbd: true }]), null);
+  assert.match(joinFamilies(['A <x>', { tbd: true }]), /A &lt;x&gt;/);
+  assert.match(joinFamilies(['Verma', 'Extra'], { limit: 1 }), /Verma<\/span> family$/);
+});
+test('buildFamilyBlessing: embeds primary (all) + other (first only), leading cap, no numeral', () => {
+  const q = buildFamilyBlessing(
+    { role: 'groom', families: ['Dang', 'Bhalla', 'Arora', 'Batra'] },
+    { role: 'bride', families: ['Verma', { tbd: true }] },
   );
-  assert.match(html, /Real GP/);
-  assert.doesNotMatch(html, /Names to be added/);
+  // \s tolerates the nbsp that binds each article to its surname group
+  assert.match(q, /^The\s<span class="fq-fam">Dang, Bhalla, Arora &amp; Batra<\/span> families and the\s<span class="fq-fam">Verma<\/span> family, united in love$/);
+  assert.doesNotMatch(q, /To be announced/);
+  assert.doesNotMatch(q, /\btwo\b|houses/i); // no count that could contradict the list
+});
+test('buildFamilyBlessing: falls back when a side has no names', () => {
+  const q = buildFamilyBlessing({ role: 'groom', families: [] }, { role: 'bride', families: ['Verma'] });
+  assert.equal(q, 'Two families, united in love');
+});
+test('buildHtmlTokens: FAMILY_BLESSING_NAMES carries the woven quotation', () => {
+  const t = buildHtmlTokens(composeNames(true, {
+    groom: { ...fx.groom, families: ['Dang', 'Bhalla'] },
+    bride: { ...fx.bride, families: ['Verma', { tbd: true }] },
+  }));
+  assert.match(t.FAMILY_BLESSING_NAMES, /Dang &amp; Bhalla/);
+  assert.match(t.FAMILY_BLESSING_NAMES, /Verma/);
+  assert.doesNotMatch(t.FAMILY_BLESSING_NAMES, /To be announced/);
 });
 
 // ---- applyTokens ------------------------------------------------------
@@ -145,6 +156,10 @@ test('buildHtmlTokens: escapes PAIR_TITLE but keeps PAIR_TITLE_RAW raw', () => {
   assert.equal(t.PAIR_TITLE_RAW, 'A$1 & B');
   assert.equal(t.HASHTAG, t.TAG_PRIMARY);
 });
+test('buildHtmlTokens: FAMILY_BLESSING_NAMES uses fallback when a side has no names', () => {
+  const t = buildHtmlTokens(composeNames(true, fx)); // fx bride families = []
+  assert.equal(t.FAMILY_BLESSING_NAMES, 'Two families, united in love');
+});
 test('buildManifestTokens: raw pair title only', () => {
   assert.deepEqual(buildManifestTokens(composeNames(true, fx)), { PAIR_TITLE: 'A$1 & B' });
 });
@@ -164,15 +179,15 @@ test('template: fully rendered output has no leftover {{TOKENS}}', () => {
 
 // ---- Real config sanity (guards against placeholder grandparents) ------
 test('site.config: both sides fully populated, no placeholder text', () => {
-  const fields = ['first', 'full', 'initial', 'surname', 'hashtag', 'role', 'parents', 'paternalGrandparents'];
+  const fields = ['first', 'full', 'initial', 'surname', 'hashtag', 'role'];
   for (const side of [groom, bride]) {
     for (const k of fields) {
       assert.ok(side[k] && String(side[k]).trim().length > 0, `${side.role}.${k} missing`);
     }
-    // paternal set must be real; maternal may still be the "Names to be added"
-    // placeholder (skipped at render time) until supplied.
-    assert.doesNotMatch(side.paternalGrandparents, /to be (updated|added)/i, `${side.role} paternal grandparents still placeholder`);
+    assert.ok(Array.isArray(side.families), `${side.role}.families must be an array`);
   }
+  // Groom families are set; bride's are pending ([] → "To be announced").
+  assert.ok(groom.families.length > 0, 'groom families should be populated');
 });
 
 // ---- Couple-photo reveal gate (runtime; build emits the reveal timestamp) --

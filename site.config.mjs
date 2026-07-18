@@ -12,9 +12,10 @@ export const groom = {
   surname: 'Dang',
   hashtag: '#SanchitKiRiya',
   role: 'groom',
-  parents: 'Ajay & Geeta Dang',
-  paternalGrandparents: 'Late Shri Subhash Chander & Mrs. Raj Rani Dang',
-  maternalGrandparents: 'S.P. Bhalla & Kamlesh Bhalla',
+  // "With the blessings of our elders" — surnames only (the closing "& Families"
+  // line carries the word "Family", so we don't repeat it per row). Order is
+  // intentional: own family first, then extended by elder seniority.
+  families: ['Dang', 'Bhalla', 'Arora', 'Batra'],
 };
 
 export const bride = {
@@ -24,10 +25,11 @@ export const bride = {
   initial: 'R',
   surname: 'Verma',
   hashtag: '#RiyaKaSanchit',
-  role: 'bride', 
-  parents: 'Vishal & Renu Verma',
-  paternalGrandparents: 'Late Shri Vijay Prakash & Mrs. Sushma Verma',
-  maternalGrandparents: 'Names to be added',
+  role: 'bride',
+  // Bride's own family (Verma) + maternal-side family (Kalra). Note: only the
+  // FROM side lists all its families in the blessing line; when this is the
+  // OTHER side (groom-first build) only the primary surname (Verma) is shown.
+  families: ['Verma', 'Kalra'],
 };
 
 // Absolute site origins, no trailing slash. Used to build absolute OG/Twitter

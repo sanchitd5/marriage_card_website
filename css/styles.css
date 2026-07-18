@@ -103,7 +103,7 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
 .display-head em { font-style: italic; color: hsl(var(--gold)); }
 
 .family-blessing {
-  margin-top: 2.2rem;
+  margin-top: 1.3rem; /* pulled up to resolve the union line, one arc not two */
   font-family: var(--font-display);
   font-style: italic;
   font-size: 1.15rem;
@@ -614,38 +614,36 @@ html[data-theme="dark"] .family-motif {
   border: 1px solid hsl(var(--gold-soft));
   filter: brightness(.94);
 }
-/* families stacked top-to-bottom: one block, then the other */
-.family-grid {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: clamp(1.6rem, 5vw, 2.8rem);
-  margin-top: 1.4rem;
+/* ── Blessings quotation ──────────────────────────────────────
+   The family surnames are woven into one declarative union line ("In the joining
+   of the Dang, Bhalla, Arora & Batra families and the Verma family, two houses
+   become one."). A single gold fleuron crowns it. Set as a light italic serif so
+   the names sit gently on the eye; the surnames themselves are upright so they
+   read out of the italic prose. Scales for 1..n names and flips per side. */
+.family-quote-mark {
+  color: hsl(var(--gold) / .8);
+  font-size: clamp(.9rem, 3vw, 1.15rem);
+  margin: clamp(1.4rem, 5vw, 2.2rem) 0 clamp(1rem, 3.5vw, 1.5rem);
 }
-/* each side is its own stacked block, centred */
-.family-side {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+.family-quote {
+  max-width: 32ch;
+  margin: 0 auto;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(1.2rem, 4vw, 1.6rem);
+  line-height: 1.6;
+  letter-spacing: .01em;
+  color: hsl(var(--ink) / .82);
+  text-wrap: balance;
 }
-.family-role { font-size: .55rem; letter-spacing: .15em; text-transform: uppercase; white-space: nowrap; color: hsl(var(--wisteria)); margin-bottom: .5rem; }
-/* breathing room between the grandparents block and the parents label */
-.family-names + .family-role { margin-top: 1.5rem; }
-.family-names { font-family: var(--font-display); font-weight: 400; font-size: clamp(1.15rem, 4vw, 2.1rem); line-height: 1.35; }
-.family-names em { font-family: var(--font-script); font-style: normal; font-size: .72em; color: hsl(var(--gold)); }
-/* horizontal separator between the two stacked family blocks */
-.family-divider {
-  height: 1px;
-  width: clamp(120px, 40%, 260px);
-  background: linear-gradient(to right,
-    transparent,
-    hsl(var(--gold)) 18%,
-    hsl(var(--gold)) 82%,
-    transparent);
+/* the surnames carry the weight (a calmer single axis than roman-in-italic); each
+   family group stays on one line so a list is never split across a wrap */
+.family-quote .fq-fam {
+  font-weight: 600;
+  color: hsl(var(--ink));
+  letter-spacing: .015em;
+  white-space: nowrap;
 }
-/* single-name variant: span all grid columns and centre */
-.family-grid > .family-names { grid-column: 1 / -1; text-align: center; font-size: clamp(1.4rem, 5vw, 2.4rem); }
 
 /* ═══ FOOTER ═════════════════════════════════════════════════ */
 .footer {

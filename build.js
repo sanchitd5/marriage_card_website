@@ -7,8 +7,9 @@
 //
 // Requires Node >= 18 (uses fs.cpSync).
 //
-// Pure helpers (parseFromGroomSide, composeNames, htmlEscape, renderFamilySide,
-// buildHtmlTokens, buildManifestTokens, applyTokens) are exported for unit tests.
+// Pure helpers (parseFromGroomSide, composeNames, htmlEscape, joinFamilies,
+// buildFamilyBlessing, buildHtmlTokens, buildManifestTokens, applyTokens) are
+// exported for unit tests.
 // The filesystem pipeline runs only when this file is invoked directly.
 
 import fs from 'node:fs';
@@ -64,8 +65,8 @@ export function composeNames(fromGroomSide, sides = { groom, bride }, sites = si
     pairTitle,
     fromGroomSide,
     siteUrl: site,
-    sideA: { role: a.role, parents: a.parents, paternalGrandparents: a.paternalGrandparents, maternalGrandparents: a.maternalGrandparents },
-    sideB: { role: b.role, parents: b.parents, paternalGrandparents: b.paternalGrandparents, maternalGrandparents: b.maternalGrandparents },
+    sideA: { role: a.role, families: a.families },
+    sideB: { role: b.role, families: b.families },
   };
 }
 
@@ -89,28 +90,51 @@ function formatCouple(raw) {
   return raw.length > 24 ? esc.replace(/ &amp; /, '<br>&amp; ') : esc;
 }
 
-// Placeholder grandparent values (not yet supplied) are skipped so they never
-// render live. Fill site.config.mjs to make a set appear.
-const isPlaceholderName = (v) => !v || /^names to be added$/i.test(String(v).trim());
+// "With the blessings of our elders" — the family surnames are embedded in a
+// single declarative union line, not a bare list: "In the joining of {PRIMARY}
+// and {OTHER}, two houses become one." Works for 1..n surnames on the FROM side
+// plus one on the other, and flips with FROM_GROOM_SIDE. See CLAUDE.md.
+//
+// Each `families` entry is one of:
+//   'Dang'              -> surname
+//   { name, relation }  -> surname (relation unused in prose)
+//   { tbd: true }       -> not-yet-confirmed placeholder -> SKIPPED in the prose
+//
+// Extract real surnames (drops tbd/empty). `limit` caps how many (the OTHER
+// side lists only its primary surname).
+function familyNames(families, { limit } = {}) {
+  let list = (Array.isArray(families) ? families : [])
+    .map((f) => (typeof f === 'string' ? f : f && !f.tbd && f.name ? f.name : null))
+    .filter((n) => n && String(n).trim());
+  if (typeof limit === 'number') list = list.slice(0, limit);
+  return list;
+}
+// Join surnames into an article phrase, en-GB ampersand grammar (NO Oxford comma
+// before "&"): 1 -> "the Dang family"; n -> "the Dang, Bhalla, Arora &amp; Batra
+// families". Surnames wrapped in <span class="fq-fam"> so the upright names stand
+// out inside the italic quote. Returns null when there are no names.
+export function joinFamilies(families, opts) {
+  const esc = familyNames(families, opts).map(htmlEscape);
+  if (!esc.length) return null;
+  const joined = esc.length === 1 ? esc[0] : `${esc.slice(0, -1).join(', ')} &amp; ${esc[esc.length - 1]}`;
+  const noun = esc.length === 1 ? 'family' : 'families';
+  // nbsp binds the article to the surnames so "the" never strands at a line end
+  return `the <span class="fq-fam">${joined}</span> ${noun}`;
+}
 
-// The card is printed from one side (FROM_GROOM_SIDE). Only the *primary* side
-// carries the grandparents' blessing line (both maternal + paternal couples);
-// the other side is listed parents-only. Both sides always show parents.
-export function renderFamilySide(side, { primary = false } = {}) {
-  const lines = ['<div class="family-side fade-up">'];
-  if (primary) {
-    const gps = [side.paternalGrandparents, side.maternalGrandparents].filter(
-      (g) => !isPlaceholderName(g),
-    );
-    if (gps.length) {
-      lines.push(`          <p class="family-role">Grand Parents of the ${htmlEscape(side.role)}</p>`);
-      for (const g of gps) lines.push(`          <h3 class="family-names">${formatCouple(g)}</h3>`);
-    }
-  }
-  lines.push(`          <p class="family-role">Parents of the ${htmlEscape(side.role)}</p>`);
-  lines.push(`          <h3 class="family-names">${formatCouple(side.parents)}</h3>`);
-  lines.push('        </div>');
-  return lines.join('\n        ');
+// The union line. PRIMARY = FROM-side (all its families), OTHER = other side
+// (primary surname only). No numeral and no "houses": the FROM side can name many
+// surnames, so a "two houses become one" count would contradict the visible list.
+// "united in love" is count-safe for 1..n and side-agnostic (flips for free).
+// Deliberate punctuation: "&" WITHIN a side, spelled "and" BETWEEN the two sides.
+// That disambiguates which names belong to which family; do not "fix" it to match.
+export function buildFamilyBlessing(sideA, sideB) {
+  const primary = joinFamilies(sideA && sideA.families);
+  const other = joinFamilies(sideB && sideB.families, { limit: 1 });
+  // No terminal period: an unpunctuated flourish, matching the kicker and the
+  // closing "Your presence is the only gift we seek" line.
+  const s = primary && other ? `${primary} and ${other}, united in love` : 'Two families, united in love';
+  return s.charAt(0).toUpperCase() + s.slice(1); // "the …" → "The …"
 }
 
 // ---- Tokens for the HTML template -------------------------------------
@@ -160,8 +184,7 @@ export function buildHtmlTokens(names, reveal = revealDate) {
     HASHTAG: htmlEscape(names.tagPrimary),
     PAIR_TITLE: htmlEscape(names.pairTitle),
     PAIR_TITLE_RAW: names.pairTitle, // for meta content where "&" is fine
-    FAMILY_SIDE_A: renderFamilySide(names.sideA, { primary: true }),
-    FAMILY_SIDE_B: renderFamilySide(names.sideB),
+    FAMILY_BLESSING_NAMES: buildFamilyBlessing(names.sideA, names.sideB),
     SITE_URL: htmlEscape(names.siteUrl),
     // Per-side social share card (name order differs); see gen-share-cards.mjs.
     SHARE_IMG: names.fromGroomSide ? 'invitation-card-share.jpg' : 'invitation-card-share-bride.jpg',
