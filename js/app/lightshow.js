@@ -219,13 +219,13 @@ export function initLightshow() {
   // studio env + lights make its chrome/metal read. Placed on the SIDES so the
   // centre stays clear for content. It fades in on a drop, dances, fades out —
   // and dims the haze while it's up, so it "replaces" the ambient show.
-  let mechaTemplate = null, mechaLoading = false, lastDrop = -999, dropSide = 1;
+  let mechaTemplate = null, mechaLoading = false, lastDrop = -999, dropSide = 1, firstDropDone = false;
   const DANCER_D = 18;          // depth the dancer sits at
   const DANCER_H_FRAC = 0.02;   // target on-screen height = 2% of the viewport
   let mechaRawH = 1;            // model's un-scaled height (for the fit)
   let mechaCenter = null;       // model's raw bounding-box centre
   function ensureMecha() {
-    if (mechaLoading || mechaTemplate || tier === 0 || !THREE.GLTFLoader || !renderer) return;
+    if (mechaLoading || mechaTemplate || !THREE.GLTFLoader || !renderer) return; // load on all tiers
     mechaLoading = true;
     try {
       const pmrem = new THREE.PMREMGenerator(renderer);
@@ -365,7 +365,10 @@ export function initLightshow() {
     let dancerK = 0;
     if (dancers.length) {
       // a drop = an onset while energy is high, with a cooldown so it's an event
-      if (burst && e > 0.6 && (now - lastDrop) > 7) { lastDrop = now; dropSide = -dropSide; }
+      // guarantee one appearance shortly after the tap (a seeded first drop),
+      // then fire on natural drops (loud onsets, with a cooldown)
+      if (!firstDropDone && ignite > 0.6) { lastDrop = now; dropSide = -dropSide; firstDropDone = true; }
+      else if (burst && e > 0.55 && (now - lastDrop) > 6) { lastDrop = now; dropSide = -dropSide; }
       const ts = now - lastDrop; // seconds since the last drop
       for (const d of dancers) {
         const mine = dancers.length === 1 || d.side === dropSide;
