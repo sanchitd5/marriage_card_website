@@ -220,8 +220,12 @@ export function initLightshow() {
   // centre stays clear for content. It fades in on a drop, dances, fades out —
   // and dims the haze while it's up, so it "replaces" the ambient show.
   let mechaTemplate = null, mechaLoading = false, lastDrop = -999, dropSide = 1, firstDropDone = false;
-  const DANCER_D = 45;          // deep in the tunnel, where the motes zoom in from
-  const DANCER_H_FRAC = 0.12;   // target on-screen height = 12% of the REAL screen pixels (reads distant)
+  // ── Dancer placement — tweak these ──────────────────────────────────
+  // size = on-screen height as a fraction of the real screen pixels (bigger = closer).
+  // z = depth into the tunnel (more negative = deeper/farther). y = vertical
+  // offset in world units (+up/-down). x is the horizontal offset in world units:
+  // xDesktop puts it out to the side on wide screens, xMobile on phones (0 = centre).
+  const DANCER = { size: 0.12, z: -45, y: 0, xDesktop: 9, xMobile: 0 };
   let mechaRawH = 1;            // model's un-scaled height (for the fit)
   let mechaCenter = null;       // model's raw bounding-box centre
   function ensureMecha() {
@@ -279,11 +283,10 @@ export function initLightshow() {
   function fitAndAddDancers() {
     if (!mechaTemplate || !scene || !camera) return;
     dancers = [];
-    const vh = 2 * DANCER_D * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-    const halfW = vh * 0.5 * camera.aspect;
+    const vh = 2 * Math.abs(DANCER.z) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
     const portrait = camera.aspect < 1;                        // phone → centre; desktop → side
-    const X = portrait ? 0 : Math.max(0, halfW * 0.6);
-    const targetPxH = DANCER_H_FRAC * window.innerHeight;      // paint to real screen pixels
+    const xMag = portrait ? DANCER.xMobile : DANCER.xDesktop;  // horizontal offset (world units)
+    const targetPxH = DANCER.size * window.innerHeight;        // paint to real screen pixels
     const sides = portrait ? [1] : (tier === 2 ? [-1, 1] : [1]);
     for (const sd of sides) {
       const inner = mechaTemplate.clone(true);
@@ -302,14 +305,14 @@ export function initLightshow() {
       const box = new THREE.Box3().setFromObject(inner);
       const rawH = box.getSize(new THREE.Vector3()).y || 1;
       inner.position.sub(box.getCenter(new THREE.Vector3()));
-      pivot.scale.setScalar((DANCER_H_FRAC * vh) / rawH);     // initial guess (world units) so pixel-fit can measure
+      pivot.scale.setScalar((DANCER.size * vh) / rawH);       // initial guess (world units) so pixel-fit can measure
       pivot.rotation.y = sd < 0 ? 0.4 : -0.4;                  // spin around the model centre
       const grp = new THREE.Group(); grp.add(pivot);
-      grp.position.set(sd * X, 0, -DANCER_D);                  // vertically centred → full model shows
+      grp.position.set(sd * xMag, DANCER.y, DANCER.z);        // XYZ from the DANCER config
       fitToPixels(grp, pivot, targetPxH);                      // refine to exact target screen pixels
       grp.visible = false;
       scene.add(grp);
-      dancers.push({ grp, inst: inner, spin: pivot, mats, side: sd, k: 0, baseY: 0 });
+      dancers.push({ grp, inst: inner, spin: pivot, mats, side: sd, k: 0, baseY: DANCER.y });
     }
   }
 
