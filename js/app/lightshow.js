@@ -214,7 +214,7 @@ export function initLightshow() {
         const o = g.scene;
         let box = new THREE.Box3().setFromObject(o);
         const sph = box.getBoundingSphere(new THREE.Sphere());
-        o.scale.setScalar(3.6 / (sph.radius || 1));
+        o.scale.setScalar(1.9 / (sph.radius || 1)); // modest side element, not dominating
         box = new THREE.Box3().setFromObject(o);
         o.position.sub(box.getCenter(new THREE.Vector3())); // centre at local origin
         mechaTemplate = o;
@@ -232,10 +232,10 @@ export function initLightshow() {
       const inst = mechaTemplate.clone(true);
       const mats = [];
       inst.traverse((m) => {
-        if (m.isMesh && m.material) { m.material = m.material.clone(); m.material.transparent = true; m.material.opacity = 0; mats.push(m.material); }
+        if (m.isMesh && m.material) { m.material = m.material.clone(); m.material.transparent = true; m.material.opacity = 0; m.material.fog = false; mats.push(m.material); }
       });
       const grp = new THREE.Group(); grp.add(inst);
-      grp.position.set(sd * 9.5, -1.5, -13);
+      grp.position.set(sd * 6, -1, -14); // to the side but off the vignetted corner
       inst.rotation.y = sd < 0 ? 0.4 : -0.4; // angle toward centre
       grp.visible = false;
       scene.add(grp);
@@ -342,7 +342,9 @@ export function initLightshow() {
         dancerK = Math.max(dancerK, d.k);
       }
     }
-    // while a dancer is up, the haze recedes so the figure "replaces" the show
+    // while a dancer is up, the haze recedes AND the vignette lifts so the
+    // figure "replaces" the show and punches through on the side
+    rootStyle.setProperty('--drop', dancerK.toFixed(3));
     const haze = 1 - 0.55 * dancerK;
     motes.material.opacity = (0.4 + e * 0.5) * haze;
 

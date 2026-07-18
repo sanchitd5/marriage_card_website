@@ -49,6 +49,7 @@
      (reduced-motion, no JS). */
   --beat: 0;
   --energy: 0.3;
+  --drop: 0; /* 0..1 while the drop dancer is on screen; lifts the vignette */
 }
 
 /* ── night mode (deeper obsidian) ───────────────────────────── */
@@ -325,6 +326,7 @@ html[data-theme="dark"] #theme-toggle .icon-sun { display: block; }
 .ls-vignette {
   position: fixed; inset: 0; z-index: 1; pointer-events: none;
   background: radial-gradient(circle at 50% 42%, transparent 32%, rgba(11, 12, 15, .5) 74%, #0b0c0f 100%);
+  opacity: calc(1 - var(--drop) * 0.8); /* the vignette lifts during a drop so the side dancer shows */
 }
 #smooth-wrapper { position: relative; z-index: 2; }
 
