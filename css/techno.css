@@ -21,11 +21,11 @@
 @font-face { font-family: "Noto Serif Devanagari"; font-style: normal; font-weight: 500; font-display: block; src: url("../assets/fonts/noto-serif-devanagari-500.woff2") format("woff2"); }
 
 :root {
-  /* day (lifted obsidian) */
-  --bg: #101218;
-  --bg-deep: #0b0c0f;
-  --surface: #171a22;
-  --hairline: #262b36;
+  /* obsidian — dark-only (the light/day theme was dropped: off-brand) */
+  --bg: #0b0c0f;
+  --bg-deep: #06070a;
+  --surface: #14161c;
+  --hairline: #232833;
   --hairline-soft: #1c2029;
   --text: #f5f7fa;          /* primary, ~18:1 on obsidian */
   --body: #c7cdd6;          /* emotional/body copy, ~11:1 */
@@ -52,15 +52,11 @@
   --drop: 0; /* 0..1 while the drop dancer is on screen; lifts the vignette */
 }
 
-/* ── night mode (deeper obsidian) ───────────────────────────── */
-html[data-theme="dark"] {
-  --bg: #0b0c0f;
-  --bg-deep: #06070a;
-  --surface: #131620;
-  --hairline: #232833;
-}
-html { background-color: #101218; }
-html[data-theme="dark"] { background-color: #0b0c0f; }
+/* dark-only: one obsidian palette regardless of the auto day/night decision */
+html, html[data-theme="dark"], html[data-theme="light"] { background-color: #0b0c0f; }
+/* the day↔night toggle contradicts the "obsidian, one cold light" concept — hidden
+   (!important overrides the shared control-shape rule later in this file) */
+#theme-toggle { display: none !important; }
 
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -77,6 +73,15 @@ img, video, canvas { max-width: 100%; display: block; }
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
 h1, h2, h3, p { margin: 0; }
 ::selection { background: rgba(var(--accent-rgb), .25); color: #fff; }
+
+/* film grain — a cheap tactile finish over the whole page so the obsidian never
+   reads as a flat fill (fixed, above content, below the fixed controls/gate) */
+body::after {
+  content: ""; position: fixed; inset: 0; z-index: 40; pointer-events: none;
+  opacity: .05; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+@media (prefers-reduced-motion: reduce) { body::after { opacity: .04; } }
 
 /* prevent pre-JS flash only when JS is present to animate things in */
 html.js .fade-up, html.js .hero-seq, html.js .interlude-art, html.js .interlude-line { opacity: 0; }
@@ -133,7 +138,7 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
   letter-spacing: -.015em;
   margin-bottom: 3rem;
 }
-.display-head em { font-style: normal; color: var(--accent); } /* the one heading accent */
+.display-head em { font-style: normal; color: var(--text); font-weight: 300; } /* tonal (weight) emphasis, not a cyan highlight */
 
 /* mid-tier voice between whisper (mono label) and shout (display) */
 .eyebrow-sub {
@@ -511,7 +516,20 @@ html[data-theme="dark"] #theme-toggle .icon-sun { display: block; }
 
 /* ═══ INTERLUDE ══════════════════════════════════════════════ */
 .interlude { text-align: center; }
-.interlude-art { display: grid; place-items: center; }
+/* cyan duotone couple portrait — the human warmth the club aesthetic was missing,
+   kept on-palette (grayscale + a cyan→obsidian overlay) */
+.interlude-art {
+  position: relative; overflow: hidden;
+  max-width: 30rem; margin-inline: auto;
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-lift);
+}
+.interlude-art img { width: 100%; display: block; aspect-ratio: 4 / 5; object-fit: cover; filter: grayscale(1) contrast(1.18) brightness(.92); }
+.interlude-art::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(165deg, rgba(var(--accent-rgb), .42), rgba(11, 12, 15, .28) 45%, rgba(11, 12, 15, .72));
+  mix-blend-mode: overlay;
+}
 .interlude-art .invocation-motif { width: 64px; }  /* small so the linework stays crisp */
 .interlude-line {
   font-family: var(--font-display); font-weight: 300;
@@ -571,7 +589,6 @@ html[data-theme="dark"] #theme-toggle .icon-sun { display: block; }
    scale only (never a full-field luminance flash), so it stays WCAG-safe; --beat
    decays smoothly so it pulses, never strobes. */
 .hero-amp { text-shadow: 0 0 calc(6px + var(--beat) * 38px) rgba(var(--accent-rgb), calc(.22 + var(--beat) * .72)); }
-.display-head em { text-shadow: 0 0 calc(4px + var(--beat) * 32px) rgba(var(--accent-rgb), calc(.14 + var(--beat) * .66)); }
 .footer-monogram em, .scratch-date { text-shadow: 0 0 calc(4px + var(--beat) * 30px) rgba(var(--accent-rgb), calc(.18 + var(--beat) * .62)); }
 /* the big names + countdown stay crisp between beats (no static bloom), then
    flare cyan ON the beat — an obvious shimmer to the track */
