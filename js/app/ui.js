@@ -69,6 +69,7 @@ function advance(m, dock, fade) {
   const audio = makeAudio(name);
   audio._trackName = name; // read by the techno light show to index its envelope
   m.currentName = name;
+  if (appState.vizConnect) appState.vizConnect(audio); // route into the MilkDrop viz graph
   wireTrack(m, audio, dock);
   if (fade) audio.volume = 0;
   m.audio = audio;

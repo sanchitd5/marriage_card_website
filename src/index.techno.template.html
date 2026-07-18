@@ -290,6 +290,9 @@
   <!-- Full-screen light-show canvas. Fixed and OUTSIDE #smooth-wrapper so the
        ScrollSmoother transform never drags it. Phase 1 draws a calm 2D light
        show; Phase 2 adds the Anyma plate + envelope-synced reactive overlay. -->
+  <!-- MilkDrop (butterchurn) viz — a tinted, music-reactive background layer that
+       cycles presets. Sits behind the tunnel; hidden until it goes live. -->
+  <canvas id="milkdrop" aria-hidden="true"></canvas>
   <canvas id="lightshow" aria-hidden="true"></canvas>
   <!-- vignette: crushes the backdrop's edges/corners to black so light
        concentrates centrally (depth + focus), sits above the canvas, below content -->
@@ -459,6 +462,9 @@
   <!-- three.js (CDN <script>, like GSAP) drives the Path-A WebGL backdrop, plus
        loaders for the drop-triggered 3D dancer (glTF + Draco + a studio env). -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
+  <!-- MilkDrop visualizer (butterchurn) + its preset pack. -->
+  <script src="https://cdn.jsdelivr.net/npm/butterchurn@2.6.7/lib/butterchurn.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/butterchurn-presets@2.4.7/lib/butterchurnPresets.min.js" defer></script>
   <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/GLTFLoader.js" defer></script>
   <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/DRACOLoader.js" defer></script>
   <script src="https://unpkg.com/three@0.128.0/examples/js/environments/RoomEnvironment.js" defer></script>

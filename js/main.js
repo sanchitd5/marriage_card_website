@@ -5,6 +5,7 @@ import { initGsap } from './app/animations.js';
 import { initGate } from './app/gate.js';
 import { initScratch } from './app/scratch.js';
 import { initLightshow } from './app/lightshow.js';
+import { initMilkdrop } from './app/milkdrop.js';
 import {
   initCountdown,
   initCalendarButtons,
@@ -31,5 +32,6 @@ window.addEventListener('DOMContentLoaded', () => {
   initGsap();
   initPetals();      // no-ops on the techno skin (no tsParticles / #tsparticles)
   initLightshow();   // no-ops off the techno skin (guards on data-skin + #lightshow)
+  initMilkdrop();    // no-ops off techno / if butterchurn CDN absent
   initTilt();
 });
