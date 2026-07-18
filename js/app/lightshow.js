@@ -221,7 +221,7 @@ export function initLightshow() {
   // and dims the haze while it's up, so it "replaces" the ambient show.
   let mechaTemplate = null, mechaLoading = false, lastDrop = -999, dropSide = 1, firstDropDone = false;
   const DANCER_D = 45;          // deep in the tunnel, where the motes zoom in from
-  const DANCER_H_FRAC = 0.18;   // target on-screen height = 18% of the REAL screen pixels
+  const DANCER_H_FRAC = 0.12;   // target on-screen height = 12% of the REAL screen pixels (reads distant)
   let mechaRawH = 1;            // model's un-scaled height (for the fit)
   let mechaCenter = null;       // model's raw bounding-box centre
   function ensureMecha() {
@@ -393,16 +393,9 @@ export function initLightshow() {
     if (appState.ignited) ensureMecha();
     let dancerK = 0;
     if (dancers.length) {
-      // a drop = an onset while energy is high, with a cooldown so it's an event
-      // guarantee one appearance shortly after the tap (a seeded first drop),
-      // then fire on natural drops (loud onsets, with a cooldown)
-      if (!firstDropDone && ignite > 0.6) { lastDrop = now; dropSide = -dropSide; firstDropDone = true; }
-      else if (burst && e > 0.55 && (now - lastDrop) > 6) { lastDrop = now; dropSide = -dropSide; }
-      const ts = now - lastDrop; // seconds since the last drop
       for (const d of dancers) {
-        const mine = dancers.length === 1 || d.side === dropSide;
-        // envelope over the ~5.5s drop window: fade in, hold, fade out
-        const target = (mine && ts < 5.5) ? (ts < 0.5 ? ts / 0.5 : Math.min(1, Math.max(0, 5.5 - ts))) : 0;
+        // TEMP: always visible once ignited (was drop-gated). Fades in on the tap.
+        const target = ignite;
         d.k += (target - d.k) * 0.14;
         d.grp.visible = d.k > 0.01;
         for (const mm of d.mats) mm.opacity = Math.min(1, d.k);
@@ -414,10 +407,8 @@ export function initLightshow() {
         dancerK = Math.max(dancerK, d.k);
       }
     }
-    // while a dancer is up, the haze recedes AND the vignette lifts so the
-    // figure "replaces" the show and punches through on the side
     rootStyle.setProperty('--drop', dancerK.toFixed(3));
-    const haze = 1 - 0.55 * dancerK;
+    const haze = 1 - 0.3 * dancerK; // milder dim since the dancer is always up for now
     motes.material.opacity = (0.4 + e * 0.5) * haze;
 
     // accent glow: rate-limit brightness change (flash safety backstop)
