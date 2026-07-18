@@ -76,6 +76,7 @@ export function initLightshow() {
   const cores = navigator.hardwareConcurrency || 4;
   const mem = navigator.deviceMemory || 4;
   let tier = (cores >= 8 && mem >= 8) ? 2 : (cores >= 4 && mem >= 4) ? 1 : 0;
+  if (typeof window !== 'undefined' && window.__lsTest) tier = 2; // verify hook: force tier, skip governor
   const TIERS = {
     2: { dpr: 1.5, motes: 1300 },
     1: { dpr: 1.0, motes: 800 },
@@ -264,6 +265,7 @@ export function initLightshow() {
   // ---- FPS governor: measure real frame times, degrade or floor ----
   let sampleStart = 0, sampleFrames = 0, sampleAcc = 0, measuring = true;
   function govern(dt) {
+    if (window.__lsTest) { measuring = false; return; }
     if (!measuring) return;
     sampleAcc += dt; sampleFrames++;
     if (sampleAcc < 2) return;               // measure ~2s per scene
