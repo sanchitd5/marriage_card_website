@@ -154,6 +154,10 @@
     settled = totalUnits; shownPct = 99; renderPct();
     root.classList.remove('theme-decision-pending');
     if (loader) loader.remove();
+    // Signal that the loading screen is gone, so the gate's auto-open countdown
+    // starts from here (gate.js listens for this / checks the flag).
+    window.__weddingBootDone = true;
+    try { window.dispatchEvent(new Event('wedding-boot-done')); } catch (e) {}
   }
 
   var tasks = [

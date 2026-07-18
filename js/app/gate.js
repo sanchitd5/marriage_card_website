@@ -70,14 +70,22 @@ export function initGate() {
   // (no decode handoff at the transition = no end lag).
   startHeroVideo();
 
-  // if the seal goes untapped, the invitation opens itself
-  // (auto-open is not a user gesture, so music will wait for the toggle)
-  const autoOpen = setTimeout(() => gateCard.click(), 8000);
+  // If the seal goes untapped, the invitation opens itself 30s AFTER the boot
+  // loader has cleared (so the countdown starts when the gate is actually on
+  // screen, not while the loading screen is still up). boot-loader.js sets
+  // window.__weddingBootDone + fires 'wedding-boot-done' when it removes itself.
+  // (auto-open is not a user gesture, so music will wait for the toggle.)
+  const AUTO_OPEN_MS = 30000;
+  let autoOpen = null;
+  const startAutoOpen = () => { if (!opened && autoOpen == null) autoOpen = setTimeout(() => gateCard.click(), AUTO_OPEN_MS); };
+  if (window.__weddingBootDone) startAutoOpen();
+  else window.addEventListener('wedding-boot-done', startAutoOpen, { once: true });
 
   gateCard.addEventListener('click', () => {
     if (opened) return;
     opened = true;
     clearTimeout(autoOpen);
+    window.removeEventListener('wedding-boot-done', startAutoOpen);
     seal.classList.add('opened'); // stop the pulse so the crack animation owns the transform
     if (appState.sealPulse) { appState.sealPulse.kill(); appState.sealPulse = null; }
     if (appState.sealRipple) { appState.sealRipple.kill(); appState.sealRipple = null; }
