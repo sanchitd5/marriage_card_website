@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/banner.svg" alt="Sanchit & Riya — Shubh Vivah · 11 & 12 December 2026" width="840">
+<img src="docs/banner.svg" alt="Sanchit & Riya — Shubh Vivah" width="840">
 
 <p><em>A heavily animated, mobile-first wedding invitation —<br>
 Regency romance (Bridgerton) fused with royal Indian palace splendour.</em></p>
@@ -22,11 +22,13 @@ from tokenised templates in `src/`.
 
 ## The Celebrations
 
-| Affair | When (IST) | Where | Dress code |
+> Dates and venues are under wraps until the reveal — watch this space. ✦
+
+| Affair | When | Where | Dress code |
 |---|---|---|---|
-| Haldi | Fri 11 Dec 2026, 11:00 | Radisson Hotel Chandigarh Zirakpur | Shades of yellow |
-| Cocktail & Engagement | Fri 11 Dec 2026, 20:00 | Radisson Hotel Chandigarh Zirakpur | Dazzling as you dare |
-| The Wedding | Sat 12 Dec 2026, 19:00 | De'vansh Resort, Ambala Cantt | — |
+| Haldi | To be revealed | To be announced | Shades of yellow |
+| Cocktail & Engagement | To be revealed | To be announced | Dazzling as you dare |
+| The Wedding | To be revealed | To be announced | — |
 
 ## Build
 
@@ -99,10 +101,14 @@ Any static server pointed at `dist/` works.
 ## Editing key values
 
 - Names, hashtags, parents, grand-parents: `site.config.mjs`
-- Countdown target: `WEDDING_TS` at the top of `js/app/config.js`
+- **Date & venue reveal gate:** `revealDate` in `site.config.mjs` — `false`
+  hides every date, venue, countdown target and directions link so nothing
+  leaks from the built site (the hero shows a suspense quote and the countdown
+  shimmers); flip to `true` to publish. Real dates/venues live in `wedding` in
+  the same file and are only injected into the build when the gate is open.
 - Music pool: `SONGS` in `js/app/config.js`
-- Event times, links and ICS text: `EVENTS` in `js/app/config.js` (UTC
-  timestamps; titles are composed from `NAMES.pairTitle`)
+- Event blurb & dress code (non-identifying copy): `BLURB` in `js/app/config.js`
+  (titles composed from `NAMES.pairTitle`; dates/venues/ICS come from the gate)
 
 <div align="center"><img src="docs/divider.svg" alt="" width="420"></div>
 
