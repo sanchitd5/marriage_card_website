@@ -91,6 +91,11 @@ export function initLightshow() {
     renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: 'high-performance' });
     renderer.setPixelRatio(TIERS[tier].dpr);
     renderer.setSize(innerWidth, innerHeight, false);
+    // correct colour + tone mapping so the mecha's PBR chrome reads (without
+    // these it renders near-black); mild exposure keeps the haze/glow intact.
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
     scene = new THREE.Scene();
     fog = new THREE.FogExp2(0x05060a, 0.072); // denser haze → motes funnel out of black
     scene.fog = fog;
@@ -181,6 +186,24 @@ export function initLightshow() {
     const t = new THREE.CanvasTexture(c); t.needsUpdate = true; return t;
   }
 
+  // A self-contained studio environment (no external RoomEnvironment script):
+  // a vertical gradient — cool light from above, cyan mid, dark floor — so the
+  // mecha's chrome reflects in-palette light and never renders black.
+  function makeEnvTexture() {
+    const c = document.createElement('canvas'); c.width = 32; c.height = 128;
+    const g = c.getContext('2d');
+    const grad = g.createLinearGradient(0, 0, 0, 128);
+    grad.addColorStop(0, '#e6f7ff');
+    grad.addColorStop(0.34, '#3aa8c8');
+    grad.addColorStop(0.62, '#12303c');
+    grad.addColorStop(1, '#050608');
+    g.fillStyle = grad; g.fillRect(0, 0, 32, 128);
+    const t = new THREE.CanvasTexture(c);
+    t.mapping = THREE.EquirectangularReflectionMapping;
+    t.needsUpdate = true;
+    return t;
+  }
+
   function glowTexture() {
     const c = document.createElement('canvas'); c.width = c.height = 64;
     const g = c.getContext('2d');
@@ -199,7 +222,7 @@ export function initLightshow() {
   // and dims the haze while it's up, so it "replaces" the ambient show.
   let mechaTemplate = null, mechaLoading = false, lastDrop = -999, dropSide = 1;
   const DANCER_D = 18;          // depth the dancer sits at
-  const DANCER_H_FRAC = 0.30;   // target on-screen height = 30% of the viewport
+  const DANCER_H_FRAC = 0.02;   // target on-screen height = 2% of the viewport
   let mechaRawH = 1;            // model's un-scaled height (for the fit)
   let mechaCenter = null;       // model's raw bounding-box centre
   function ensureMecha() {
@@ -207,7 +230,7 @@ export function initLightshow() {
     mechaLoading = true;
     try {
       const pmrem = new THREE.PMREMGenerator(renderer);
-      scene.environment = pmrem.fromScene(new THREE.RoomEnvironment(), 0.04).texture;
+      scene.environment = pmrem.fromEquirectangular(makeEnvTexture()).texture;
     } catch (e) { /* env optional */ }
     const dir = new THREE.DirectionalLight(0x9fe8ff, 2.4); dir.position.set(3, 6, 4); scene.add(dir);
     scene.add(new THREE.AmbientLight(0x22303c, 0.6));
@@ -243,7 +266,7 @@ export function initLightshow() {
       const inner = mechaTemplate.clone(true);
       const mats = [];
       inner.traverse((m) => {
-        if (m.isMesh && m.material) { m.material = m.material.clone(); m.material.transparent = true; m.material.opacity = 0; m.material.fog = false; mats.push(m.material); }
+        if (m.isMesh && m.material) { m.material = m.material.clone(); m.material.transparent = true; m.material.opacity = 0; m.material.fog = false; if ('envMapIntensity' in m.material) m.material.envMapIntensity = 1.5; mats.push(m.material); }
       });
       // Center the model inside an identity PIVOT (transform-agnostic: works
       // regardless of any glTF root rotation/scale), then scale the pivot so the
