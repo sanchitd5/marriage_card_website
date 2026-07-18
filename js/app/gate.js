@@ -130,13 +130,17 @@ export function initGate() {
   }
 
   function finish(instant) {
-    document.body.style.overflow = '';
     if (appState.smoother) appState.smoother.scrollTop(0); else window.scrollTo(0, 0);
     startHeroVideo(); // ensure the background hero is live (idempotent)
     heroEntrance(instant);
 
+    // keep the page locked until the gate is fully gone, so the reveal can't be
+    // scrolled past while it is still playing/dissolving
+    const unblock = () => { document.body.style.overflow = ''; };
+
     if (!window.gsap || instant) {
       gateEl.remove();
+      unblock();
       if (window.ScrollTrigger) ScrollTrigger.refresh();
       return;
     }
@@ -147,6 +151,7 @@ export function initGate() {
       autoAlpha: 0, duration: finish.fadeDur || 1.3, ease: 'power2.inOut',
       onComplete: () => {
         gateEl.remove();
+        unblock();
         if (window.ScrollTrigger) ScrollTrigger.refresh();
       },
     });
