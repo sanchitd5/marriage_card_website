@@ -71,11 +71,9 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
 .wrap--narrow { max-width: 46rem; }
 .band { padding-block: clamp(4.5rem, 10vw, 8rem); }
 .band--tint { background: hsl(var(--parchment)); }
-/* phones and tablets: every act of the story gets its own full stage */
-@media (max-width: 899px) {
-  .band, .footer { min-height: 100svh; display: flex; align-items: center; }
-  .band > .wrap, .footer > .wrap { width: 100%; }
-}
+/* every act of the story gets its own full stage, at every viewport */
+.band, .footer { min-height: 100svh; display: flex; align-items: center; }
+.band > .wrap, .footer > .wrap { width: 100%; }
 
 .kicker {
   font-family: var(--font-body);
