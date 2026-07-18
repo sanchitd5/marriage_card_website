@@ -1,13 +1,13 @@
-import { NAMES, SONGS, WEDDING_TS, REVEAL_DATE, EVENT_DATES, EVENT_VENUES, REVEAL_COUPLE, GALLERY } from './couple.mjs';
+import { NAMES, SONGS, WEDDING_TS, REVEAL_DATE, EVENT_DATES, EVENT_VENUES, COUPLE_REVEAL_TS, GALLERY } from './couple.mjs';
 
 // SONGS is auto-discovered from assets/audio/theme-N.mp3 at build time.
 // WEDDING_TS / EVENT_DATES / EVENT_VENUES are build-gated: null while
 // site.config revealDate is false, so NO date- or venue-identifying value
 // ships in this (verbatim-copied) module until the reveal.
-// GALLERY is build-gated too: while REVEAL_COUPLE is false the couple's photo
-// filenames and captions are stripped (only grid-sizing classes remain) and the
-// photo files are excluded from dist — leak-proof, not merely hidden.
-export { NAMES, SONGS, WEDDING_TS, REVEAL_DATE, REVEAL_COUPLE, GALLERY };
+// COUPLE_REVEAL_TS is the epoch-ms when the couple's gallery photos unlock
+// (weddingTs + offset); gallery.js reveals them at RUNTIME against authoritative
+// server time (0 = reveal now, null = stay hidden). No redeploy needed.
+export { NAMES, SONGS, WEDDING_TS, REVEAL_DATE, COUPLE_REVEAL_TS, GALLERY };
 
 const D = EVENT_DATES || {};
 const V = EVENT_VENUES || {};

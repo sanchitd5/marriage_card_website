@@ -31,18 +31,16 @@ export function parseFromGroomSide(rawFlag) {
 // at/after that moment reveals them. REVEAL_COUPLE=true|false forces it.
 export const COUPLE_REVEAL_OFFSET_MS = (coupleRevealOffsetHours || 0) * 60 * 60 * 1000;
 
-export function computeRevealCouple(weddingTsUTC, now = Date.now(), env = process.env.REVEAL_COUPLE) {
-  if (env === 'true') return true;
-  if (env === 'false') return false;
-  if (!Array.isArray(weddingTsUTC) || weddingTsUTC.length < 6) return false;
-  return now >= Date.UTC(...weddingTsUTC) + COUPLE_REVEAL_OFFSET_MS;
-}
-
-// While hidden, keep only the non-identifying grid-sizing class; drop src/alt
-// so no photo filename or caption ships in the generated GALLERY.
-export function gateGallery(list, reveal) {
-  if (!Array.isArray(list)) return [];
-  return reveal ? list : list.map(item => (item && item.cls ? { cls: item.cls } : {}));
+// Reveal moment (epoch-ms) for the couple photos: weddingTs + offset. The
+// "is it time yet?" check happens at RUNTIME in the browser against
+// authoritative server time (js/app/time.js + gallery.js), so the gallery
+// self-reveals with no redeploy. Special values: `0` = reveal immediately,
+// `null` = stay hidden (REVEAL_COUPLE=false, or a fail-safe on a bad timestamp).
+export function computeCoupleRevealTs(weddingTsUTC, env = process.env.REVEAL_COUPLE) {
+  if (env === 'true') return 0;
+  if (env === 'false') return null;
+  if (!Array.isArray(weddingTsUTC) || weddingTsUTC.length < 6) return null;
+  return Date.UTC(...weddingTsUTC) + COUPLE_REVEAL_OFFSET_MS;
 }
 
 export function composeNames(fromGroomSide, sides = { groom, bride }, sites = siteUrls) {
@@ -66,8 +64,8 @@ export function composeNames(fromGroomSide, sides = { groom, bride }, sites = si
     pairTitle,
     fromGroomSide,
     siteUrl: site,
-    sideA: { role: a.role, parents: a.parents, grandparents: a.grandparents },
-    sideB: { role: b.role, parents: b.parents, grandparents: b.grandparents },
+    sideA: { role: a.role, parents: a.parents, paternalGrandparents: a.paternalGrandparents, maternalGrandparents: a.maternalGrandparents },
+    sideB: { role: b.role, parents: b.parents, paternalGrandparents: b.paternalGrandparents, maternalGrandparents: b.maternalGrandparents },
   };
 }
 
@@ -91,15 +89,28 @@ function formatCouple(raw) {
   return raw.length > 24 ? esc.replace(/ &amp; /, '<br>&amp; ') : esc;
 }
 
-export function renderFamilySide(side) {
-  return [
-    '<div class="family-side fade-up">',
-    `          <p class="family-role">Grand Parents of the ${htmlEscape(side.role)}</p>`,
-    `          <h3 class="family-names">${formatCouple(side.grandparents)}</h3>`,
-    `          <p class="family-role">Parents of the ${htmlEscape(side.role)}</p>`,
-    `          <h3 class="family-names">${formatCouple(side.parents)}</h3>`,
-    '        </div>',
-  ].join('\n        ');
+// Placeholder grandparent values (not yet supplied) are skipped so they never
+// render live. Fill site.config.mjs to make a set appear.
+const isPlaceholderName = (v) => !v || /^names to be added$/i.test(String(v).trim());
+
+// The card is printed from one side (FROM_GROOM_SIDE). Only the *primary* side
+// carries the grandparents' blessing line (both maternal + paternal couples);
+// the other side is listed parents-only. Both sides always show parents.
+export function renderFamilySide(side, { primary = false } = {}) {
+  const lines = ['<div class="family-side fade-up">'];
+  if (primary) {
+    const gps = [side.paternalGrandparents, side.maternalGrandparents].filter(
+      (g) => !isPlaceholderName(g),
+    );
+    if (gps.length) {
+      lines.push(`          <p class="family-role">Grand Parents of the ${htmlEscape(side.role)}</p>`);
+      for (const g of gps) lines.push(`          <h3 class="family-names">${formatCouple(g)}</h3>`);
+    }
+  }
+  lines.push(`          <p class="family-role">Parents of the ${htmlEscape(side.role)}</p>`);
+  lines.push(`          <h3 class="family-names">${formatCouple(side.parents)}</h3>`);
+  lines.push('        </div>');
+  return lines.join('\n        ');
 }
 
 // ---- Tokens for the HTML template -------------------------------------
@@ -149,7 +160,7 @@ export function buildHtmlTokens(names, reveal = revealDate) {
     HASHTAG: htmlEscape(names.tagPrimary),
     PAIR_TITLE: htmlEscape(names.pairTitle),
     PAIR_TITLE_RAW: names.pairTitle, // for meta content where "&" is fine
-    FAMILY_SIDE_A: renderFamilySide(names.sideA),
+    FAMILY_SIDE_A: renderFamilySide(names.sideA, { primary: true }),
     FAMILY_SIDE_B: renderFamilySide(names.sideB),
     SITE_URL: htmlEscape(names.siteUrl),
     // Per-side social share card (name order differs); see gen-share-cards.mjs.
@@ -194,14 +205,19 @@ function runBuild() {
   const names = composeNames(fromGroomSide);
   const htmlTokens = buildHtmlTokens(names);
   const manifestTokens = buildManifestTokens(names);
-  const revealCouple = computeRevealCouple(wedding.weddingTsUTC);
+
+  // Couple-photo gate: the photos always ship; the browser reveals the gallery
+  // at this moment using authoritative server time (no redeploy needed).
+  // REVEAL_COUPLE=true|false forces reveal-now / stay-hidden.
+  const coupleRevealTs = computeCoupleRevealTs(wedding.weddingTsUTC);
 
   const root = __dirname;
   const dist = path.join(root, 'dist');
   const srcDir = path.join(root, 'src');
 
   console.log(`build: FROM_GROOM_SIDE=${fromGroomSide} → pairTitle="${names.pairTitle}"`);
-  console.log(`build: revealCouple=${revealCouple} (couple photos ${revealCouple ? 'INCLUDED' : 'excluded — hidden until reveal'})`);
+  const tsDesc = coupleRevealTs === 0 ? 'immediately' : coupleRevealTs == null ? 'never (hidden)' : new Date(coupleRevealTs).toISOString();
+  console.log(`build: couple photos ship; browser reveals gallery at ${tsDesc} (runtime server-time check)`);
 
   // Wipe & recreate dist/
   fs.rmSync(dist, { recursive: true, force: true });
@@ -212,14 +228,7 @@ function runBuild() {
   // are intentionally excluded from the published build.
   const staticTrees = ['css', 'js', 'assets'];
   // Skip gitignored subpaths (raw AI generations live in assets/images/gen/).
-  // While the couple gate is closed, also exclude assets/photos/ entirely, so
-  // the couple's photos never ship (leak-proof, not merely hidden in the UI).
-  const copyFilter = (src) => {
-    const parts = src.split(path.sep);
-    if (parts.includes('gen')) return false;
-    if (!revealCouple && parts.includes('photos')) return false;
-    return true;
-  };
+  const copyFilter = (src) => !src.split(path.sep).includes('gen');
   for (const dir of staticTrees) {
     const from = path.join(root, dir);
     if (!fs.existsSync(from)) continue;
@@ -275,8 +284,8 @@ function runBuild() {
     'export const WEDDING_TS = ' + (revealDate ? 'Date.UTC(' + wedding.weddingTsUTC.join(', ') + ')' : 'null') + ';',
     'export const EVENT_DATES = ' + JSON.stringify(eventDates) + ';',
     'export const EVENT_VENUES = ' + JSON.stringify(eventVenues) + ';',
-    'export const REVEAL_COUPLE = ' + JSON.stringify(revealCouple) + ';',
-    'export const GALLERY = ' + JSON.stringify(gateGallery(gallery, revealCouple)) + ';',
+    'export const COUPLE_REVEAL_TS = ' + JSON.stringify(coupleRevealTs) + ';',
+    'export const GALLERY = ' + JSON.stringify(gallery) + ';',
     '',
   ].join('\n');
   const coupleOut = path.join(dist, 'js', 'app', 'couple.mjs');

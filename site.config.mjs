@@ -13,7 +13,8 @@ export const groom = {
   hashtag: '#SanchitKiRiya',
   role: 'groom',
   parents: 'Ajay & Geeta Dang',
-  grandparents: 'Late Shri Subhash Chander & Mrs. Raj Rani Dang',
+  paternalGrandparents: 'Late Shri Subhash Chander & Mrs. Raj Rani Dang',
+  maternalGrandparents: 'S.P. Bhalla & Kamlesh Bhalla',
 };
 
 export const bride = {
@@ -25,7 +26,8 @@ export const bride = {
   hashtag: '#RiyaKaSanchit',
   role: 'bride', 
   parents: 'Vishal & Renu Verma',
-  grandparents: 'Late Shri Vijay Prakash & Mrs. Sushma Verma',
+  paternalGrandparents: 'Late Shri Vijay Prakash & Mrs. Sushma Verma',
+  maternalGrandparents: 'Names to be added',
 };
 
 // Absolute site origins, no trailing slash. Used to build absolute OG/Twitter
@@ -79,20 +81,20 @@ export const weddingHidden = {
   eventVenue: 'Venue to be announced',
 };
 
-// ── Couple-photo reveal gate ─────────────────────────────────────────
-// The gallery photos of the couple stay SECRET until this many hours after
-// the wedding start (weddingTsUTC). Leak-proof by construction: while hidden,
-// build.js excludes assets/photos/ from dist AND strips the filenames/captions
-// from the generated GALLERY, so no image, path, or description ships. Reveal
-// is build-time (computed from the clock at deploy) — schedule a Netlify
-// rebuild at/after the reveal moment to flip it automatically. Force with
-// REVEAL_COUPLE=true|false node build.js. The painted portrait (art-couple.jpg)
-// is intentionally NOT gated.
+// ── Couple-photo reveal gate (runtime, no redeploy) ──────────────────
+// The gallery photos stay veiled until this many hours after the wedding start
+// (weddingTsUTC). The reveal happens in the BROWSER at runtime: build.js emits
+// the reveal timestamp (weddingTs + offset) and gallery.js unlocks the photos
+// once authoritative *server* time (js/app/time.js — the CDN Date header, NOT
+// the visitor's clock) passes it. No redeploy needed. Trade-off vs a build-time
+// exclusion: the photos ship in the build (reachable by direct URL) and the
+// reveal timestamp (≈ the wedding date) is present in the page source. Force
+// with REVEAL_COUPLE=true|false node build.js. The painted portrait
+// (art-couple.jpg) is intentionally NOT gated.
 export const coupleRevealOffsetHours = 5;
 
-// Gallery source of truth. `src` maps to assets/photos/<src>.jpg. While the
-// couple gate is closed, only the non-identifying `cls` (grid sizing) survives
-// into the build — `src`/`alt` are dropped so nothing about the photos leaks.
+// Gallery source of truth. `src` maps to assets/photos/<src>.jpg. Shipped in
+// full; gallery.js decides at runtime when to render it (see above).
 export const gallery = [
   { src: 'photo-01', alt: 'A quiet forehead kiss before the floral arch', cls: 'gframe--tall' },
   { src: 'photo-02', alt: 'A twirl beneath the spiral staircase' },

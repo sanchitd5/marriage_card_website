@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { groom, bride } from './site.config.mjs';
+import { groom, bride, revealDate, wedding } from './site.config.mjs';
 
 const PW = process.env.PLAYWRIGHT_PATH ||
   '/Users/sanchitdang/.npm/_npx/423231821c231c73/node_modules/playwright/index.js';
@@ -24,8 +24,11 @@ const base = path.join(root, 'assets/images/gen/share-source.png');
 const outDir = path.join(root, 'assets/images');
 const tmpDir = process.env.TMPDIR || '/tmp';
 
-const DATE = '11 &amp; 12 December 2026';
-const CITY = 'Chandigarh &amp; Ambala';
+// Date/city are gated by revealDate so the OG share image never leaks the
+// wedding date before you publish it. While hidden: a date-free "Save the Date"
+// teaser and no city. Real values are sourced from site.config (single source).
+const DATE = revealDate ? wedding.dateRange : 'Save the Date';
+const CITY = revealDate ? wedding.heroLocation : '';
 
 const bg = 'data:image/png;base64,' + fs.readFileSync(base).toString('base64');
 
@@ -61,7 +64,7 @@ function html(nameA, nameB) {
   <div class="names">${nameA} <span class="amp">&amp;</span> ${nameB}</div>
   <div class="rule"></div>
   <div class="date">${DATE}</div>
-  <div class="city">${CITY}</div>
+  ${CITY ? `<div class="city">${CITY}</div>` : ''}
 </div></div></body></html>`;
 }
 

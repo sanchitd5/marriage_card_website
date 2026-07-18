@@ -349,7 +349,17 @@ html[data-theme="dark"] .hero-veil {
     linear-gradient(0deg, hsl(263 24% 11% / .97) 0%, hsl(263 24% 11% / .6) 28%, hsl(263 24% 11% / .28) 58%),
     radial-gradient(ellipse at center 58%, hsl(263 28% 9% / .45) 0%, hsl(263 24% 11% / .2) 70%);
 }
-.hero-inner { position: relative; z-index: 2; padding: 18vh 1.25rem 0; width: 100%; }
+.hero-inner {
+  position: absolute; inset: 0; z-index: 2; width: 100%;
+  display: grid;
+  grid-template-rows: 1fr auto 1fr;   /* names row centred → "&" at 50svh */
+  align-items: center; justify-items: center;
+  padding: 9vh 1.25rem;               /* symmetric top/bottom keeps centre true */
+  box-sizing: border-box;
+}
+.hero-top    { align-self: end; }      /* invocation + kicker: sit just above centre */
+.hero-bottom { align-self: start; }    /* date + hashtag: sit just below centre */
+.hero-inner > .hero-names { grid-row: 2; margin-block: .5rem; }
 .hero .kicker { max-width: 34rem; margin-inline: auto; text-transform: none; letter-spacing: .12em; font-style: italic; font-size: .95rem; color: hsl(var(--wisteria-deep) / .85); }
 .hero-names {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -397,7 +407,7 @@ html[data-theme="dark"] .hero-veil {
 .hero-tag-text {
   display: inline-block;
 }
-.scroll-cue { position: relative; z-index: 2; margin: 5vh auto 4vh; display: grid; place-items: center; gap: .3rem; }
+.scroll-cue { position: absolute; bottom: 3.5vh; left: 0; right: 0; z-index: 2; margin-inline: auto; display: grid; place-items: center; gap: .3rem; }
 
 /* floating scroll cue — compact circle, same style as music-toggle */
 #floating-cue {

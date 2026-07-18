@@ -14,8 +14,8 @@ import {
   buildHtmlTokens,
   buildManifestTokens,
   applyTokens,
-  computeRevealCouple,
-  gateGallery,
+  computeCoupleRevealTs,
+  COUPLE_REVEAL_OFFSET_MS,
 } from '../build.js';
 import { groom, bride } from '../site.config.mjs';
 
@@ -25,11 +25,13 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const fx = {
   groom: {
     first: 'A$1', full: 'A Full', initial: 'A', surname: 'AS',
-    hashtag: '#a', role: 'groom', parents: 'P & Q', grandparents: 'G <one>',
+    hashtag: '#a', role: 'groom', parents: 'P & Q',
+    paternalGrandparents: 'G <one>', maternalGrandparents: 'G <mat-a>',
   },
   bride: {
     first: 'B', full: 'B Full', initial: 'B', surname: 'BS',
-    hashtag: '#b', role: 'bride', parents: 'R & S', grandparents: "G'two",
+    hashtag: '#b', role: 'bride', parents: 'R & S',
+    paternalGrandparents: "G'two", maternalGrandparents: "G'mat-b",
   },
 };
 
@@ -87,13 +89,34 @@ test('htmlEscape: escapes & first so it does not double-encode', () => {
 });
 
 // ---- renderFamilySide -------------------------------------------------
-test('renderFamilySide: emits escaped role, parents, grandparents', () => {
-  const html = renderFamilySide({ role: 'groom', parents: 'P & Q', grandparents: 'G <one>' });
+test('renderFamilySide: primary side shows both grandparent sets + parents', () => {
+  const html = renderFamilySide(
+    { role: 'groom', parents: 'P & Q', paternalGrandparents: 'G <one>', maternalGrandparents: 'G two' },
+    { primary: true },
+  );
   assert.match(html, /Grand Parents of the groom/);
   assert.match(html, /Parents of the groom/);
   assert.match(html, /P &amp; Q/);
-  assert.match(html, /G &lt;one&gt;/);
+  assert.match(html, /G &lt;one&gt;/); // paternal, escaped
+  assert.match(html, /G two/); // maternal
   assert.match(html, /class="family-side fade-up"/);
+});
+test('renderFamilySide: secondary side is parents-only (no grandparents)', () => {
+  const html = renderFamilySide({
+    role: 'bride', parents: 'R & S', paternalGrandparents: 'GP', maternalGrandparents: 'GM',
+  });
+  assert.match(html, /Parents of the bride/);
+  assert.match(html, /R &amp; S/);
+  assert.doesNotMatch(html, /Grand Parents of the bride/);
+  assert.doesNotMatch(html, /GP|GM/);
+});
+test('renderFamilySide: placeholder grandparent set is skipped', () => {
+  const html = renderFamilySide(
+    { role: 'groom', parents: 'P & Q', paternalGrandparents: 'Real GP', maternalGrandparents: 'Names to be added' },
+    { primary: true },
+  );
+  assert.match(html, /Real GP/);
+  assert.doesNotMatch(html, /Names to be added/);
 });
 
 // ---- applyTokens ------------------------------------------------------
@@ -141,51 +164,35 @@ test('template: fully rendered output has no leftover {{TOKENS}}', () => {
 
 // ---- Real config sanity (guards against placeholder grandparents) ------
 test('site.config: both sides fully populated, no placeholder text', () => {
-  const fields = ['first', 'full', 'initial', 'surname', 'hashtag', 'role', 'parents', 'grandparents'];
+  const fields = ['first', 'full', 'initial', 'surname', 'hashtag', 'role', 'parents', 'paternalGrandparents'];
   for (const side of [groom, bride]) {
     for (const k of fields) {
       assert.ok(side[k] && String(side[k]).trim().length > 0, `${side.role}.${k} missing`);
     }
-    assert.doesNotMatch(side.grandparents, /to be updated/i, `${side.role} grandparents still placeholder`);
+    // paternal set must be real; maternal may still be the "Names to be added"
+    // placeholder (skipped at render time) until supplied.
+    assert.doesNotMatch(side.paternalGrandparents, /to be (updated|added)/i, `${side.role} paternal grandparents still placeholder`);
   }
 });
 
-// ---- Couple-photo reveal gate -----------------------------------------
-const WTS = [2026, 11, 12, 13, 30, 0];          // 12 Dec 2026 13:30 UTC
-const REVEAL_AT = Date.UTC(...WTS) + 5 * 3600 * 1000; // + 5h
+// ---- Couple-photo reveal gate (runtime; build emits the reveal timestamp) --
+const WTS = [2026, 11, 12, 13, 30, 0];                    // 12 Dec 2026 13:30 UTC
+const REVEAL_AT = Date.UTC(...WTS) + COUPLE_REVEAL_OFFSET_MS;
 
-test('computeRevealCouple: hidden before reveal moment', () => {
-  assert.equal(computeRevealCouple(WTS, REVEAL_AT - 1, undefined), false);
+test('computeCoupleRevealTs: default = weddingTs + offset', () => {
+  assert.equal(computeCoupleRevealTs(WTS, undefined), REVEAL_AT);
+  assert.equal(COUPLE_REVEAL_OFFSET_MS, 5 * 3600 * 1000);
 });
 
-test('computeRevealCouple: revealed at/after reveal moment', () => {
-  assert.equal(computeRevealCouple(WTS, REVEAL_AT, undefined), true);
-  assert.equal(computeRevealCouple(WTS, REVEAL_AT + 1, undefined), true);
+test('computeCoupleRevealTs: REVEAL_COUPLE=true → 0 (reveal now)', () => {
+  assert.equal(computeCoupleRevealTs(WTS, 'true'), 0);
 });
 
-test('computeRevealCouple: REVEAL_COUPLE=true forces on before the time', () => {
-  assert.equal(computeRevealCouple(WTS, REVEAL_AT - 1e9, 'true'), true);
+test('computeCoupleRevealTs: REVEAL_COUPLE=false → null (stay hidden)', () => {
+  assert.equal(computeCoupleRevealTs(WTS, 'false'), null);
 });
 
-test('computeRevealCouple: REVEAL_COUPLE=false forces off after the time', () => {
-  assert.equal(computeRevealCouple(WTS, REVEAL_AT + 1e9, 'false'), false);
-});
-
-test('computeRevealCouple: invalid timestamp → hidden (fail safe)', () => {
-  assert.equal(computeRevealCouple(undefined, REVEAL_AT + 1e9, undefined), false);
-  assert.equal(computeRevealCouple([2026, 11], REVEAL_AT + 1e9, undefined), false);
-});
-
-test('gateGallery: revealed returns the list unchanged', () => {
-  const list = [{ src: 'photo-01', alt: 'secret', cls: 'gframe--tall' }, { src: 'photo-02', alt: 'x' }];
-  assert.deepEqual(gateGallery(list, true), list);
-});
-
-test('gateGallery: hidden strips src/alt, keeps only cls (no leak)', () => {
-  const list = [{ src: 'photo-01', alt: 'a quiet kiss', cls: 'gframe--tall' }, { src: 'photo-02', alt: 'proposal' }];
-  const out = gateGallery(list, false);
-  assert.deepEqual(out, [{ cls: 'gframe--tall' }, {}]);
-  const json = JSON.stringify(out);
-  assert.doesNotMatch(json, /photo-0/, 'photo filename leaked');
-  assert.doesNotMatch(json, /kiss|proposal/, 'caption leaked');
+test('computeCoupleRevealTs: invalid timestamp → null (fail safe)', () => {
+  assert.equal(computeCoupleRevealTs(undefined, undefined), null);
+  assert.equal(computeCoupleRevealTs([2026, 11], undefined), null);
 });
