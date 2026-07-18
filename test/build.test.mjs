@@ -14,6 +14,8 @@ import {
   buildHtmlTokens,
   buildManifestTokens,
   applyTokens,
+  computeRevealCouple,
+  gateGallery,
 } from '../build.js';
 import { groom, bride } from '../site.config.mjs';
 
@@ -146,4 +148,44 @@ test('site.config: both sides fully populated, no placeholder text', () => {
     }
     assert.doesNotMatch(side.grandparents, /to be updated/i, `${side.role} grandparents still placeholder`);
   }
+});
+
+// ---- Couple-photo reveal gate -----------------------------------------
+const WTS = [2026, 11, 12, 13, 30, 0];          // 12 Dec 2026 13:30 UTC
+const REVEAL_AT = Date.UTC(...WTS) + 5 * 3600 * 1000; // + 5h
+
+test('computeRevealCouple: hidden before reveal moment', () => {
+  assert.equal(computeRevealCouple(WTS, REVEAL_AT - 1, undefined), false);
+});
+
+test('computeRevealCouple: revealed at/after reveal moment', () => {
+  assert.equal(computeRevealCouple(WTS, REVEAL_AT, undefined), true);
+  assert.equal(computeRevealCouple(WTS, REVEAL_AT + 1, undefined), true);
+});
+
+test('computeRevealCouple: REVEAL_COUPLE=true forces on before the time', () => {
+  assert.equal(computeRevealCouple(WTS, REVEAL_AT - 1e9, 'true'), true);
+});
+
+test('computeRevealCouple: REVEAL_COUPLE=false forces off after the time', () => {
+  assert.equal(computeRevealCouple(WTS, REVEAL_AT + 1e9, 'false'), false);
+});
+
+test('computeRevealCouple: invalid timestamp → hidden (fail safe)', () => {
+  assert.equal(computeRevealCouple(undefined, REVEAL_AT + 1e9, undefined), false);
+  assert.equal(computeRevealCouple([2026, 11], REVEAL_AT + 1e9, undefined), false);
+});
+
+test('gateGallery: revealed returns the list unchanged', () => {
+  const list = [{ src: 'photo-01', alt: 'secret', cls: 'gframe--tall' }, { src: 'photo-02', alt: 'x' }];
+  assert.deepEqual(gateGallery(list, true), list);
+});
+
+test('gateGallery: hidden strips src/alt, keeps only cls (no leak)', () => {
+  const list = [{ src: 'photo-01', alt: 'a quiet kiss', cls: 'gframe--tall' }, { src: 'photo-02', alt: 'proposal' }];
+  const out = gateGallery(list, false);
+  assert.deepEqual(out, [{ cls: 'gframe--tall' }, {}]);
+  const json = JSON.stringify(out);
+  assert.doesNotMatch(json, /photo-0/, 'photo filename leaked');
+  assert.doesNotMatch(json, /kiss|proposal/, 'caption leaked');
 });

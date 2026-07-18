@@ -78,3 +78,31 @@ export const weddingHidden = {
   eventWhen: 'Date &amp; time to be announced',
   eventVenue: 'Venue to be announced',
 };
+
+// ── Couple-photo reveal gate ─────────────────────────────────────────
+// The gallery photos of the couple stay SECRET until this many hours after
+// the wedding start (weddingTsUTC). Leak-proof by construction: while hidden,
+// build.js excludes assets/photos/ from dist AND strips the filenames/captions
+// from the generated GALLERY, so no image, path, or description ships. Reveal
+// is build-time (computed from the clock at deploy) — schedule a Netlify
+// rebuild at/after the reveal moment to flip it automatically. Force with
+// REVEAL_COUPLE=true|false node build.js. The painted portrait (art-couple.jpg)
+// is intentionally NOT gated.
+export const coupleRevealOffsetHours = 5;
+
+// Gallery source of truth. `src` maps to assets/photos/<src>.jpg. While the
+// couple gate is closed, only the non-identifying `cls` (grid sizing) survives
+// into the build — `src`/`alt` are dropped so nothing about the photos leaks.
+export const gallery = [
+  { src: 'photo-01', alt: 'A quiet forehead kiss before the floral arch', cls: 'gframe--tall' },
+  { src: 'photo-02', alt: 'A twirl beneath the spiral staircase' },
+  { src: 'photo-04', alt: 'Sanchit on one knee, asking the question' },
+  { src: 'photo-05', alt: 'Laughing together at the engagement' },
+  { src: 'photo-06', alt: 'A playful moment with the groom’s stole' },
+  { src: 'photo-08', alt: 'Poolside, in ivory and gold', cls: 'gframe--tall' },
+  { src: 'photo-10', alt: 'A rooftop embrace at golden hour' },
+  { src: 'photo-12', alt: 'Nose to nose, mid-laugh' },
+  { src: 'photo-14', alt: 'Dancing at the engagement celebration', cls: 'gframe--wide' },
+  { src: 'photo-16', alt: 'Beneath the grand ceiling, holding close' },
+  { src: 'photo-17', alt: 'Roses in hand, on the morning walk' },
+];

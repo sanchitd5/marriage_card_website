@@ -8,10 +8,14 @@ export function initGate() {
   const gateEl = $('#gate');
   if (!gateEl) return;
 
-  const video = $('#gate-video');
+  const dayVideo = $('#gate-video-day');
+  const nightVideo = $('#gate-video-night');
   const gateCard = $('.gate-card');
   const seal = $('#seal');
-  if (!video || !gateCard || !seal) return;
+  if (!dayVideo || !nightVideo || !gateCard || !seal) return;
+
+  const gateVideos = [dayVideo, nightVideo];
+  const themeVideo = theme => (theme === 'dark' ? nightVideo : dayVideo);
 
   document.body.style.overflow = 'hidden';
   // the invitation always opens from the top of the story
@@ -23,9 +27,29 @@ export function initGate() {
   // wide (≥768px) breakpoint: serve 16:9 landscape assets for tablet/desktop
   const isWide = () => window.matchMedia('(min-width: 768px)').matches;
 
-  // night mode gets its own candlelit gate art and reveal video
+  // Point each stacked reveal video at the right tier/wide variant, ONCE. The
+  // day↔night switch is a crossfade between the two elements, never a reload.
+  (function loadVideoSources() {
+    const w = isWide() ? '-wide' : '';
+    const suffix = videoSuffix();
+    [['-day', dayVideo], ['-night', nightVideo]].forEach(([n, v]) => {
+      const src = v.querySelector('source');
+      if (!src) return;
+      const want = `assets/videos/gate-reveal${n}${w}${suffix}.mp4`;
+      if ((src.getAttribute('src') || '') !== want) {
+        src.setAttribute('src', want);
+        v.load();
+      }
+    });
+  })();
+
+  // Crossfade which reveal video is visible (works before AND during the reveal,
+  // so toggling mode mid-open is a smooth dissolve). Night mode also gets its own
+  // candlelit closed/open stills, but only until the reveal starts.
   appState.setGateTheme = theme => {
-    if (opened) return;
+    const active = themeVideo(theme);
+    gateVideos.forEach(v => v.classList.toggle('is-active', v === active));
+    if (opened) return; // stills no longer matter once the drapes are opening
     const n  = theme === 'dark' ? '-night' : '';
     const w  = isWide() ? '-wide' : '';
     const closedImg = $('.gate-still--closed');
@@ -38,14 +62,6 @@ export function initGate() {
     const openSrc   = openImg.closest('picture')?.querySelector('source');
     if (closedSrc) closedSrc.srcset = `assets/images/art-gate-closed${n}-wide.jpg`;
     if (openSrc)   openSrc.srcset   = `assets/images/art-gate-open${n}-wide.jpg`;
-    video.poster = `assets/images/art-gate-closed${n}${w}.jpg`;
-    const src = video.querySelector('source');
-    if (!src) return;
-    const want = `assets/videos/gate-reveal${n || '-day'}${w}${videoSuffix()}.mp4`;
-    if (!(src.getAttribute('src') || '').endsWith(want)) {
-      src.setAttribute('src', want);
-      video.load();
-    }
   };
   appState.setGateTheme(document.documentElement.dataset.theme);
 
@@ -87,43 +103,58 @@ export function initGate() {
     let ending = false;
     const FADE = 1.3;          // gate fade duration
     const LEAD = 1.6;          // begin fading this many seconds before the clip ends
-    const tryPlay = video.play();
 
-    // Fade the WHOLE gate out a bit before the reveal video actually ends, so it
-    // dissolves onto the already-playing hero underneath (never shows the reveal
-    // clip's frozen final frame).
+    // Play BOTH clips from the top so they stay frame-synced; the reveal and the
+    // end-fade timing key off the ACTIVE one (guaranteed to run), so a mode
+    // toggle mid-reveal crossfades cleanly and an unbuffered inactive clip can
+    // never abort the sequence.
+    const active = themeVideo(document.documentElement.dataset.theme);
+    let activePlay = null;
+    gateVideos.forEach(v => {
+      try { v.currentTime = 0; } catch (e) { /* not seekable yet */ }
+      const p = v.play();
+      if (v === active) { activePlay = p; return; }
+      if (p && p.catch) p.catch(() => {}); // inactive clip: best-effort, ignore
+    });
+
+    // Fade the WHOLE gate out a bit before the reveal clip ends, so it dissolves
+    // onto the already-playing hero underneath (never shows a frozen final frame).
     const beginEnd = () => {
       if (ending) return;
       ending = true;
       finish(false);
     };
     const armFade = () => {
-      const dur = video.duration;
+      const dur = active.duration;
       if (isFinite(dur) && dur > 0) {
         const onTime = () => {
-          if (video.currentTime >= dur - LEAD) {
-            video.removeEventListener('timeupdate', onTime);
+          if (active.currentTime >= dur - LEAD) {
+            active.removeEventListener('timeupdate', onTime);
             beginEnd();
           }
         };
-        video.addEventListener('timeupdate', onTime);
+        active.addEventListener('timeupdate', onTime);
       }
     };
+    // CSS crossfades .is-active in once #gate.revealing is set.
+    const reveal = () => {
+      gsap.set('.gate-still--closed', { opacity: 1 });
+      gateEl.classList.add('revealing');
+      if (isFinite(active.duration) && active.duration > 0) armFade();
+      else active.addEventListener('loadedmetadata', armFade, { once: true });
+    };
 
-    if (tryPlay && tryPlay.then) {
-      tryPlay.then(() => {
-        gsap.set('.gate-still--closed', { opacity: 1 });
-        gsap.to(video, { opacity: 1, duration: .3 });
-        if (isFinite(video.duration) && video.duration > 0) armFade();
-        else video.addEventListener('loadedmetadata', armFade, { once: true });
-      }).catch(beginEnd);
-    } else if (video.error) {
+    if (activePlay && activePlay.then) {
+      activePlay.then(reveal).catch(beginEnd);
+    } else if (active.error) {
       beginEnd();
+    } else {
+      reveal();
     }
 
     // fallbacks: natural end, and missing/unplayable file
-    video.addEventListener('ended', beginEnd, { once: true });
-    setTimeout(() => { if (!ending && video.readyState < 2) beginEnd(); }, 1500);
+    active.addEventListener('ended', beginEnd, { once: true });
+    setTimeout(() => { if (!ending && active.readyState < 2) beginEnd(); }, 1500);
 
     // expose fade duration to finish()
     finish.fadeDur = FADE;

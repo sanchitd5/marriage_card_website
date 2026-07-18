@@ -227,8 +227,14 @@
         <source media="(min-width: 768px)" srcset="assets/images/art-gate-open-wide.jpg">
         <img class="gate-still gate-still--open" src="assets/images/art-gate-open.jpg" alt="" aria-hidden="true">
       </picture>
-      <video id="gate-video" class="gate-video" playsinline muted preload="metadata" poster="assets/images/art-gate-closed.jpg">
+      <!-- Day + night reveal clips are stacked and play in sync; the theme
+           toggle just crossfades opacity between them (see gate.js) so switching
+           mode mid-reveal is a smooth dissolve, not a src reload. -->
+      <video id="gate-video-day" class="gate-video is-active" data-gate-theme="light" playsinline muted preload="metadata" poster="assets/images/art-gate-closed.jpg">
         <source src="assets/videos/gate-reveal-day.mp4" type="video/mp4">
+      </video>
+      <video id="gate-video-night" class="gate-video" data-gate-theme="dark" playsinline muted preload="metadata" poster="assets/images/art-gate-closed-night.jpg">
+        <source src="assets/videos/gate-reveal-night.mp4" type="video/mp4">
       </video>
     </div>
     <div class="gate-card">

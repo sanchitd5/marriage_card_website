@@ -1,10 +1,13 @@
-import { NAMES, SONGS, WEDDING_TS, REVEAL_DATE, EVENT_DATES, EVENT_VENUES } from './couple.mjs';
+import { NAMES, SONGS, WEDDING_TS, REVEAL_DATE, EVENT_DATES, EVENT_VENUES, REVEAL_COUPLE, GALLERY } from './couple.mjs';
 
 // SONGS is auto-discovered from assets/audio/theme-N.mp3 at build time.
 // WEDDING_TS / EVENT_DATES / EVENT_VENUES are build-gated: null while
 // site.config revealDate is false, so NO date- or venue-identifying value
 // ships in this (verbatim-copied) module until the reveal.
-export { NAMES, SONGS, WEDDING_TS, REVEAL_DATE };
+// GALLERY is build-gated too: while REVEAL_COUPLE is false the couple's photo
+// filenames and captions are stripped (only grid-sizing classes remain) and the
+// photo files are excluded from dist — leak-proof, not merely hidden.
+export { NAMES, SONGS, WEDDING_TS, REVEAL_DATE, REVEAL_COUPLE, GALLERY };
 
 const D = EVENT_DATES || {};
 const V = EVENT_VENUES || {};
@@ -29,16 +32,3 @@ export const EVENTS = {
   wedding: mkEvent('wedding', `Wedding of ${NAMES.pairTitle}`),
 };
 
-export const GALLERY = [
-  { src: 'photo-01', alt: 'A quiet forehead kiss before the floral arch', cls: 'gframe--tall' },
-  { src: 'photo-02', alt: 'A twirl beneath the spiral staircase' },
-  { src: 'photo-04', alt: 'Sanchit on one knee, asking the question' },
-  { src: 'photo-05', alt: 'Laughing together at the engagement' },
-  { src: 'photo-06', alt: 'A playful moment with the groom’s stole' },
-  { src: 'photo-08', alt: 'Poolside, in ivory and gold', cls: 'gframe--tall' },
-  { src: 'photo-10', alt: 'A rooftop embrace at golden hour' },
-  { src: 'photo-12', alt: 'Nose to nose, mid-laugh' },
-  { src: 'photo-14', alt: 'Dancing at the engagement celebration', cls: 'gframe--wide' },
-  { src: 'photo-16', alt: 'Beneath the grand ceiling, holding close' },
-  { src: 'photo-17', alt: 'Roses in hand, on the morning walk' },
-];

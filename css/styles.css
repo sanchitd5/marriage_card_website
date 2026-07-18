@@ -124,6 +124,11 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
   object-fit: cover; object-position: center;
 }
 .gate-still--open, .gate-video { opacity: 0; }
+/* Both reveal videos are stacked; only the active theme's is shown, and the
+   theme toggle crossfades between them. They stay hidden until the reveal
+   begins (#gate.revealing), so the closed-drape still owns the pre-tap frame. */
+.gate-video { transition: opacity .55s ease; }
+#gate.revealing .gate-video.is-active { opacity: 1; }
 .gate-card {
   position: relative; z-index: 2;
   cursor: pointer;
@@ -575,6 +580,21 @@ html[data-theme="dark"] .hero-veil {
 .gframe img { aspect-ratio: 4 / 5; }
 .gframe--tall img { aspect-ratio: auto; min-height: 100%; }
 .gframe--wide img { aspect-ratio: 16 / 10; }
+/* Couple gate closed: a single veiled panel replaces the masonry (photos are
+   absent from the build entirely — see gallery.js / build.js). */
+.gallery-grid--veiled { grid-template-columns: 1fr; place-items: center; }
+.gframe--veiled {
+  display: grid; place-items: center; gap: 1rem;
+  width: 100%; min-height: 42svh;
+  padding: clamp(2rem, 8vw, 4rem) 1.5rem;
+  text-align: center;
+}
+.gframe--veiled .veil-motif { font-size: 2rem; color: hsl(var(--gold)); line-height: 1; }
+.gframe--veiled .veil-note {
+  font-family: var(--font-display); font-style: italic;
+  font-size: clamp(1.15rem, 3.6vw, 1.55rem); line-height: 1.5;
+  color: hsl(var(--ink) / .72); max-width: 24rem;
+}
 
 /* ═══ FAMILY ═════════════════════════════════════════════════ */
 .family { text-align: center; }

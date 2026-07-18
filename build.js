@@ -14,7 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { groom, bride, siteUrls, revealDate, wedding, weddingHidden } from './site.config.mjs';
+import { groom, bride, siteUrls, revealDate, wedding, weddingHidden, gallery, coupleRevealOffsetHours } from './site.config.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,6 +23,26 @@ const __dirname = path.dirname(__filename);
 // FROM_GROOM_SIDE defaults to true; only the literal string 'false' flips it.
 export function parseFromGroomSide(rawFlag) {
   return rawFlag === undefined ? true : rawFlag !== 'false';
+}
+
+// ---- Couple-photo reveal gate -----------------------------------------
+// Gallery photos of the couple stay hidden until `coupleRevealOffsetHours`
+// after the wedding start, computed from the build clock so the first deploy
+// at/after that moment reveals them. REVEAL_COUPLE=true|false forces it.
+export const COUPLE_REVEAL_OFFSET_MS = (coupleRevealOffsetHours || 0) * 60 * 60 * 1000;
+
+export function computeRevealCouple(weddingTsUTC, now = Date.now(), env = process.env.REVEAL_COUPLE) {
+  if (env === 'true') return true;
+  if (env === 'false') return false;
+  if (!Array.isArray(weddingTsUTC) || weddingTsUTC.length < 6) return false;
+  return now >= Date.UTC(...weddingTsUTC) + COUPLE_REVEAL_OFFSET_MS;
+}
+
+// While hidden, keep only the non-identifying grid-sizing class; drop src/alt
+// so no photo filename or caption ships in the generated GALLERY.
+export function gateGallery(list, reveal) {
+  if (!Array.isArray(list)) return [];
+  return reveal ? list : list.map(item => (item && item.cls ? { cls: item.cls } : {}));
 }
 
 export function composeNames(fromGroomSide, sides = { groom, bride }, sites = siteUrls) {
@@ -174,12 +194,14 @@ function runBuild() {
   const names = composeNames(fromGroomSide);
   const htmlTokens = buildHtmlTokens(names);
   const manifestTokens = buildManifestTokens(names);
+  const revealCouple = computeRevealCouple(wedding.weddingTsUTC);
 
   const root = __dirname;
   const dist = path.join(root, 'dist');
   const srcDir = path.join(root, 'src');
 
   console.log(`build: FROM_GROOM_SIDE=${fromGroomSide} → pairTitle="${names.pairTitle}"`);
+  console.log(`build: revealCouple=${revealCouple} (couple photos ${revealCouple ? 'INCLUDED' : 'excluded — hidden until reveal'})`);
 
   // Wipe & recreate dist/
   fs.rmSync(dist, { recursive: true, force: true });
@@ -190,7 +212,14 @@ function runBuild() {
   // are intentionally excluded from the published build.
   const staticTrees = ['css', 'js', 'assets'];
   // Skip gitignored subpaths (raw AI generations live in assets/images/gen/).
-  const copyFilter = (src) => !src.split(path.sep).includes('gen');
+  // While the couple gate is closed, also exclude assets/photos/ entirely, so
+  // the couple's photos never ship (leak-proof, not merely hidden in the UI).
+  const copyFilter = (src) => {
+    const parts = src.split(path.sep);
+    if (parts.includes('gen')) return false;
+    if (!revealCouple && parts.includes('photos')) return false;
+    return true;
+  };
   for (const dir of staticTrees) {
     const from = path.join(root, dir);
     if (!fs.existsSync(from)) continue;
@@ -246,6 +275,8 @@ function runBuild() {
     'export const WEDDING_TS = ' + (revealDate ? 'Date.UTC(' + wedding.weddingTsUTC.join(', ') + ')' : 'null') + ';',
     'export const EVENT_DATES = ' + JSON.stringify(eventDates) + ';',
     'export const EVENT_VENUES = ' + JSON.stringify(eventVenues) + ';',
+    'export const REVEAL_COUPLE = ' + JSON.stringify(revealCouple) + ';',
+    'export const GALLERY = ' + JSON.stringify(gateGallery(gallery, revealCouple)) + ';',
     '',
   ].join('\n');
   const coupleOut = path.join(dist, 'js', 'app', 'couple.mjs');
