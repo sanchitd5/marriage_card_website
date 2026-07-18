@@ -84,6 +84,7 @@ export function initLightshow() {
 
   let renderer, scene, camera, motes, glow, glowCore, bokeh, positions, speeds, fog;
   let dancers = [];
+  let sceneTextures = [];        // textures created per build, disposed on rebuild
   let running = true, raf = 0, floored = false;
 
   function buildScene() {
@@ -96,9 +97,10 @@ export function initLightshow() {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
     scene = new THREE.Scene();
+    sceneTextures = [];
     fog = new THREE.FogExp2(0x05060a, 0.072); // denser haze → motes funnel out of black
     scene.fog = fog;
-    camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.1, 120);
+    camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.1, 600); // far covers a deep DANCER.z
     camera.position.set(0, 0, 0);
 
     const N = TIERS[tier].motes;
@@ -156,11 +158,31 @@ export function initLightshow() {
     glowCore.position.set(0, 0, -70);
     scene.add(glowCore);
 
-    // Dancers: a few luminous figures at depth, silhouetted against the glow.
-    // The drop dancer (mecha glTF) is instanced once it has loaded; on a
-    // governor rebuild it re-instances from the cached template.
+    // The drop dancer (mecha glTF) is instanced once loaded; on a governor
+    // rebuild its lights/env and instances are recreated for the new scene.
     dancers = [];
+    if (mechaLoading || mechaTemplate) setupMechaScene();
     if (mechaTemplate) fitAndAddDancers();
+  }
+
+  // Lights + a studio env for the mecha's PBR chrome. Recreated per build (a
+  // PMREM env texture is bound to the renderer/context, so it can't be cached
+  // across a rebuild). Guarded to run once per scene.
+  function setupMechaScene() {
+    if (!scene || !renderer || scene.userData.lit) return;
+    scene.userData.lit = true;
+    const dir = new THREE.DirectionalLight(0xbfe9ff, 3.2); dir.position.set(3, 6, 4); scene.add(dir);
+    const fill = new THREE.DirectionalLight(0x88b0ff, 1.4); fill.position.set(-4, 1, 3); scene.add(fill);
+    scene.add(new THREE.AmbientLight(0x33445a, 0.8));
+    try {
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      const src = makeEnvTexture();
+      const env = pmrem.fromEquirectangular(src).texture;
+      scene.environment = env;
+      sceneTextures.push(env);
+      src.dispose();
+      pmrem.dispose();
+    } catch (e) { /* env optional */ }
   }
 
   // place a mote on a tunnel ring at a given depth
@@ -182,7 +204,7 @@ export function initLightshow() {
     rg.addColorStop(0.5, 'rgba(255,255,255,0.35)');
     rg.addColorStop(1, 'rgba(255,255,255,0)');
     g.fillStyle = rg; g.fillRect(0, 0, 32, 32);
-    const t = new THREE.CanvasTexture(c); t.needsUpdate = true; return t;
+    const t = new THREE.CanvasTexture(c); t.needsUpdate = true; sceneTextures.push(t); return t;
   }
 
   // A self-contained studio environment (no external RoomEnvironment script):
@@ -211,15 +233,15 @@ export function initLightshow() {
     rg.addColorStop(0.3, 'rgba(120,230,255,0.6)');
     rg.addColorStop(1, 'rgba(0,0,0,0)');
     g.fillStyle = rg; g.fillRect(0, 0, 64, 64);
-    const t = new THREE.CanvasTexture(c); t.needsUpdate = true; return t;
+    const t = new THREE.CanvasTexture(c); t.needsUpdate = true; sceneTextures.push(t); return t;
   }
 
-  // ── Drop dancer: the cyber mecha (glTF/Draco), shown ONLY on big drops ──
-  // Lazy-loaded after ignition (never for reduced-motion or tier-0 devices). A
-  // studio env + lights make its chrome/metal read. Placed on the SIDES so the
-  // centre stays clear for content. It fades in on a drop, dances, fades out —
-  // and dims the haze while it's up, so it "replaces" the ambient show.
-  let mechaTemplate = null, mechaLoading = false, lastDrop = -999, dropSide = 1, firstDropDone = false;
+  // ── The cyber mecha dancer (glTF/Draco) ─────────────────────────────
+  // Lazy-loaded after ignition. Lights + a studio env (in setupMechaScene, per
+  // build) make its chrome read. Placed on the side (desktop) / centre (mobile)
+  // via the DANCER config, sized to real screen pixels by fitToPixels. Currently
+  // visible whenever ignited (target = ignite); it fades in on the tap and spins.
+  let mechaTemplate = null, mechaLoading = false;
   // ── Dancer placement — tweak these ──────────────────────────────────
   // size = on-screen height as a fraction of the real screen pixels (bigger = closer).
   // z = depth into the tunnel (more negative = deeper/farther). y = vertical
@@ -231,13 +253,7 @@ export function initLightshow() {
   function ensureMecha() {
     if (mechaLoading || mechaTemplate || !THREE.GLTFLoader || !renderer) return; // load on all tiers
     mechaLoading = true;
-    try {
-      const pmrem = new THREE.PMREMGenerator(renderer);
-      scene.environment = pmrem.fromEquirectangular(makeEnvTexture()).texture;
-    } catch (e) { /* env optional */ }
-    const dir = new THREE.DirectionalLight(0xbfe9ff, 3.2); dir.position.set(3, 6, 4); scene.add(dir);
-    const fill = new THREE.DirectionalLight(0x88b0ff, 1.4); fill.position.set(-4, 1, 3); scene.add(fill);
-    scene.add(new THREE.AmbientLight(0x33445a, 0.8));
+    setupMechaScene(); // lights + env on the current scene (idempotent)
     try {
       const draco = new THREE.DRACOLoader();
       draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
@@ -335,6 +351,7 @@ export function initLightshow() {
   }
   function floor() {
     floored = true; measuring = false;
+    state.drop = 0;              // don't strand the MilkDrop viz visible
     disposeGL();
     const amb = $('#ambient'); if (amb) amb.style.display = '';   // CSS fog stands in
     canvas.style.display = 'none';
@@ -344,8 +361,13 @@ export function initLightshow() {
     if (bokeh) { bokeh.geometry.dispose(); bokeh.material.dispose(); }
     if (glow) glow.material.dispose();
     if (glowCore) glowCore.material.dispose();
-    for (const d of dancers) { d.grp.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); for (const mm of d.mats) mm.dispose(); }
+    // dancers share the template's GEOMETRY (clone(true) copies geometry by
+    // reference) — dispose only the per-instance cloned materials, never the
+    // shared geometry (that would break the template on the next rebuild).
+    for (const d of dancers) { for (const mm of d.mats) mm.dispose(); }
     dancers = [];
+    for (const t of sceneTextures) { try { t.dispose(); } catch (e) {} }
+    sceneTextures = [];
     if (renderer) { renderer.dispose(); }
     scene = motes = bokeh = glow = glowCore = null;
   }
@@ -382,11 +404,12 @@ export function initLightshow() {
     rootStyle.setProperty('--energy', e.toFixed(3));
     rootStyle.setProperty('--beat', beat.toFixed(3));
 
-    // drop level: rises during loud/high-energy sections, spikes on hard beats,
-    // eases out in the quiet — drives the MilkDrop viz (appears only on drops)
-    const dropTarget = e > 0.58 ? 1 : 0;
-    dropLevel += (dropTarget - dropLevel) * (dropTarget > dropLevel ? 0.12 : 0.03); // fast in, slow out
-    dropLevel = Math.max(dropLevel, beat * ignite * 0.9);
+    // drop level: rises in SUSTAINED loud/high-energy sections, eases out in the
+    // quiet — drives the MilkDrop viz (only on drops). Hysteresis avoids
+    // threshold dithering; NO per-beat spike (that strobed the full-field layer,
+    // a flash risk), so both edges stay smoothly rate-limited like the glow.
+    const dropTarget = e > (dropLevel > 0.5 ? 0.46 : 0.62) ? 1 : 0; // Schmitt trigger
+    dropLevel += (dropTarget - dropLevel) * (dropTarget > dropLevel ? 0.06 : 0.03); // ≤ ~0.06/frame
     state.drop = dropLevel;
 
     // advance motes toward camera; recycle past the near plane
