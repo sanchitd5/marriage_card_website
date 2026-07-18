@@ -128,12 +128,38 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
   position: relative; z-index: 2;
   cursor: pointer;
   text-align: center;
-  padding: 1.5rem 1.6rem 1.2rem;
+  padding: 1.7rem 1.7rem 1.4rem;
   max-width: 24rem;
   margin-inline: 1.25rem;
-  background: hsl(var(--ivory) / .92);
-  border: 1px solid hsl(var(--gold-soft) / .8);
-  box-shadow: inset 0 0 0 5px hsl(var(--ivory)), inset 0 0 0 6px hsl(var(--gold-soft) / .55), var(--shadow-lift);
+  background: transparent;
+  border: 0;
+  /* soft wisteria-tinted shadow (follows the frosted shape) seats the panel a
+     few mm in front of the drape rather than pasting it flat on top */
+  filter: drop-shadow(4px 11px 20px hsl(var(--wisteria-deep) / .42));
+}
+/* Frosted sheer panel behind the content: the painted drape blurs and tints
+   THROUGH it, so the card reads as the gauzy centre of the closed curtain —
+   arched like a jharokha window at the top and feathered at the edges so it
+   dissolves into the sheer instead of sitting on it as a hard rectangle. Frost
+   lives on ::before (kept square-ish, no overflow-clip) so the arched card
+   never triggers the iOS backdrop-filter gray-out. */
+.gate-card::before {
+  content: ""; position: absolute; inset: -5% -4%; z-index: -1;
+  background: hsl(var(--ivory) / .74);
+  -webkit-backdrop-filter: blur(16px) saturate(135%) brightness(1.09);
+          backdrop-filter: blur(16px) saturate(135%) brightness(1.09);
+  border-radius: 48% 48% 14px 14px / 30% 30% 14px 14px;
+  box-shadow:
+    inset 0 1px 0 hsl(var(--ivory) / .7),
+    inset 0 0 0 1px hsl(var(--ivory) / .55),
+    inset 0 0 0 5px hsl(var(--gold-soft) / .3);
+  /* feather: solid through the centre, dissolving toward the edges/bottom */
+  -webkit-mask-image: radial-gradient(125% 116% at 50% 42%, #000 58%, transparent 100%);
+          mask-image: radial-gradient(125% 116% at 50% 42%, #000 58%, transparent 100%);
+}
+/* No backdrop-filter (older browsers): fall back to a solid, legible panel. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .gate-card::before { background: hsl(var(--ivory) / .9); }
 }
 /* Ganesha invocation — heads the welcome gate and the footer. Static and
    un-animated by intent (sacred text must not shimmer/warp); the gate-card's
@@ -221,7 +247,22 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
   text-shadow: 0 1px 3px hsl(20 30% 15% / .5);
 }
 .seal-monogram em { font-family: var(--font-script); font-style: normal; font-size: .62em; color: hsl(0 0% 98%); margin-inline: .1em; }
-.gate-hint { font-size: .8rem; color: hsl(var(--ink) / .55); margin-top: .85rem; font-style: italic; }
+.gate-hint { font-size: .8rem; color: hsl(var(--ink) / .72); margin-top: .85rem; font-style: italic; }
+/* keep copy legible over the translucent frost (halo flips with the theme) */
+.gate-invocation .shloka,
+.gate-invocation .shloka-roman,
+.gate-kicker,
+.gate-line,
+.gate-hint { text-shadow: 0 0 4px hsl(var(--ivory) / .92), 0 1px 2px hsl(var(--ivory) / .85); }
+/* Pale gold (52% L) reads poorly on the light frosted panel — use a deeper
+   bronze-gold for the small gate labels in light mode; dark mode keeps the
+   brighter --gold, which has ample contrast on the dark panel. */
+.gate-kicker,
+.gate-invocation .shloka-roman,
+.gate-invocation .shloka { color: hsl(38 62% 38%); }
+html[data-theme="dark"] .gate-kicker,
+html[data-theme="dark"] .gate-invocation .shloka-roman,
+html[data-theme="dark"] .gate-invocation .shloka { color: hsl(var(--gold)); }
 
 /* ═══ THEME TOGGLE ═══════════════════════════════════════════ */
 #theme-toggle {
