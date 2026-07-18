@@ -12,9 +12,13 @@ export function initGate() {
   const nightVideo = $('#gate-video-night');
   const gateCard = $('.gate-card');
   const seal = $('#seal');
-  if (!dayVideo || !nightVideo || !gateCard || !seal) return;
+  if (!gateCard || !seal) return;
+  // The techno skin ships no reveal video — the gate is a CSS/canvas stage. When
+  // the video elements are absent we run a lighter, video-free reveal; the
+  // Regency path (both videos present) is unchanged.
+  const hasVideo = !!(dayVideo && nightVideo);
 
-  const gateVideos = [dayVideo, nightVideo];
+  const gateVideos = hasVideo ? [dayVideo, nightVideo] : [];
   const themeVideo = theme => (theme === 'dark' ? nightVideo : dayVideo);
 
   document.body.style.overflow = 'hidden';
@@ -27,48 +31,50 @@ export function initGate() {
   // wide (≥768px) breakpoint: serve 16:9 landscape assets for tablet/desktop
   const isWide = () => window.matchMedia('(min-width: 768px)').matches;
 
-  // Point each stacked reveal video at the right tier/wide variant, ONCE. The
-  // day↔night switch is a crossfade between the two elements, never a reload.
-  (function loadVideoSources() {
-    const w = isWide() ? '-wide' : '';
-    const suffix = videoSuffix();
-    [['-day', dayVideo], ['-night', nightVideo]].forEach(([n, v]) => {
-      const src = v.querySelector('source');
-      if (!src) return;
-      const want = `assets/videos/gate-reveal${n}${w}${suffix}.mp4`;
-      if ((src.getAttribute('src') || '') !== want) {
-        src.setAttribute('src', want);
-        v.load();
-      }
-    });
-  })();
+  if (hasVideo) {
+    // Point each stacked reveal video at the right tier/wide variant, ONCE. The
+    // day↔night switch is a crossfade between the two elements, never a reload.
+    (function loadVideoSources() {
+      const w = isWide() ? '-wide' : '';
+      const suffix = videoSuffix();
+      [['-day', dayVideo], ['-night', nightVideo]].forEach(([n, v]) => {
+        const src = v.querySelector('source');
+        if (!src) return;
+        const want = `assets/videos/gate-reveal${n}${w}${suffix}.mp4`;
+        if ((src.getAttribute('src') || '') !== want) {
+          src.setAttribute('src', want);
+          v.load();
+        }
+      });
+    })();
 
-  // Crossfade which reveal video is visible (works before AND during the reveal,
-  // so toggling mode mid-open is a smooth dissolve). Night mode also gets its own
-  // candlelit closed/open stills, but only until the reveal starts.
-  appState.setGateTheme = theme => {
-    const active = themeVideo(theme);
-    gateVideos.forEach(v => v.classList.toggle('is-active', v === active));
-    if (opened) return; // stills no longer matter once the drapes are opening
-    const n  = theme === 'dark' ? '-night' : '';
-    const w  = isWide() ? '-wide' : '';
-    const closedImg = $('.gate-still--closed');
-    const openImg   = $('.gate-still--open');
-    if (!closedImg || !openImg) return;
-    closedImg.src = `assets/images/art-gate-closed${n}${w}.jpg`;
-    openImg.src   = `assets/images/art-gate-open${n}${w}.jpg`;
-    // also update the <source> inside the <picture> wrappers
-    const closedSrc = closedImg.closest('picture')?.querySelector('source');
-    const openSrc   = openImg.closest('picture')?.querySelector('source');
-    if (closedSrc) closedSrc.srcset = `assets/images/art-gate-closed${n}-wide.jpg`;
-    if (openSrc)   openSrc.srcset   = `assets/images/art-gate-open${n}-wide.jpg`;
-  };
-  appState.setGateTheme(document.documentElement.dataset.theme);
+    // Crossfade which reveal video is visible (works before AND during the reveal,
+    // so toggling mode mid-open is a smooth dissolve). Night mode also gets its own
+    // candlelit closed/open stills, but only until the reveal starts.
+    appState.setGateTheme = theme => {
+      const active = themeVideo(theme);
+      gateVideos.forEach(v => v.classList.toggle('is-active', v === active));
+      if (opened) return; // stills no longer matter once the drapes are opening
+      const n  = theme === 'dark' ? '-night' : '';
+      const w  = isWide() ? '-wide' : '';
+      const closedImg = $('.gate-still--closed');
+      const openImg   = $('.gate-still--open');
+      if (!closedImg || !openImg) return;
+      closedImg.src = `assets/images/art-gate-closed${n}${w}.jpg`;
+      openImg.src   = `assets/images/art-gate-open${n}${w}.jpg`;
+      // also update the <source> inside the <picture> wrappers
+      const closedSrc = closedImg.closest('picture')?.querySelector('source');
+      const openSrc   = openImg.closest('picture')?.querySelector('source');
+      if (closedSrc) closedSrc.srcset = `assets/images/art-gate-closed${n}-wide.jpg`;
+      if (openSrc)   openSrc.srcset   = `assets/images/art-gate-open${n}-wide.jpg`;
+    };
+    appState.setGateTheme(document.documentElement.dataset.theme);
 
-  // Start the hero video playing in the background immediately, behind the still
-  // opaque gate. When the gate reveal fades out it uncovers an already-live clip
-  // (no decode handoff at the transition = no end lag).
-  startHeroVideo();
+    // Start the hero video playing in the background immediately, behind the still
+    // opaque gate. When the gate reveal fades out it uncovers an already-live clip
+    // (no decode handoff at the transition = no end lag).
+    startHeroVideo();
+  }
 
   // If the seal goes untapped, the invitation opens itself 30s AFTER the boot
   // loader has cleared (so the countdown starts when the gate is actually on
@@ -84,6 +90,7 @@ export function initGate() {
   gateCard.addEventListener('click', () => {
     if (opened) return;
     opened = true;
+    appState.ignited = true; // the tap is the drop: the light show ignites here
     clearTimeout(autoOpen);
     window.removeEventListener('wedding-boot-done', startAutoOpen);
     seal.classList.add('opened'); // stop the pulse so the crack animation owns the transform
@@ -93,10 +100,24 @@ export function initGate() {
     if (appState.smoother) appState.smoother.scrollTop(0);
     attemptAutoFullscreen();
     startMusic(); // inside the user gesture: unlocks audio autoplay policy
-    startHeroVideo(); // gesture-backed retry in case background autoplay was blocked
+    if (hasVideo) startHeroVideo(); // gesture-backed retry in case background autoplay was blocked
 
     if (REDUCED || !window.gsap) {
       finish(true);
+      return;
+    }
+
+    // Techno skin: no drape video to decode. Break the glyph seal, flash the
+    // stage's light burst (#gate.revealing in CSS), then dissolve the gate onto
+    // the hero backdrop already painted underneath.
+    if (!hasVideo) {
+      gateEl.classList.add('revealing');
+      finish.fadeDur = 1.1;
+      gsap.timeline()
+        .to('.seal', { scale: 1.14, duration: .16, ease: 'power2.in' })
+        .to('.seal', { scale: 0, rotate: 26, autoAlpha: 0, duration: .5, ease: 'back.in(1.7)' })
+        .to('.gate-card', { autoAlpha: 0, y: -20, duration: .5, ease: 'power2.inOut' }, '-=.25')
+        .add(() => finish(false), '+=.12');
       return;
     }
 

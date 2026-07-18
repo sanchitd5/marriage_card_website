@@ -24,26 +24,43 @@ export function initScratch() {
     canvas.width = w;
     canvas.height = h;
 
+    // Foil skin: Regency = champagne gold; techno = brushed graphite with a
+    // cyan sheen (matches the obsidian palette). Branch on the skin hook.
+    const techno = document.documentElement.dataset.skin === 'techno';
     const g = ctx.createLinearGradient(0, 0, w, h);
-    g.addColorStop(0, '#c9a03e');
-    g.addColorStop(.25, '#e8cf8a');
-    g.addColorStop(.5, '#b8923a');
-    g.addColorStop(.75, '#f0dda6');
-    g.addColorStop(1, '#c9a03e');
+    if (techno) {
+      g.addColorStop(0, '#1a1d24');
+      g.addColorStop(.25, '#2a2f3a');
+      g.addColorStop(.5, '#14161c');
+      g.addColorStop(.75, '#2f3542');
+      g.addColorStop(1, '#1a1d24');
+    } else {
+      g.addColorStop(0, '#c9a03e');
+      g.addColorStop(.25, '#e8cf8a');
+      g.addColorStop(.5, '#b8923a');
+      g.addColorStop(.75, '#f0dda6');
+      g.addColorStop(1, '#c9a03e');
+    }
     ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, h);
 
     // foil speckle
     for (let i = 0; i < w * h / 900; i++) {
-      ctx.fillStyle = Math.random() > .5 ? 'rgba(255,244,214,.28)' : 'rgba(122,90,26,.18)';
+      if (techno) {
+        ctx.fillStyle = Math.random() > .5 ? 'rgba(34,211,238,.16)' : 'rgba(244,246,251,.12)';
+      } else {
+        ctx.fillStyle = Math.random() > .5 ? 'rgba(255,244,214,.28)' : 'rgba(122,90,26,.18)';
+      }
       ctx.fillRect(Math.random() * w, Math.random() * h, 1.5, 1.5);
     }
 
-    ctx.font = `500 ${Math.round(h * .09)}px Lora, serif`;
+    ctx.font = techno
+      ? `700 ${Math.round(h * .08)}px "Space Mono", ui-monospace, monospace`
+      : `500 ${Math.round(h * .09)}px Lora, serif`;
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(94,70,20,.55)';
-    ctx.letterSpacing = '4px';
+    ctx.fillStyle = techno ? 'rgba(34,211,238,.62)' : 'rgba(94,70,20,.55)';
+    ctx.letterSpacing = techno ? '6px' : '4px';
     ctx.fillText('SCRATCH TO REVEAL', w / 2, h / 2 + h * .03);
 
     if (appState.scratchAPI.onRepaint) appState.scratchAPI.onRepaint();

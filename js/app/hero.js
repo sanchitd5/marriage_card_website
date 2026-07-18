@@ -92,7 +92,9 @@ function startHashtagCycle() {
   let index = 0;
   let busy = false;
 
-  const GOLDS = ['#f5c518', '#ffd700', '#ffe080', '#e8950a', '#c88a10', '#fff0a0'];
+  const GOLDS = document.documentElement.dataset.skin === 'techno'
+    ? ['#22d3ee', '#38bdf8', '#67e8f9', '#f4f6fb', '#a5f3fc', '#cffafe']
+    : ['#f5c518', '#ffd700', '#ffe080', '#e8950a', '#c88a10', '#fff0a0'];
 
   function sparkleSwap(nextTag) {
     if (busy) return;

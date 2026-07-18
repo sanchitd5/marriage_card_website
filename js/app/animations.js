@@ -148,7 +148,10 @@ export function initGsap() {
     el.appendChild(cvs);
     const ctx = cvs.getContext('2d');
 
-    const GOLDS = ['#f5c518', '#ffd700', '#ffe080', '#e8950a', '#c88a10', '#fff0a0'];
+    // Sparkle palette follows the skin: Regency gold, techno cyan/ice.
+    const GOLDS = document.documentElement.dataset.skin === 'techno'
+      ? ['#22d3ee', '#38bdf8', '#67e8f9', '#f4f6fb', '#a5f3fc', '#cffafe']
+      : ['#f5c518', '#ffd700', '#ffe080', '#e8950a', '#c88a10', '#fff0a0'];
     const pts = Array.from({ length: 60 }, () => ({
       x: Math.random() * cvs.width,
       y: Math.random() * cvs.height,

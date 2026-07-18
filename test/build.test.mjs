@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   parseFromGroomSide,
+  parseTheme,
   composeNames,
   htmlEscape,
   joinFamilies,
@@ -46,6 +47,17 @@ test('parseFromGroomSide: "true" and any other string stay true', () => {
   assert.equal(parseFromGroomSide('0'), true);
   assert.equal(parseFromGroomSide('no'), true);
   assert.equal(parseFromGroomSide(''), true);
+});
+
+// ---- parseTheme -------------------------------------------------------
+test('parseTheme: undefined / anything but "techno" → regency', () => {
+  assert.equal(parseTheme(undefined), 'regency');
+  assert.equal(parseTheme(''), 'regency');
+  assert.equal(parseTheme('Regency'), 'regency');
+  assert.equal(parseTheme('TECHNO'), 'regency'); // case-sensitive by design
+});
+test('parseTheme: only literal "techno" opts into the techno skin', () => {
+  assert.equal(parseTheme('techno'), 'techno');
 });
 
 // ---- composeNames -----------------------------------------------------
@@ -175,6 +187,27 @@ test('template: seal + footer monogram use INITIAL tokens (no hardcoded R&S)', (
 test('template: fully rendered output has no leftover {{TOKENS}}', () => {
   const rendered = applyTokens(template, buildHtmlTokens(composeNames(true)));
   assert.doesNotMatch(rendered, /\{\{[A-Z_]+\}\}/);
+});
+
+// ---- Techno template integration --------------------------------------
+const technoTemplate = fs.readFileSync(path.join(here, '../src/index.techno.template.html'), 'utf8');
+
+test('techno template: fully rendered output has no leftover {{TOKENS}}', () => {
+  const rendered = applyTokens(technoTemplate, buildHtmlTokens(composeNames(true)));
+  assert.doesNotMatch(rendered, /\{\{[A-Z_]+\}\}/);
+});
+test('techno template: uses its own stylesheet and skin hook, not the Regency sheet', () => {
+  assert.match(technoTemplate, /css\/techno\.css/);
+  assert.doesNotMatch(technoTemplate, /css\/styles\.css/);
+  assert.match(technoTemplate, /dataset\.skin = 'techno'/);
+});
+test('techno template: friends-facing — omits the family blessings section + token', () => {
+  assert.doesNotMatch(technoTemplate, /FAMILY_BLESSING_NAMES/);
+  assert.doesNotMatch(technoTemplate, /class="band[^"]*family/);
+});
+test('techno template: seal + footer monogram use INITIAL tokens (no hardcoded S&R)', () => {
+  assert.match(technoTemplate, /seal-monogram">\{\{INITIAL_A\}\}<em>&amp;<\/em>\{\{INITIAL_B\}\}/);
+  assert.match(technoTemplate, /footer-monogram">\{\{INITIAL_A\}\}<em>&amp;<\/em>\{\{INITIAL_B\}\}/);
 });
 
 // ---- Real config sanity (guards against placeholder grandparents) ------

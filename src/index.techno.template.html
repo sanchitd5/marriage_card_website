@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>{{PAIR_TITLE}} — Shubh Vivah{{TITLE_DATE}}</title>
+  <meta name="description" content="Dearest friends, it is with the greatest pleasure that we announce the wedding of {{FULL_A}} and {{FULL_B}} — {{MONTH_YEAR}}{{META_LOCATION}}.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{{SITE_URL}}/">
+  <meta property="og:locale" content="en_IN">
+  <meta property="og:title" content="{{PAIR_TITLE_RAW}} — Shubh Vivah">
+  <meta property="og:description" content="You are cordially invited to the most anticipated affair of the season. {{DATE_RANGE}}.">
+  <meta property="og:image" content="{{SITE_URL}}/assets/images/{{SHARE_IMG}}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Invitation card for {{FIRST_A}} and {{FIRST_B}}'s wedding celebration, {{DATE_RANGE}}.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{PAIR_TITLE_RAW}} — Shubh Vivah">
+  <meta name="twitter:description" content="You are cordially invited to the most anticipated affair of the season. {{DATE_RANGE}}.">
+  <meta name="twitter:image" content="{{SITE_URL}}/assets/images/{{SHARE_IMG}}">
+  <meta name="theme-color" content="#0B0C0F">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="{{PAIR_TITLE}}">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="canonical" href="{{SITE_URL}}/">
+
+  <style>
+    /* Boot loader — obsidian ground, a cyan progress ring around the couple's
+       monogram, mono percentage. Colours hardcoded: the main stylesheet's
+       custom props are not applied yet at first paint. */
+    #theme-boot-loader { display: none; }
+    html.theme-decision-pending #theme-boot-loader {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 50% 42%, #14161c 0%, #0b0c0f 60%);
+      color: #9aa3b2;
+      font-family: "Space Mono", ui-monospace, monospace;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      font-size: .72rem;
+    }
+    #theme-boot-loader .boot-inner { display: grid; place-items: center; gap: 1rem; }
+    #theme-boot-loader .boot-crest {
+      position: relative;
+      width: 8rem;
+      height: 8rem;
+      display: grid;
+      place-items: center;
+    }
+    /* pressed obsidian field with a hairline ring */
+    #theme-boot-loader .boot-crest::before {
+      content: "";
+      position: absolute;
+      inset: 9%;
+      border-radius: 50%;
+      border: 1px solid #262a33;
+      box-shadow: inset 0 0 32px rgba(34, 211, 238, .06);
+    }
+    #theme-boot-loader .boot-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      /* cyan arc fills against a graphite track; easy to read the arc end */
+      background: conic-gradient(#22d3ee calc(var(--boot-p, 0) * 1%), #262a33 0);
+      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 1.5px));
+              mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 1.5px));
+      transition: background .25s linear;
+      filter: drop-shadow(0 0 6px rgba(34, 211, 238, .35));
+    }
+    #theme-boot-loader .boot-monogram {
+      position: relative;
+      z-index: 1;
+      font-family: "Space Grotesk", ui-sans-serif, sans-serif;
+      font-weight: 500;
+      font-size: 2.4rem;
+      line-height: 1;
+      letter-spacing: .12em;
+      color: #f4f6fb;
+    }
+    #theme-boot-loader .boot-monogram em {
+      font-style: normal;
+      color: #22d3ee;
+      margin-inline: .06em;
+    }
+    #theme-boot-loader .boot-pct {
+      font-size: .8rem;
+      letter-spacing: .14em;
+      color: #22d3ee;
+      font-variant-numeric: tabular-nums;
+    }
+    /* a single row of waveform ticks — the "signal is warming up" cue. Pure CSS
+       so it needs no module engine (self-contained boot cue). Parked flat under
+       reduced motion. */
+    #theme-boot-loader .boot-wave {
+      display: flex; align-items: flex-end; gap: 3px; height: 16px;
+    }
+    #theme-boot-loader .boot-wave i {
+      width: 2px; height: 30%;
+      background: #22d3ee;
+      opacity: .7;
+      animation: boot-tick 1.1s ease-in-out infinite;
+    }
+    #theme-boot-loader .boot-wave i:nth-child(2) { animation-delay: .14s; }
+    #theme-boot-loader .boot-wave i:nth-child(3) { animation-delay: .28s; }
+    #theme-boot-loader .boot-wave i:nth-child(4) { animation-delay: .42s; }
+    #theme-boot-loader .boot-wave i:nth-child(5) { animation-delay: .56s; }
+    #theme-boot-loader .boot-wave i:nth-child(6) { animation-delay: .70s; }
+    #theme-boot-loader .boot-wave i:nth-child(7) { animation-delay: .84s; }
+    #theme-boot-loader .boot-tag {
+      font-family: "Space Mono", ui-monospace, monospace;
+      letter-spacing: .22em;
+      font-size: .62rem;
+      color: #9aa3b2;
+    }
+    @keyframes boot-tick { 0%, 100% { height: 20%; opacity: .5; } 50% { height: 100%; opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) {
+      #theme-boot-loader .boot-wave i { animation: none; height: 50%; }
+    }
+  </style>
+
+  <script>
+    document.documentElement.classList.add('js');
+    document.documentElement.classList.add('theme-decision-pending');
+    // Skin hook: shared JS modules (scratch foil, confetti, name-sparkle, gate
+    // reveal) branch on this instead of being duplicated. Absent = 'regency'.
+    document.documentElement.dataset.skin = 'techno';
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('reduce-motion');
+    (function () {
+      // Infer day/night from local sun without geolocation permission.
+      // Techno keeps a day/night axis (two obsidian variants); the resolver is
+      // shared with the module engine so it can refresh over time.
+      function isNightNow() {
+        try {
+          var ZONES = {
+            'Asia/Kolkata': [23, 80], 'Asia/Karachi': [24.9, 67], 'Asia/Dhaka': [23.8, 90.4],
+            'Asia/Kathmandu': [27.7, 85.3], 'Asia/Colombo': [6.9, 79.9], 'Asia/Dubai': [25.3, 55.3],
+            'Asia/Riyadh': [24.7, 46.7], 'Asia/Qatar': [25.3, 51.5], 'Asia/Singapore': [1.35, 103.8],
+            'Asia/Kuala_Lumpur': [3.1, 101.7], 'Asia/Bangkok': [13.8, 100.5], 'Asia/Hong_Kong': [22.3, 114.2],
+            'Asia/Shanghai': [31.2, 121.5], 'Asia/Tokyo': [35.7, 139.7], 'Asia/Seoul': [37.6, 127],
+            'Asia/Manila': [14.6, 121], 'Asia/Jakarta': [-6.2, 106.8], 'Asia/Jerusalem': [32.1, 34.8],
+            'Europe/London': [51.5, -0.1], 'Europe/Dublin': [53.3, -6.3], 'Europe/Paris': [48.9, 2.4],
+            'Europe/Berlin': [52.5, 13.4], 'Europe/Amsterdam': [52.4, 4.9], 'Europe/Brussels': [50.8, 4.4],
+            'Europe/Zurich': [47.4, 8.5], 'Europe/Madrid': [40.4, -3.7], 'Europe/Rome': [41.9, 12.5],
+            'Europe/Lisbon': [38.7, -9.1], 'Europe/Warsaw': [52.2, 21], 'Europe/Stockholm': [59.3, 18.1],
+            'Europe/Moscow': [55.8, 37.6], 'Europe/Istanbul': [41, 29], 'Africa/Cairo': [30, 31.2],
+            'Africa/Johannesburg': [-26.2, 28], 'Africa/Nairobi': [-1.3, 36.8],
+            'America/New_York': [40.7, -74], 'America/Toronto': [43.7, -79.4], 'America/Chicago': [41.9, -87.6],
+            'America/Denver': [39.7, -105], 'America/Phoenix': [33.4, -112.1], 'America/Los_Angeles': [34.1, -118.2],
+            'America/Vancouver': [49.3, -123.1], 'America/Mexico_City': [19.4, -99.1], 'America/Sao_Paulo': [-23.5, -46.6],
+            'America/Buenos_Aires': [-34.6, -58.4], 'Australia/Sydney': [-33.9, 151.2], 'Australia/Melbourne': [-37.8, 145],
+            'Australia/Perth': [-31.9, 115.9], 'Australia/Brisbane': [-27.5, 153], 'Pacific/Auckland': [-36.8, 174.8],
+          };
+          var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          var c = ZONES[tz] || null;
+          if (!c) c = [23, -new Date().getTimezoneOffset() / 60 * 15];
+          var lat = c[0] * Math.PI / 180, lon = c[1];
+          var now = new Date();
+          var doy = Math.floor((now - new Date(Date.UTC(now.getUTCFullYear(), 0, 0))) / 864e5);
+          var g = 2 * Math.PI / 365 * (doy - 1 + (now.getUTCHours() - 12) / 24);
+          var eq = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g)
+                   - 0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+          var decl = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g)
+                   - 0.006758 * Math.cos(2 * g) + 0.000907 * Math.sin(2 * g)
+                   - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+          var cosHa = (Math.cos(90.833 * Math.PI / 180) - Math.sin(lat) * Math.sin(decl))
+                    / (Math.cos(lat) * Math.cos(decl));
+          if (cosHa > 1) return true;
+          if (cosHa < -1) return false;
+          if (!isFinite(cosHa)) { var h = now.getHours(); return h < 6 || h >= 19; }
+          var ha = Math.acos(cosHa) * 180 / Math.PI;
+          var utcNowMin = now.getUTCHours() * 60 + now.getUTCMinutes();
+          var TWILIGHT_BUFFER_MIN = 24;
+          var sunriseUtc = 720 - 4 * (lon + ha) - eq + TWILIGHT_BUFFER_MIN;
+          var sunsetUtc = 720 - 4 * (lon - ha) - eq - TWILIGHT_BUFFER_MIN;
+          var mod = function (m) { return ((m % 1440) + 1440) % 1440; };
+          return mod(utcNowMin - sunsetUtc) < mod(sunriseUtc - sunsetUtc);
+        } catch (e) {
+          if (window.matchMedia) return matchMedia('(prefers-color-scheme: dark)').matches;
+          var hh = new Date().getHours();
+          return hh < 6 || hh >= 19;
+        }
+      }
+      function resolveAutoTheme() {
+        var night = isNightNow();
+        document.documentElement.dataset.autoNight = night ? '1' : '0';
+        return night ? 'dark' : 'light';
+      }
+      window.__getWeddingAutoTheme = resolveAutoTheme;
+      document.documentElement.dataset.theme = resolveAutoTheme();
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.content = document.documentElement.dataset.theme === 'dark' ? '#0b0c0f' : '#101218';
+      window.__weddingThemeDecisionReady = true;
+      window.dispatchEvent(new Event('wedding-theme-ready'));
+    })();
+  </script>
+  <!-- Fonts are VENDORED + subset (self-hosted woff2 in assets/fonts/, declared
+       in css/techno.css) — no external font CDN. Preload the two hero faces so
+       the names + shloka paint without a swap. -->
+  <link rel="preload" href="assets/fonts/space-grotesk-700.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/noto-serif-devanagari-500.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/techno.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🕉️%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+  <!-- Nataraja / cosmic-dance invocation motif. An ABSTRACT emblem, not a
+       figurative deity: a prabhā-maṇḍala ring of light with an inner spiral
+       (cosmic dance / sound) and a central bindu. Static by intent — the sacred
+       mark is never tilted, warped or shimmered. Referenced via <use>. -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <symbol id="nataraja-motif" viewBox="0 0 100 100">
+      <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="50" cy="50" r="46" stroke-width="1"/>
+        <circle cx="50" cy="50" r="38" stroke-width=".5" opacity=".55"/>
+        <!-- a precise instrument dial: one accented index at top, three quiet
+             cardinals (not a fuzzy spinner ring) -->
+        <path stroke-width="1.7" d="M50 3.5 V10"/>
+        <path stroke-width=".8" d="M96.5 50 H91 M50 96.5 V91 M3.5 50 H9"/>
+        <!-- chandra: Shiva's crescent moon, cleanly formed -->
+        <path stroke-width="1.5" d="M56 31 A20 20 0 1 0 56 69 A15 20 0 1 1 56 31"/>
+        <!-- central bindu -->
+        <circle cx="50" cy="50" r="1.8" fill="currentColor" stroke="none"/>
+      </g>
+    </symbol>
+  </svg>
+
+  <div id="theme-boot-loader" aria-live="polite" aria-label="Preparing your invitation">
+    <div class="boot-inner">
+      <span class="boot-crest" aria-hidden="true">
+        <span class="boot-ring"></span>
+        <span class="boot-monogram">{{INITIAL_A}}<em>&amp;</em>{{INITIAL_B}}</span>
+      </span>
+      <span class="boot-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+      <span class="boot-pct">0%</span>
+      <span class="boot-tag">Warming the signal…</span>
+    </div>
+  </div>
+  <script src="js/app/boot-loader.js"></script>
+
+  <!-- ══════════ INTRO GATE ══════════ -->
+  <!-- Techno gate: no video. An obsidian stage (grid + light-shaft, from CSS)
+       with a glyph "seal" the guest taps to break. gate.js detects the absent
+       video elements and runs a CSS-only reveal. -->
+  <div id="gate" class="gate--techno" role="dialog" aria-modal="true" aria-label="Wedding invitation. Tap the seal to enter.">
+    <div class="gate-stage" aria-hidden="true">
+      <div class="gate-grid"></div>
+      <div class="gate-shaft"></div>
+      <div class="gate-scanlines"></div>
+    </div>
+    <div class="gate-card">
+      <p class="invocation gate-invocation">
+        <svg class="invocation-motif" aria-hidden="true" focusable="false"><use href="#nataraja-motif"/></svg>
+        <span class="shloka" lang="sa">आङ्गिकं भुवनं यस्य वाचिकं सर्ववाङ्मयम्&nbsp;।</span>
+        <span class="shloka-roman" aria-hidden="true">āṅgikaṃ bhuvanaṃ yasya · vācikaṃ sarva-vāṅmayam</span>
+      </p>
+      <p class="gate-kicker">Signal locked</p>
+      <p class="gate-line">Dearest friends, the floor is about to&nbsp;open</p>
+      <button id="seal" class="seal seal--techno" aria-label="Break the seal and enter">
+        <span class="seal-ring" aria-hidden="true"></span>
+        <span class="seal-monogram">{{INITIAL_A}}<em>&amp;</em>{{INITIAL_B}}</span>
+        <span class="seal-ripple" aria-hidden="true"></span>
+      </button>
+      <p class="gate-hint">Tap to enter</p>
+    </div>
+  </div>
+
+  <!-- ══════════ THEME TOGGLE ══════════ -->
+  <button id="theme-toggle" aria-label="Switch to night mode" aria-pressed="false">
+    <svg class="icon-moon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+    <svg class="icon-sun" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.2 5.2l1.9 1.9M16.9 16.9l1.9 1.9M18.8 5.2l-1.9 1.9M7.1 16.9l-1.9 1.9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+  </button>
+
+  <!-- ══════════ RIGHT DOCK (scroll cue + music) ══════════ -->
+  <div id="right-dock">
+    <div id="floating-cue" aria-hidden="true">
+      <span class="cue-chevrons" aria-hidden="true"><i></i><i></i></span>
+    </div>
+    <div id="music-dock" hidden>
+      <button id="music-toggle" aria-label="Pause the music" aria-pressed="false">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path class="icon-note" d="M9 18V5l12-2v13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="18" cy="16" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Full-screen light-show canvas. Fixed and OUTSIDE #smooth-wrapper so the
+       ScrollSmoother transform never drags it. Phase 1 draws a calm 2D light
+       show; Phase 2 adds the Anyma plate + envelope-synced reactive overlay. -->
+  <canvas id="lightshow" aria-hidden="true"></canvas>
+  <!-- vignette: crushes the backdrop's edges/corners to black so light
+       concentrates centrally (depth + focus), sits above the canvas, below content -->
+  <div class="ls-vignette" aria-hidden="true"></div>
+
+  <div id="smooth-wrapper">
+    <div id="smooth-content">
+
+      <!-- ══════════ HERO ══════════ -->
+      <header class="hero" id="hero">
+        <div class="hero-media" data-speed="0.9" aria-hidden="true">
+          <div class="hero-grid"></div>
+          <div class="hero-shaft"></div>
+        </div>
+        <div class="hero-veil"></div>
+        <div class="hero-inner">
+          <div class="hero-top">
+            <p class="invocation hero-invocation">
+              <svg class="invocation-motif" aria-hidden="true" focusable="false"><use href="#nataraja-motif"/></svg>
+              <span class="shloka" lang="sa">तं नुमः सात्त्विकं शिवम्&nbsp;॥</span>
+            </p>
+            <p class="kicker hero-seq">Dearest friends, it is with the greatest pleasure that we announce the union of</p>
+          </div>
+          <h1 class="hero-names">
+            <span class="hero-name hero-seq" data-text="{{FIRST_A}}">{{FIRST_A}}</span>
+            <span class="hero-amp hero-seq">&amp;</span>
+            <span class="hero-name hero-seq" data-text="{{FIRST_B}}">{{FIRST_B}}</span>
+          </h1>
+          <div class="hero-bottom">
+            <p class="hero-date hero-seq">{{HERO_LINE}}</p>
+            <div class="hero-wave hero-seq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <p class="hero-tag hero-seq" id="hero-hashtag">
+              <span class="hero-tag-text" data-tags="{{TAG_PRIMARY}},{{TAG_SECONDARY}}">{{TAG_PRIMARY}}</span>
+            </p>
+          </div>
+        </div>
+        <div class="scroll-cue hero-seq">
+          <span class="cue-mouse" aria-hidden="true"><span></span></span>
+          <span class="cue-chevrons" aria-hidden="true"><i></i><i></i></span>
+          <span class="cue-label">Scroll</span>
+        </div>
+      </header>
+
+      <!-- ══════════ COUNTDOWN + SCRATCH ══════════ -->
+      <section class="band band--tint countdown" id="countdown">
+        <div class="wrap">
+          <p class="kicker fade-up">The most anticipated set of the season</p>
+          <h2 class="script-head fade-up">Until the drop</h2>
+          <div class="count-grid" role="timer" aria-live="off">
+            <div class="count-cell fade-up"><span class="count-num" id="cd-days">–</span><span class="count-label">Days</span></div>
+            <div class="count-cell fade-up"><span class="count-num" id="cd-hours">–</span><span class="count-label">Hours</span></div>
+            <div class="count-cell fade-up"><span class="count-num" id="cd-mins">–</span><span class="count-label">Minutes</span></div>
+            <div class="count-cell fade-up"><span class="count-num" id="cd-secs">–</span><span class="count-label">Seconds</span></div>
+          </div>
+          <div class="scratch fade-up">
+            <p class="scratch-prompt">“Some dates drop without warning. This one you get to see coming.”</p>
+            <p class="scratch-hint">A gentle scratch of your fingertip will do</p>
+            <div class="scratch-frame">
+              <div class="scratch-under">
+                <span class="scratch-date">{{SCRATCH_DATE}}</span>
+                <span class="scratch-sub">{{SCRATCH_SUB}}</span>
+              </div>
+              <canvas id="scratch-canvas" aria-label="Scratch-off panel hiding the wedding date"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════════ EVENTS ══════════ -->
+      <section class="band events" id="events">
+        <div class="wrap">
+          <p class="kicker fade-up">The running order</p>
+          <h2 class="display-head fade-up">Three sets,<br><em>two hearts</em></h2>
+          <div class="event-grid">
+
+            <article class="event-card" data-tilt>
+              <p class="event-no">Track 01</p>
+              <h3 class="event-name">Haldi</h3>
+              <p class="event-when"><time datetime="{{EVENT_HALDI_DT}}">{{EVENT_HALDI_WHEN}}</time></p>
+              <p class="event-venue">{{EVENT_HALDI_VENUE}}</p>
+              <p class="event-dress"><span>Dress code</span> Shades of yellow</p>
+              <div class="event-actions">
+                <a class="btn-quiet" href="{{EVENT_HALDI_MAP}}" target="_blank" rel="noopener" {{REVEAL_ONLY}}>Get directions</a>
+                <button class="btn-quiet" data-ics="haldi">Add to calendar</button>
+              </div>
+            </article>
+
+            <article class="event-card" data-tilt>
+              <p class="event-no">Track 02</p>
+              <h3 class="event-name">Cocktail &amp; Engagement</h3>
+              <p class="event-when"><time datetime="{{EVENT_COCKTAIL_DT}}">{{EVENT_COCKTAIL_WHEN}}</time></p>
+              <p class="event-venue">{{EVENT_COCKTAIL_VENUE}}</p>
+              <p class="event-dress"><span>Dress code</span> Dazzling as you dare</p>
+              <div class="event-actions">
+                <a class="btn-quiet" href="{{EVENT_COCKTAIL_MAP}}" target="_blank" rel="noopener" {{REVEAL_ONLY}}>Get directions</a>
+                <button class="btn-quiet" data-ics="cocktail">Add to calendar</button>
+              </div>
+            </article>
+
+            <article class="event-card event-card--main" data-tilt>
+              <p class="event-no">Headline</p>
+              <h3 class="event-name">The Wedding</h3>
+              <p class="event-when"><time datetime="{{EVENT_WEDDING_DT}}">{{EVENT_WEDDING_WHEN}}</time></p>
+              <p class="event-venue">{{EVENT_WEDDING_VENUE}}</p>
+              <p class="event-dress"><span>Dress code</span> Traditional grandeur</p>
+              <div class="event-actions">
+                <a class="btn-quiet" href="{{EVENT_WEDDING_MAP}}" target="_blank" rel="noopener" {{REVEAL_ONLY}}>Get directions</a>
+                <button class="btn-quiet" data-ics="wedding">Add to calendar</button>
+              </div>
+            </article>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════════ INTERLUDE ══════════ -->
+      <section class="band band--tint interlude">
+        <div class="wrap wrap--narrow">
+          <div class="interlude-art" aria-hidden="true">
+            <svg class="invocation-motif" focusable="false"><use href="#nataraja-motif"/></svg>
+          </div>
+          <p class="interlude-line">“Two frequencies, phase-locked long before they ever met.”</p>
+        </div>
+      </section>
+
+      <!-- ══════════ GALLERY ══════════ -->
+      <section class="band gallery" id="gallery">
+        <div class="wrap">
+          <p class="kicker fade-up">A courtship, in frames</p>
+          <h2 class="display-head fade-up">The story <em>so far</em></h2>
+          <div class="gallery-grid" id="gallery-grid"><!-- populated by js --></div>
+        </div>
+      </section>
+
+      <!-- ══════════ FOOTER ══════════ -->
+      <footer class="footer">
+        <div class="wrap wrap--narrow">
+          <p class="invocation footer-invocation">
+            <svg class="invocation-motif" aria-hidden="true" focusable="false"><use href="#nataraja-motif"/></svg>
+            <span class="shloka" lang="sa">तं नुमः सात्त्विकं शिवम्&nbsp;॥</span>
+            <span class="shloka-roman" aria-hidden="true">taṃ numaḥ sāttvikaṃ śivam</span>
+          </p>
+          <p class="footer-monogram">{{INITIAL_A}}<em>&amp;</em>{{INITIAL_B}}</p>
+          <span class="footer-rule" aria-hidden="true"></span>
+          <p class="footer-line">Some love stories cannot merely be told, they must be witnessed. We would be honoured to have you on the floor with us.</p>
+          <p class="footer-sign">Yours, in the greatest anticipation,<br><span>{{FIRST_A}} &amp; {{FIRST_B}}</span></p>
+          <p class="footer-tag">{{HASHTAG}}</p>
+        </div>
+      </footer>
+
+    </div>
+  </div>
+
+  <!-- CSS-only ambience fallback (hidden when the JS light show runs) -->
+  <div class="ambient" id="ambient" aria-hidden="true">
+    <span class="ambient-grid"></span>
+    <span class="ambient-scanlines"></span>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollTrigger.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollSmoother.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/SplitText.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/Flip.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/vanilla-tilt@1.8.1/dist/vanilla-tilt.min.js" defer></script>
+  <!-- three.js (CDN <script>, like GSAP) drives the Path-A WebGL backdrop, plus
+       loaders for the drop-triggered 3D dancer (glTF + Draco + a studio env). -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
+  <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/GLTFLoader.js" defer></script>
+  <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/DRACOLoader.js" defer></script>
+  <script src="https://unpkg.com/three@0.128.0/examples/js/environments/RoomEnvironment.js" defer></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

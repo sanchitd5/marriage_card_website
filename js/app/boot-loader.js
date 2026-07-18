@@ -115,8 +115,11 @@
       }
       // Warm one track's metadata so the loader reflects "music can start".
       // theme-1 always exists; the actual (shuffled) playback pool is chosen
-      // later by ui.js from the build-discovered SONGS list.
-      var track = 'assets/audio/theme-1.mp3';
+      // later by ui.js from the build-discovered SONGS list. The techno skin has
+      // its own playlist under assets/audio/techno/.
+      var track = document.documentElement.dataset.skin === 'techno'
+        ? 'assets/audio/techno/theme-1.mp3'
+        : 'assets/audio/theme-1.mp3';
       var audio = new Audio();
       audio.preload = 'metadata';
       audio.addEventListener('loadedmetadata', finish, { once: true });
