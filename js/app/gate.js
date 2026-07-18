@@ -90,6 +90,7 @@ export function initGate() {
   gateCard.addEventListener('click', () => {
     if (opened) return;
     opened = true;
+    appState.ignited = true; // the tap is the drop: the light show ignites here
     clearTimeout(autoOpen);
     window.removeEventListener('wedding-boot-done', startAutoOpen);
     seal.classList.add('opened'); // stop the pulse so the crack animation owns the transform

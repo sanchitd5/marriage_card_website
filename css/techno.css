@@ -42,6 +42,13 @@
 
   --ease-luxe: cubic-bezier(.25, 1, .5, 1);
   --shadow-lift: 0 24px 60px -28px rgba(0, 0, 0, .85);
+
+  /* driven each frame by the light show (js/app/lightshow.js): --energy is the
+     smoothed track energy (0..1), --beat spikes on onsets and decays. UI accents
+     react to these. Defaults keep everything calm when no show runs
+     (reduced-motion, no JS). */
+  --beat: 0;
+  --energy: 0.3;
 }
 
 /* ── night mode (deeper obsidian) ───────────────────────────── */
@@ -81,7 +88,9 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
 .wrap { max-width: 74rem; margin-inline: auto; padding-inline: 1.5rem; }
 .wrap--narrow { max-width: 46rem; }
 .band { padding-block: clamp(4.5rem, 9vw, 7rem); position: relative; }
-.band--tint { background: linear-gradient(180deg, var(--bg-deep), var(--bg)); }
+/* translucent so the fixed WebGL backdrop stays visible through every section,
+   not just the hero. Dark enough to hold text contrast over the live haze. */
+.band--tint { background: linear-gradient(180deg, rgba(6, 7, 10, .58), rgba(11, 12, 15, .46)); }
 .band, .footer { min-height: 100svh; display: flex; align-items: center; }
 .band > .wrap, .footer > .wrap { width: 100%; }
 
@@ -175,10 +184,14 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
 #gate {
   position: fixed; inset: 0; z-index: 60;
   display: grid; place-items: center;
-  background: radial-gradient(120% 90% at 50% 34%, var(--surface), var(--bg-deep) 60%);
+  /* translucent so the live WebGL backdrop shows THROUGH the gate before tap —
+     the tap then dissolves the card onto the same, continuing scene */
+  background: radial-gradient(120% 90% at 50% 42%, rgba(8, 9, 12, .28), rgba(6, 7, 10, .5) 72%);
   overflow: hidden;
 }
 .gate-stage { position: absolute; inset: 0; pointer-events: none; }
+/* the WebGL backdrop replaces the gate's own CSS stage decorations */
+.gate--techno .gate-stage { display: none; }
 /* soft volumetric fog instead of a synthwave wireframe grid */
 .gate-grid, .hero-grid, .ambient-grid {
   position: absolute; inset: 0;
@@ -423,7 +436,8 @@ html[data-theme="dark"] #theme-toggle .icon-sun { display: block; }
   padding: 1.1rem .6rem .7rem;
   border: 1px solid var(--hairline);
   border-top: 1px solid rgba(var(--accent-rgb), .35);
-  background: linear-gradient(180deg, var(--surface), transparent);
+  background: linear-gradient(180deg, rgba(23, 26, 34, .5), transparent);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
 }
 .count-num {
   font-family: var(--font-mono); font-weight: 700;
@@ -447,7 +461,8 @@ html[data-theme="dark"] #theme-toggle .icon-sun { display: block; }
 @media (min-width: 900px) { .event-grid { grid-template-columns: repeat(3, 1fr); max-width: none; align-items: stretch; } }
 .event-card {
   display: flex; flex-direction: column;
-  background: linear-gradient(180deg, var(--surface), var(--bg));
+  background: linear-gradient(180deg, rgba(23, 26, 34, .72), rgba(11, 12, 15, .55));
+  -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px);
   border: 1px solid var(--hairline);
   box-shadow: var(--shadow-lift);
   padding: 1.8rem 1.5rem 1.5rem;
@@ -499,7 +514,7 @@ html[data-theme="dark"] #theme-toggle .icon-sun { display: block; }
 .gallery { text-align: center; }
 .gallery-grid { display: grid; gap: clamp(.6rem, 2vw, 1.1rem); grid-template-columns: repeat(2, 1fr); grid-auto-flow: row dense; text-align: initial; }
 @media (min-width: 760px) { .gallery-grid { grid-template-columns: repeat(3, 1fr); } .gallery-grid > .gframe:last-child { grid-column: span 2; } }
-.gframe { margin: 0; background: var(--surface); border: 1px solid var(--hairline); box-shadow: var(--shadow-lift); padding: .35rem; overflow: hidden; }
+.gframe { margin: 0; background: rgba(23, 26, 34, .6); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border: 1px solid var(--hairline); box-shadow: var(--shadow-lift); padding: .35rem; overflow: hidden; }
 .gframe img { width: 100%; height: 100%; object-fit: cover; filter: saturate(.7) contrast(1.05); }
 .gframe--tall { grid-row: span 2; } .gframe--wide { grid-column: span 2; }
 .gframe img { aspect-ratio: 4 / 5; }
@@ -532,7 +547,7 @@ html[data-theme="dark"] #theme-toggle .icon-sun { display: block; }
 }
 
 /* ═══ FOOTER ═════════════════════════════════════════════════ */
-.footer { text-align: center; padding-block: clamp(4rem, 9vw, 6.5rem); background: var(--bg-deep); color: var(--text); border-top: 1px solid var(--hairline); }
+.footer { text-align: center; padding-block: clamp(4rem, 9vw, 6.5rem); background: rgba(6, 7, 10, .72); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); color: var(--text); border-top: 1px solid var(--hairline); }
 .footer-monogram { font-family: var(--font-display); font-weight: 700; font-size: 2.1rem; letter-spacing: .06em; color: var(--text); }
 .footer-monogram em { font-style: normal; color: var(--accent); }
 .footer-rule { display: block; width: 64px; height: 1px; margin: 1.4rem auto 1.8rem; background: var(--hairline); }
@@ -540,6 +555,22 @@ html[data-theme="dark"] #theme-toggle .icon-sun { display: block; }
 .footer-sign { margin-top: 1.6rem; font-family: var(--font-mono); font-size: .8rem; color: var(--muted); }
 .footer-sign span { font-family: var(--font-display); font-weight: 600; font-size: 1.35rem; color: var(--text); display: inline-block; margin-top: .5rem; letter-spacing: .03em; }
 .footer-tag { margin-top: 1.4rem; font-family: var(--font-mono); font-size: .7rem; letter-spacing: .18em; color: var(--muted); }
+
+/* ═══ BEAT-REACTIVE ACCENTS ═════════════════════════════════
+   The few earned cyan moments shimmer to the track. Small-area glow + a bar
+   scale only (never a full-field luminance flash), so it stays WCAG-safe; --beat
+   decays smoothly so it pulses, never strobes. */
+.hero-amp { text-shadow: 0 0 calc(6px + var(--beat) * 38px) rgba(var(--accent-rgb), calc(.22 + var(--beat) * .72)); }
+.display-head em { text-shadow: 0 0 calc(4px + var(--beat) * 32px) rgba(var(--accent-rgb), calc(.14 + var(--beat) * .66)); }
+.footer-monogram em, .scratch-date { text-shadow: 0 0 calc(4px + var(--beat) * 30px) rgba(var(--accent-rgb), calc(.18 + var(--beat) * .62)); }
+/* the big names + countdown stay crisp between beats (no static bloom), then
+   flare cyan ON the beat — an obvious shimmer to the track */
+.hero-name { text-shadow: 0 0 calc(var(--beat) * 26px) rgba(var(--accent-rgb), calc(var(--beat) * .5)); }
+.count-num { text-shadow: 0 0 calc(var(--beat) * 22px) rgba(var(--accent-rgb), calc(var(--beat) * .6)); }
+.hero-tag, .kicker { text-shadow: 0 0 calc(var(--beat) * 14px) rgba(var(--accent-rgb), calc(var(--beat) * .4)); }
+.hero-wave i { transform: scaleY(calc(.5 + var(--energy) * 1.3)); transform-origin: bottom; }
+.hero-wave i:nth-child(3n) { filter: drop-shadow(0 0 calc(4px + var(--beat) * 16px) rgba(var(--accent-rgb), calc(.35 + var(--beat) * .6))); }
+.event-card--main::before { box-shadow: 0 0 calc(var(--beat) * 18px) rgba(var(--accent-rgb), calc(.25 + var(--beat) * .72)); }
 
 /* ═══ CSS AMBIENCE (fallback under the JS light show / no-JS) ═ */
 .ambient { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }

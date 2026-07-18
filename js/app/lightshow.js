@@ -83,6 +83,7 @@ export function initLightshow() {
   };
 
   let renderer, scene, camera, motes, glow, glowCore, bokeh, positions, speeds, fog;
+  let dancers = [];
   let running = true, raf = 0, floored = false;
 
   function buildScene() {
@@ -149,6 +150,26 @@ export function initLightshow() {
     glowCore.scale.set(12, 12, 1);
     glowCore.position.set(0, 0, -70);
     scene.add(glowCore);
+
+    // Dancers: a few luminous figures at depth, silhouetted against the glow.
+    // Count scales with the device tier (0 on the weakest). They stay invisible
+    // until ignition (the tap), then fade in and dance.
+    dancers = [];
+    const DANCE_N = tier === 2 ? 3 : tier === 1 ? 2 : 0;
+    // close enough to survive the exp fog (they should read as figures IN the
+    // haze, not be erased by it), low and to the sides so they frame the names.
+    const spread = [-9.5, 9, -5.5];
+    const zs = [-17, -19, -27];
+    for (let i = 0; i < DANCE_N; i++) {
+      const f = makeFigure();
+      const s = 1.0 + (i % 2) * 0.22;
+      f.group.scale.set(s, s, s);
+      f.baseY = -3.6 * s;
+      f.group.position.set(spread[i], f.baseY, zs[i]);
+      f.phase = i * 2.1;
+      scene.add(f.group);
+      dancers.push(f);
+    }
   }
 
   // place a mote on a tunnel ring at a given depth
@@ -184,6 +205,36 @@ export function initLightshow() {
     const t = new THREE.CanvasTexture(c); t.needsUpdate = true; return t;
   }
 
+  // A stylized luminous dancer — a light-FIGURE in the haze (Anyma register),
+  // built procedurally from primitives (no rigged glTF). Additive so it reads as
+  // a glowing silhouette, not a solid mannequin. Joints are animatable; the
+  // figure sways/dances to the beat. Swap in a license-clear rigged glTF later
+  // for a photoreal figure without touching the rest of the show.
+  function makeFigure() {
+    // fog:false so the figures read clearly as dancers instead of being erased
+    // by the tunnel's exp fog at depth.
+    const mat = new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+    const limb = (len, r0, r1) => new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, len, 7, 1, true), mat);
+    const g = new THREE.Group();
+    const torso = limb(2.2, 0.26, 0.42); torso.position.y = 2.3; g.add(torso);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), mat); head.position.y = 3.85; g.add(head);
+    const arm = (side) => {
+      const pivot = new THREE.Group(); pivot.position.set(side * 0.5, 3.3, 0);
+      const upper = limb(1.5, 0.14, 0.12); upper.position.y = -0.75; pivot.add(upper);
+      const elbow = new THREE.Group(); elbow.position.y = -1.5; pivot.add(elbow);
+      const fore = limb(1.3, 0.11, 0.09); fore.position.y = -0.65; elbow.add(fore);
+      g.add(pivot); return { pivot, elbow };
+    };
+    const leg = (side) => {
+      const pivot = new THREE.Group(); pivot.position.set(side * 0.22, 1.2, 0);
+      const thigh = limb(1.5, 0.17, 0.14); thigh.position.y = -0.75; pivot.add(thigh);
+      const knee = new THREE.Group(); knee.position.y = -1.5; pivot.add(knee);
+      const shin = limb(1.4, 0.13, 0.1); shin.position.y = -0.7; knee.add(shin);
+      g.add(pivot); return { pivot, knee };
+    };
+    return { group: g, mat, torso, armL: arm(-1), armR: arm(1), legL: leg(-1), legR: leg(1) };
+  }
+
   // ---- FPS governor: measure real frame times, degrade or floor ----
   let sampleStart = 0, sampleFrames = 0, sampleAcc = 0, measuring = true;
   function govern(dt) {
@@ -212,12 +263,15 @@ export function initLightshow() {
     if (bokeh) { bokeh.geometry.dispose(); bokeh.material.dispose(); }
     if (glow) glow.material.dispose();
     if (glowCore) glowCore.material.dispose();
+    for (const f of dancers) { f.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); f.mat.dispose(); }
+    dancers = [];
     if (renderer) { renderer.dispose(); }
     scene = motes = bokeh = glow = glowCore = null;
   }
 
   // ---- main loop ----
-  let smoothE = 0.3, glowBright = 0.5, prevGlow = 0.5;
+  let smoothE = 0.3, glowBright = 0.4, ignite = 0, beat = 0;
+  const rootStyle = document.documentElement.style;
   let last = 0;
   function frame(ts) {
     if (!running || floored) return;
@@ -227,40 +281,65 @@ export function initLightshow() {
     govern(dt);
     if (floored) return;
 
-    // energy → smoothed drive
-    const e = readEnergy(dt);
-    smoothE += (e - smoothE) * 0.15;
-    state.energy = smoothE;
+    // ignition: dormant before the tap (a quiet tease), surging to full over
+    // ~1.5s when appState.ignited flips — the tap IS the drop / the surprise.
+    ignite += ((appState.ignited ? 1 : 0) - ignite) * 0.03;
 
-    // onset burst (small-area: nudges speed + glow briefly, flash-safe)
+    // energy → smoothed drive, then damped by ignition so pre-tap stays quiet
+    const eRaw = readEnergy(dt);
+    smoothE += (eRaw - smoothE) * 0.15;
+    const e = smoothE * (0.13 + 0.87 * ignite);
+    state.energy = e;
+
+    // onset burst → beat spike (decays); only meaningful once ignited
     let burst = 0;
     const m = appState.music;
     if (m && m.audio && !m.paused) burst = onsetHit(m.audio._trackName, m.audio.currentTime || 0) ? 1 : 0;
+    beat = Math.max(beat * 0.9, burst * ignite); // linger a little so the shimmer reads
+
+    // expose to the DOM for beat-reactive UI (small-area glow only → flash-safe)
+    rootStyle.setProperty('--energy', e.toFixed(3));
+    rootStyle.setProperty('--beat', beat.toFixed(3));
 
     // advance motes toward camera; recycle past the near plane
     const depth = motes.userData.depth;
-    const spd = (10 + smoothE * 26 + burst * 18) * dt;
+    const spd = (5 + e * 30 + beat * 16) * dt;
     for (let i = 0; i < speeds.length; i++) {
       positions[i * 3 + 2] += speeds[i] * spd;
       if (positions[i * 3 + 2] > 2) resetMote(i, depth, false);
     }
     motes.geometry.attributes.position.needsUpdate = true;
-    motes.material.size = 0.4 + smoothE * 0.5;
-    motes.material.opacity = 0.55 + smoothE * 0.4;
+    motes.material.size = 0.4 + e * 0.5;
+    motes.material.opacity = 0.4 + e * 0.5;
 
     // accent glow: rate-limit brightness change (flash safety backstop)
-    const targetGlow = 0.35 + smoothE * 0.5 + burst * 0.15;
+    const targetGlow = 0.2 + e * 0.6 + beat * 0.12;
     glowBright += Math.max(-0.05, Math.min(0.05, targetGlow - glowBright)); // ≤0.05/frame
-    glow.material.opacity = glowBright * 0.7;
-    glowCore.material.opacity = 0.4 + glowBright * 0.5;
+    glow.material.opacity = glowBright * 0.7 * (0.35 + 0.65 * ignite);
+    glowCore.material.opacity = (0.3 + glowBright * 0.5) * (0.3 + 0.7 * ignite);
     glow.position.z = glowCore.position.z = -72 + Math.sin(now * 0.2) * 6;
     glow.material.rotation += 0.002;
+
+    // dancers: invisible until ignition, then fade in and dance harder on drops
+    for (const f of dancers) {
+      f.mat.opacity = Math.min(0.85, ignite * (0.5 + e * 0.4));
+      const t2 = now * (1.05 + e * 0.7) + f.phase;
+      const amp = 0.25 + e * 0.9 + beat * 0.5;
+      f.group.rotation.z = Math.sin(t2 * 0.9) * 0.12 * ignite;
+      f.group.position.y = f.baseY + Math.abs(Math.sin(t2)) * 0.4 * ignite;
+      f.armL.pivot.rotation.z = 0.5 + Math.sin(t2) * amp;
+      f.armR.pivot.rotation.z = -0.5 - Math.sin(t2 + 0.6) * amp;
+      f.armL.elbow.rotation.z = -0.4 - Math.max(0, Math.sin(t2)) * 0.6;
+      f.armR.elbow.rotation.z = 0.4 + Math.max(0, Math.sin(t2 + 0.6)) * 0.6;
+      f.legL.pivot.rotation.x = Math.sin(t2) * 0.16 * amp;
+      f.legR.pivot.rotation.x = -Math.sin(t2) * 0.16 * amp;
+    }
 
     // subtle camera parallax + fog breathing
     camera.position.x = Math.sin(now * 0.13) * 0.7;
     camera.position.y = Math.cos(now * 0.11) * 0.5;
     camera.lookAt(0, 0, -60);
-    fog.density = 0.05 + (1 - smoothE) * 0.02;
+    fog.density = 0.058 + (1 - e) * 0.02;
 
     renderer.render(scene, camera);
     raf = requestAnimationFrame(frame);
