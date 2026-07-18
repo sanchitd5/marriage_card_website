@@ -26,6 +26,16 @@ export function parseFromGroomSide(rawFlag) {
   return rawFlag === undefined ? true : rawFlag !== 'false';
 }
 
+// ---- Theme flag (visual skin) -----------------------------------------
+// WEDDING_THEME selects the visual skin, mirroring FROM_GROOM_SIDE. Default
+// 'regency' (the original Bridgerton build); only the literal 'techno' opts
+// into the friends-facing techno skin. Kept a pure helper so both the pipeline
+// and unit tests read the same value. The theme picks a template + stylesheet
+// and, for techno, drops the Regency video tree (rendered scene replaces it).
+export function parseTheme(rawFlag) {
+  return rawFlag === 'techno' ? 'techno' : 'regency';
+}
+
 // ---- Couple-photo reveal gate -----------------------------------------
 // Gallery photos of the couple stay hidden until `coupleRevealOffsetHours`
 // after the wedding start, computed from the build clock so the first deploy
@@ -225,6 +235,7 @@ function runBuild() {
   }
 
   const fromGroomSide = parseFromGroomSide(process.env.FROM_GROOM_SIDE);
+  const theme = parseTheme(process.env.WEDDING_THEME);
   const names = composeNames(fromGroomSide);
   const htmlTokens = buildHtmlTokens(names);
   const manifestTokens = buildManifestTokens(names);
@@ -238,7 +249,7 @@ function runBuild() {
   const dist = path.join(root, 'dist');
   const srcDir = path.join(root, 'src');
 
-  console.log(`build: FROM_GROOM_SIDE=${fromGroomSide} → pairTitle="${names.pairTitle}"`);
+  console.log(`build: WEDDING_THEME=${theme} FROM_GROOM_SIDE=${fromGroomSide} → pairTitle="${names.pairTitle}"`);
   const tsDesc = coupleRevealTs === 0 ? 'immediately' : coupleRevealTs == null ? 'never (hidden)' : new Date(coupleRevealTs).toISOString();
   console.log(`build: couple photos ship; browser reveals gallery at ${tsDesc} (runtime server-time check)`);
 
@@ -251,15 +262,31 @@ function runBuild() {
   // are intentionally excluded from the published build.
   const staticTrees = ['css', 'js', 'assets'];
   // Skip gitignored subpaths (raw AI generations live in assets/images/gen/).
-  const copyFilter = (src) => !src.split(path.sep).includes('gen');
+  // The techno skin renders its backdrop scene instead of shipping video, so it
+  // drops the whole Regency assets/videos/ tree (LOCKED: no palace footage in
+  // the techno build). A techno Path-B plate, when added, lives outside videos/.
+  const copyFilter = (src) => {
+    const parts = src.split(path.sep);
+    if (parts.includes('gen')) return false;
+    if (theme === 'techno') {
+      // No Regency palace footage in the techno build (LOCKED).
+      if (parts.includes('videos')) return false;
+      // Ship only the techno playlist (assets/audio/techno/*), not the Regency
+      // top-level tracks (assets/audio/theme-N.mp3).
+      const ai = parts.indexOf('audio');
+      if (ai !== -1 && parts.length === ai + 2 && /^theme-\d+\.mp3$/.test(parts[ai + 1])) return false;
+    }
+    return true;
+  };
   for (const dir of staticTrees) {
     const from = path.join(root, dir);
     if (!fs.existsSync(from)) continue;
     fs.cpSync(from, path.join(dist, dir), { recursive: true, filter: copyFilter });
   }
 
-  // Render index.html
-  const htmlTemplate = fs.readFileSync(path.join(srcDir, 'index.template.html'), 'utf8');
+  // Render index.html (theme picks the template; techno uses its own skin).
+  const templateFile = theme === 'techno' ? 'index.techno.template.html' : 'index.template.html';
+  const htmlTemplate = fs.readFileSync(path.join(srcDir, templateFile), 'utf8');
   fs.writeFileSync(path.join(dist, 'index.html'), applyTokens(htmlTemplate, htmlTokens));
 
   // Render manifest.webmanifest
@@ -274,13 +301,19 @@ function runBuild() {
 
   // Discover the music pool from assets/audio/theme-N.mp3 (sorted numerically),
   // so adding/removing a track needs no code change — just drop the file in.
-  const audioDir = path.join(root, 'assets', 'audio');
+  // The techno skin has its OWN playlist under assets/audio/techno/; names are
+  // emitted with the `techno/` prefix so ui.js's `assets/audio/${name}.mp3`
+  // resolves. Regency keeps the top-level tracks.
+  const songPrefix = theme === 'techno' ? 'techno/' : '';
+  const audioDir = theme === 'techno'
+    ? path.join(root, 'assets', 'audio', 'techno')
+    : path.join(root, 'assets', 'audio');
   const songs = fs.existsSync(audioDir)
     ? fs.readdirSync(audioDir)
         .map((f) => /^(theme-(\d+))\.mp3$/.exec(f))
         .filter(Boolean)
         .sort((a, b) => Number(a[2]) - Number(b[2]))
-        .map((m) => m[1])
+        .map((m) => songPrefix + m[1])
     : [];
   console.log(`build: discovered ${songs.length} music track(s)`);
 

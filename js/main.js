@@ -4,6 +4,7 @@ import { buildGallery } from './app/gallery.js';
 import { initGsap } from './app/animations.js';
 import { initGate } from './app/gate.js';
 import { initScratch } from './app/scratch.js';
+import { initLightshow } from './app/lightshow.js';
 import {
   initCountdown,
   initCalendarButtons,
@@ -28,6 +29,7 @@ initTheme();
 
 window.addEventListener('DOMContentLoaded', () => {
   initGsap();
-  initPetals();
+  initPetals();      // no-ops on the techno skin (no tsParticles / #tsparticles)
+  initLightshow();   // no-ops off the techno skin (guards on data-skin + #lightshow)
   initTilt();
 });

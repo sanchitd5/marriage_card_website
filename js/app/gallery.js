@@ -15,15 +15,18 @@ function photosHTML() {
      </figure>`).join('');
 }
 
-const VEILED_HTML =
-  `<figure class="gframe gframe--veiled fade-up">
-     <span class="veil-motif" aria-hidden="true">&#10022;</span>
+// Techno reads the veil as a redacted "SEALED" label; Regency as a gold fleuron.
+function veiledHTML() {
+  const motif = document.documentElement.dataset.skin === 'techno' ? 'Sealed' : '&#10022;';
+  return `<figure class="gframe gframe--veiled fade-up">
+     <span class="veil-motif" aria-hidden="true">${motif}</span>
      <p class="veil-note">Their story is kept close, to be unveiled after the celebration</p>
    </figure>`;
+}
 
 function renderVeiled(grid) {
   grid.classList.add('gallery-grid--veiled');
-  grid.innerHTML = VEILED_HTML;
+  grid.innerHTML = veiledHTML();
 }
 
 // Swap the veiled panel for the real masonry. Because this can run AFTER the

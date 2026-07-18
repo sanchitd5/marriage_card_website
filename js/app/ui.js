@@ -65,7 +65,10 @@ function wireTrack(m, audio, dock) {
 
 // Start the next track. fade=true ramps it up while the previous ramps down.
 function advance(m, dock, fade) {
-  const audio = makeAudio(nextName(m));
+  const name = nextName(m);
+  const audio = makeAudio(name);
+  audio._trackName = name; // read by the techno light show to index its envelope
+  m.currentName = name;
   wireTrack(m, audio, dock);
   if (fade) audio.volume = 0;
   m.audio = audio;
@@ -86,6 +89,7 @@ function beginCrossfade(m, cur, dock) {
   const t0 = performance.now();
   (function ramp(now) {
     const p = Math.min(1, (now - t0) / (CROSSFADE * 1000));
+    m.crossP = p; // exposed so the light show blends the two tracks' envelopes
     try {
       cur.volume = MUSIC_VOL * (1 - p);
       next.volume = MUSIC_VOL * p;
@@ -93,6 +97,7 @@ function beginCrossfade(m, cur, dock) {
     if (p < 1) { requestAnimationFrame(ramp); return; }
     try { cur.pause(); cur.currentTime = 0; } catch (e) {}
     if (m.outgoing === cur) m.outgoing = null;
+    m.crossP = null;
     m.fading = false;
   })(t0);
 }
@@ -241,10 +246,13 @@ export function initCountdown() {
   // NON-alphanumeric glyphs (no digits → never reads as a broken timer), to
   // build anticipation. Reduced-motion → a calm static glyph.
   if (!WEDDING_TS) {
-    const GLYPHS = ['✦', '✧', '·', '•'];
+    // Techno reads as a sealed counter (dim dots), Regency as a gilt shimmer
+    // (stars). Neither uses digits, so the date can never leak.
+    const techno = document.documentElement.dataset.skin === 'techno';
+    const GLYPHS = techno ? ['·', '•', '◦', '•'] : ['✦', '✧', '·', '•'];
     const cells = [els.d, els.h, els.m, els.s];
     if (REDUCED) {
-      cells.forEach(el => { el.textContent = '✦'; });
+      cells.forEach(el => { el.textContent = techno ? '·' : '✦'; });
       return;
     }
     let i = 0;

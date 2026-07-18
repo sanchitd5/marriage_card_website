@@ -13,8 +13,9 @@ A heavily animated, mobile-first wedding invitation (Sanchit & Riya). Plain HTML
 ## Commands
 
 ```sh
-node build.js                        # build → dist/ (groom-first, default)
+node build.js                        # build → dist/ (groom-first, default Regency skin)
 FROM_GROOM_SIDE=false node build.js  # bride-first build (or: npm run build:bride)
+WEDDING_THEME=techno node build.js   # friends-facing techno skin (see docs/techno-variant.md)
 npm test                             # node --test "test/**/*.test.mjs" (build-helper unit tests)
 node --test test/build.test.mjs      # run a single test file
 python3 -m http.server -d dist 8642  # serve locally after a build → http://127.0.0.1:8642
