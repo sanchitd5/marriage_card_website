@@ -220,8 +220,8 @@ export function initLightshow() {
   // centre stays clear for content. It fades in on a drop, dances, fades out —
   // and dims the haze while it's up, so it "replaces" the ambient show.
   let mechaTemplate = null, mechaLoading = false, lastDrop = -999, dropSide = 1, firstDropDone = false;
-  const DANCER_D = 18;          // depth the dancer sits at
-  const DANCER_H_FRAC = 0.02;   // target on-screen height = 2% of the viewport
+  const DANCER_D = 45;          // deep in the tunnel, where the motes zoom in from
+  const DANCER_H_FRAC = 0.18;   // target on-screen height = 18% of the REAL screen pixels
   let mechaRawH = 1;            // model's un-scaled height (for the fit)
   let mechaCenter = null;       // model's raw bounding-box centre
   function ensureMecha() {
@@ -231,8 +231,9 @@ export function initLightshow() {
       const pmrem = new THREE.PMREMGenerator(renderer);
       scene.environment = pmrem.fromEquirectangular(makeEnvTexture()).texture;
     } catch (e) { /* env optional */ }
-    const dir = new THREE.DirectionalLight(0x9fe8ff, 2.4); dir.position.set(3, 6, 4); scene.add(dir);
-    scene.add(new THREE.AmbientLight(0x22303c, 0.6));
+    const dir = new THREE.DirectionalLight(0xbfe9ff, 3.2); dir.position.set(3, 6, 4); scene.add(dir);
+    const fill = new THREE.DirectionalLight(0x88b0ff, 1.4); fill.position.set(-4, 1, 3); scene.add(fill);
+    scene.add(new THREE.AmbientLight(0x33445a, 0.8));
     try {
       const draco = new THREE.DRACOLoader();
       draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
@@ -250,34 +251,62 @@ export function initLightshow() {
       }, undefined, () => { mechaLoading = false; });
     } catch (e) { mechaLoading = false; }
   }
-  // Fit the mecha to DANCER_H_FRAC of the viewport height and instance it on the
-  // side(s) — vertically centred so the FULL model is visible, horizontally out
-  // by a fraction of the visible width (adapts to phone vs desktop aspect).
+  // Measure the model's ACTUAL projected pixel height on screen and scale it to
+  // a target pixel size (fraction of the real innerHeight). Iterates so it lands
+  // exactly, regardless of the model's internal glTF transform or its depth.
+  function fitToPixels(grp, pivot, targetPxH) {
+    const corner = new THREE.Vector3();
+    for (let iter = 0; iter < 4; iter++) {
+      grp.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(pivot);
+      if (box.isEmpty()) break;
+      let ymin = Infinity, ymax = -Infinity;
+      for (let i = 0; i < 8; i++) {
+        corner.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z);
+        corner.project(camera);
+        ymin = Math.min(ymin, corner.y); ymax = Math.max(ymax, corner.y);
+      }
+      const pxH = (ymax - ymin) * 0.5 * window.innerHeight; // NDC span → screen pixels
+      if (pxH < 0.5) break;
+      const k = targetPxH / pxH;
+      if (Math.abs(k - 1) < 0.02) break;
+      pivot.scale.multiplyScalar(k);
+    }
+  }
+
+  // Instance the mecha on the side(s), sized to real pixels and vertically
+  // centred so the FULL body shows. Centre stays clear for content.
   function fitAndAddDancers() {
     if (!mechaTemplate || !scene || !camera) return;
     dancers = [];
-    const vh = 2 * DANCER_D * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)); // world height at depth
-    const halfW = vh * 0.5 * camera.aspect;                    // visible half-width at depth
-    const modelHalfW = DANCER_H_FRAC * vh * 0.35;              // ~half the model's on-screen width
-    const X = Math.max(0, Math.min(halfW * 0.62, halfW - modelHalfW)); // to the side, still fully in frame
-    const sides = tier === 2 ? [-1, 1] : [1];
+    const vh = 2 * DANCER_D * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    const halfW = vh * 0.5 * camera.aspect;
+    const portrait = camera.aspect < 1;                        // phone → centre; desktop → side
+    const X = portrait ? 0 : Math.max(0, halfW * 0.6);
+    const targetPxH = DANCER_H_FRAC * window.innerHeight;      // paint to real screen pixels
+    const sides = portrait ? [1] : (tier === 2 ? [-1, 1] : [1]);
     for (const sd of sides) {
       const inner = mechaTemplate.clone(true);
       const mats = [];
       inner.traverse((m) => {
-        if (m.isMesh && m.material) { m.material = m.material.clone(); m.material.transparent = true; m.material.opacity = 0; m.material.fog = false; if ('envMapIntensity' in m.material) m.material.envMapIntensity = 1.5; mats.push(m.material); }
+        if (m.isMesh && m.material) {
+          m.material = m.material.clone();
+          m.material.transparent = true; m.material.opacity = 0; m.material.fog = false;
+          if ('envMapIntensity' in m.material) m.material.envMapIntensity = 2.0;
+          if ('emissiveIntensity' in m.material) m.material.emissiveIntensity = 2.2; // self-lit so it reads on the dark bg
+          mats.push(m.material);
+        }
       });
-      // Center the model inside an identity PIVOT (transform-agnostic: works
-      // regardless of any glTF root rotation/scale), then scale the pivot so the
-      // model fits DANCER_H_FRAC of the viewport height with its FULL body shown.
+      // centre the geometry inside an identity pivot (transform-agnostic)
       const pivot = new THREE.Group(); pivot.add(inner); pivot.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(inner);
-      const h = box.getSize(new THREE.Vector3()).y || 1;
-      inner.position.sub(box.getCenter(new THREE.Vector3())); // centre geometry at the pivot origin
-      pivot.scale.setScalar((DANCER_H_FRAC * vh) / h);
-      pivot.rotation.y = sd < 0 ? 0.4 : -0.4;                  // spin around the model CENTRE (pivot), not an offset
+      const rawH = box.getSize(new THREE.Vector3()).y || 1;
+      inner.position.sub(box.getCenter(new THREE.Vector3()));
+      pivot.scale.setScalar((DANCER_H_FRAC * vh) / rawH);     // initial guess (world units) so pixel-fit can measure
+      pivot.rotation.y = sd < 0 ? 0.4 : -0.4;                  // spin around the model centre
       const grp = new THREE.Group(); grp.add(pivot);
       grp.position.set(sd * X, 0, -DANCER_D);                  // vertically centred → full model shows
+      fitToPixels(grp, pivot, targetPxH);                      // refine to exact target screen pixels
       grp.visible = false;
       scene.add(grp);
       dancers.push({ grp, inst: inner, spin: pivot, mats, side: sd, k: 0, baseY: 0 });
