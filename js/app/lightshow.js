@@ -155,7 +155,7 @@ export function initLightshow() {
     // The drop dancer (mecha glTF) is instanced once it has loaded; on a
     // governor rebuild it re-instances from the cached template.
     dancers = [];
-    if (mechaTemplate) addDancers();
+    if (mechaTemplate) fitAndAddDancers();
   }
 
   // place a mote on a tunnel ring at a given depth
@@ -197,6 +197,10 @@ export function initLightshow() {
   // centre stays clear for content. It fades in on a drop, dances, fades out —
   // and dims the haze while it's up, so it "replaces" the ambient show.
   let mechaTemplate = null, mechaLoading = false, lastDrop = -999, dropSide = 1;
+  const DANCER_D = 18;          // depth the dancer sits at
+  const DANCER_H_FRAC = 0.30;   // target on-screen height = 30% of the viewport
+  let mechaRawH = 1;            // model's un-scaled height (for the fit)
+  let mechaCenter = null;       // model's raw bounding-box centre
   function ensureMecha() {
     if (mechaLoading || mechaTemplate || tier === 0 || !THREE.GLTFLoader || !renderer) return;
     mechaLoading = true;
@@ -212,34 +216,48 @@ export function initLightshow() {
       const loader = new THREE.GLTFLoader(); loader.setDRACOLoader(draco);
       loader.load('assets/scene/mecha.glb', (g) => {
         const o = g.scene;
-        let box = new THREE.Box3().setFromObject(o);
-        const sph = box.getBoundingSphere(new THREE.Sphere());
-        o.scale.setScalar(1.9 / (sph.radius || 1)); // modest side element, not dominating
-        box = new THREE.Box3().setFromObject(o);
-        o.position.sub(box.getCenter(new THREE.Vector3())); // centre at local origin
+        o.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(o);
+        const size = box.getSize(new THREE.Vector3());
+        mechaRawH = size.y || 1;
+        mechaCenter = box.getCenter(new THREE.Vector3()); // recenter per-instance after scaling
         mechaTemplate = o;
-        addDancers();
+        fitAndAddDancers();
         state.mechaReady = true;
       }, undefined, () => { mechaLoading = false; });
     } catch (e) { mechaLoading = false; }
   }
-  // Instance the mecha on the side(s). Two sides on the strongest tier, one else.
-  function addDancers() {
-    if (!mechaTemplate || !scene) return;
+  // Fit the mecha to DANCER_H_FRAC of the viewport height and instance it on the
+  // side(s) — vertically centred so the FULL model is visible, horizontally out
+  // by a fraction of the visible width (adapts to phone vs desktop aspect).
+  function fitAndAddDancers() {
+    if (!mechaTemplate || !scene || !camera) return;
     dancers = [];
+    const vh = 2 * DANCER_D * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)); // world height at depth
+    const halfW = vh * 0.5 * camera.aspect;                    // visible half-width at depth
+    const modelHalfW = DANCER_H_FRAC * vh * 0.35;              // ~half the model's on-screen width
+    const X = Math.max(0, Math.min(halfW * 0.62, halfW - modelHalfW)); // to the side, still fully in frame
     const sides = tier === 2 ? [-1, 1] : [1];
     for (const sd of sides) {
-      const inst = mechaTemplate.clone(true);
+      const inner = mechaTemplate.clone(true);
       const mats = [];
-      inst.traverse((m) => {
+      inner.traverse((m) => {
         if (m.isMesh && m.material) { m.material = m.material.clone(); m.material.transparent = true; m.material.opacity = 0; m.material.fog = false; mats.push(m.material); }
       });
-      const grp = new THREE.Group(); grp.add(inst);
-      grp.position.set(sd * 6, -1, -14); // to the side but off the vignetted corner
-      inst.rotation.y = sd < 0 ? 0.4 : -0.4; // angle toward centre
+      // Center the model inside an identity PIVOT (transform-agnostic: works
+      // regardless of any glTF root rotation/scale), then scale the pivot so the
+      // model fits DANCER_H_FRAC of the viewport height with its FULL body shown.
+      const pivot = new THREE.Group(); pivot.add(inner); pivot.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(inner);
+      const h = box.getSize(new THREE.Vector3()).y || 1;
+      inner.position.sub(box.getCenter(new THREE.Vector3()));
+      pivot.scale.setScalar((DANCER_H_FRAC * vh) / h);
+      inner.rotation.y = sd < 0 ? 0.4 : -0.4;                  // angle toward centre
+      const grp = new THREE.Group(); grp.add(pivot);
+      grp.position.set(sd * X, 0, -DANCER_D);                  // vertically centred → full model shows
       grp.visible = false;
       scene.add(grp);
-      dancers.push({ grp, inst, mats, side: sd, k: 0 });
+      dancers.push({ grp, inst: inner, mats, side: sd, k: 0, baseY: 0 });
     }
   }
 
@@ -335,9 +353,9 @@ export function initLightshow() {
         d.grp.visible = d.k > 0.01;
         for (const mm of d.mats) mm.opacity = Math.min(1, d.k);
         if (d.grp.visible) {
-          d.inst.rotation.y += 0.02 + e * 0.05;                       // turn/show off
-          d.grp.position.y = -1.5 + Math.sin(now * 3 + d.side) * 0.4 * d.k; // bob
-          d.grp.rotation.z = Math.sin(now * 2 + d.side) * 0.05 * d.k;       // sway
+          d.inst.rotation.y += 0.02 + e * 0.05;                            // turn/show off
+          d.grp.position.y = d.baseY + Math.sin(now * 3 + d.side) * 0.35 * d.k; // bob
+          d.grp.rotation.z = Math.sin(now * 2 + d.side) * 0.05 * d.k;           // sway
         }
         dancerK = Math.max(dancerK, d.k);
       }
@@ -380,6 +398,8 @@ export function initLightshow() {
   } catch (e) { floor(); return; }
   window.addEventListener('resize', onResize, { passive: true });
   document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); else start(); });
+
+  state.dbgDancers = () => dancers.map((d) => ({ k: +(d.k || 0).toFixed(2), vis: d.grp.visible, pos: [+d.grp.position.x.toFixed(1), +d.grp.position.y.toFixed(1), +d.grp.position.z.toFixed(1)], sc: +(d.inst.parent ? d.inst.parent.scale.x : -1).toFixed(4), op: +((d.mats[0] ? d.mats[0].opacity : -1)).toFixed(2), tier }));
 
   const amb = $('#ambient'); if (amb) amb.style.display = 'none'; // JS show live → retire CSS fog
   raf = requestAnimationFrame(frame);
