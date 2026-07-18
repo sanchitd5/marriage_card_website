@@ -128,20 +128,68 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
   position: relative; z-index: 2;
   cursor: pointer;
   text-align: center;
-  padding: 2rem 1.75rem 1.5rem;
+  padding: 1.5rem 1.6rem 1.2rem;
   max-width: 24rem;
   margin-inline: 1.25rem;
   background: hsl(var(--ivory) / .92);
   border: 1px solid hsl(var(--gold-soft) / .8);
   box-shadow: inset 0 0 0 5px hsl(var(--ivory)), inset 0 0 0 6px hsl(var(--gold-soft) / .55), var(--shadow-lift);
 }
+/* Ganesha invocation — heads the welcome gate and the footer. Static and
+   un-animated by intent (sacred text must not shimmer/warp); the gate-card's
+   own dismissal fade carries it off. Devanagari uses a text-subset webfont. */
+.invocation { text-align: center; }
+.shloka {
+  display: block;
+  font-family: "Noto Serif Devanagari", var(--font-display), serif;
+  font-weight: 500;
+  color: hsl(var(--gold));
+  letter-spacing: .02em;
+  line-height: 1.4;
+}
+.shloka-roman {
+  display: block;
+  margin-top: .35rem;
+  font-size: .58rem; letter-spacing: .24em; text-transform: uppercase;
+  color: hsl(var(--gold) / .72);
+}
+/* Ganesha medallion — deity above the shloka. Static; never animated. Gold via
+   currentColor so it flips with the theme like the other gold marks. */
+.invocation-motif {
+  display: block;
+  margin: 0 auto .4rem;
+  color: hsl(var(--gold));
+  aspect-ratio: 1;
+}
+.gate-invocation { margin-bottom: .75rem; }
+.gate-invocation .invocation-motif { width: clamp(58px, 14vw, 72px); }
+.gate-invocation .shloka { font-size: 1.02rem; }
+.footer-invocation { margin-bottom: 1.1rem; }
+.footer-invocation .invocation-motif { width: 62px; }
+.footer-invocation .shloka { font-size: .95rem; }
+.hero-invocation { margin-bottom: 1.3rem; }
+.hero-invocation .invocation-motif { width: clamp(58px, 14vw, 74px); }
+.hero-invocation .shloka { font-size: clamp(1rem, 3.4vw, 1.2rem); }
+/* Hero sits over video → soft shadow keeps the gold legible on any frame. */
+.hero-invocation .invocation-motif,
+.hero-invocation .shloka {
+  filter: drop-shadow(0 1px 4px hsl(263 30% 12% / .45));
+}
+/* Short / landscape phones: trim the invocation so the wax seal stays above
+   the fold and tappable (#gate is centered + overflow:hidden, no scroll). */
+@media (max-height: 640px) {
+  .gate-invocation { margin-bottom: .55rem; }
+  .gate-invocation .invocation-motif { width: 58px; margin-bottom: .3rem; }
+  .gate-invocation .shloka { font-size: .92rem; }
+  .gate-invocation .shloka-roman { display: none; }
+}
 .gate-kicker {
   font-size: .62rem; letter-spacing: .28em; text-transform: uppercase;
-  color: hsl(var(--gold)); font-weight: 500; margin-bottom: .9rem;
+  color: hsl(var(--gold)); font-weight: 500; margin-bottom: .7rem;
 }
 .gate-line {
   font-family: var(--font-display); font-weight: 400; font-style: italic;
-  font-size: 1.25rem; line-height: 1.5; margin-bottom: 1.6rem;
+  font-size: 1.25rem; line-height: 1.5; margin-bottom: 1.15rem;
 }
 .seal {
   position: relative;
@@ -173,7 +221,7 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
   text-shadow: 0 1px 3px hsl(20 30% 15% / .5);
 }
 .seal-monogram em { font-family: var(--font-script); font-style: normal; font-size: .62em; color: hsl(0 0% 98%); margin-inline: .1em; }
-.gate-hint { font-size: .8rem; color: hsl(var(--ink) / .55); margin-top: 1.1rem; font-style: italic; }
+.gate-hint { font-size: .8rem; color: hsl(var(--ink) / .55); margin-top: .85rem; font-style: italic; }
 
 /* ═══ THEME TOGGLE ═══════════════════════════════════════════ */
 #theme-toggle {
