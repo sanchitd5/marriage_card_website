@@ -117,6 +117,10 @@ export function initKineticDancer() {
   // Idle-energy baseline lifted to ~0.28 so the groove amplitude reads even
   // without music (the figure still visibly dances when silent).
   let energy = 0.28, prevFast = 0, energySlow = 0.28, beat = 0, phase = 0;
+  let beatAccent = 0;                 // on-beat pulse (0..1), music-locked
+  let ENV = null;                     // the offline envelope JSON (fetched once)
+  const trackInfo = {};               // per-track { beatPeriod, bpm, t0 } (cached)
+  const N_BEATS = 4;                  // a full gesture spans this many musical beats
   let headTrail = 0; // secondary-motion memory for the head
 
   // The rig, once built (~15 bones):
@@ -247,6 +251,65 @@ export function initKineticDancer() {
     beat *= 0.86;
   }
 
+  // ── BPM sync (adapted from zhaojw1998/Real-Time-Music-Driven-Dancing-Robot) ──
+  // That robot ran madmom's DBN beat-tracker live and time-scaled motion frames
+  // onto the beat (spb/fpb) with a PID re-sync. We already have the OFFLINE
+  // envelope (per-track energy + onsets) AND an authoritative clock
+  // (audio.currentTime), so we skip live DSP + PID: estimate a fixed BPM per
+  // track by AUTOCORRELATING the energy envelope (robust for 4-on-the-floor
+  // techno), phase-align the beat grid to the onsets, then derive the beat phase
+  // analytically from currentTime — drift-free by construction.
+  function analyzeEnv(fps, env, onsets) {
+    const minBPM = 100, maxBPM = 160;                    // techno band → also fixes octave
+    const lagMin = Math.max(1, Math.round(fps * 60 / maxBPM));
+    const lagMax = Math.round(fps * 60 / minBPM);
+    let mean = 0; for (let i = 0; i < env.length; i++) mean += env[i]; mean /= env.length || 1;
+    let bestLag = lagMin, bestR = -Infinity;
+    for (let lag = lagMin; lag <= lagMax; lag++) {
+      let r = 0;
+      for (let k = 0; k + lag < env.length; k++) r += (env[k] - mean) * (env[k + lag] - mean);
+      if (r > bestR) { bestR = r; bestLag = lag; }
+    }
+    const beatPeriod = bestLag / fps;
+    // phase-align the grid {t0 + n*beatPeriod} to the onset times (max overlap)
+    let t0 = (onsets && onsets.length) ? onsets[0] % beatPeriod : 0;
+    if (onsets && onsets.length > 4) {
+      const STEPS = 32; let bestPhi = 0, bestS = -Infinity;
+      for (let s = 0; s < STEPS; s++) {
+        const phi = s / STEPS * beatPeriod; let sum = 0;
+        for (let i = 0; i < onsets.length; i++) sum += Math.cos(2 * Math.PI * (onsets[i] - phi) / beatPeriod);
+        if (sum > bestS) { bestS = sum; bestPhi = phi; }
+      }
+      t0 = bestPhi;
+    }
+    return { beatPeriod, bpm: 60 / beatPeriod, t0 };
+  }
+  fetch('assets/audio/techno/envelopes.json').then(r => r.ok ? r.json() : null).then(j => {
+    if (!j || !j.tracks) return;
+    ENV = j;
+    for (const name in j.tracks) {
+      const tr = j.tracks[name];
+      if (tr && tr.env && tr.env.length) trackInfo[name] = analyzeEnv(j.fps || 25, tr.env, tr.onsets || []);
+    }
+  }).catch(() => {});
+
+  // Returns the gesture-phase RATE (Hz) + the on-beat accent for `now`. When the
+  // music is playing and its track is analysed, the rate is BPM-locked (a full
+  // gesture spans N_BEATS beats) and the accent spikes on each beat; otherwise a
+  // slow free-run idle with no phantom beat. Rate-based (not absolute) so play/
+  // pause never snaps the phase.
+  function musicClock() {
+    const m = appState.music, a = m && m.audio;
+    const playing = !!(a && !m.paused && !a.paused && a.currentTime > 0.05);
+    const info = playing && a._trackName && trackInfo[a._trackName];
+    if (info) {
+      const beatPos = (a.currentTime - info.t0) / info.beatPeriod;
+      const beatPhase = beatPos - Math.floor(beatPos);   // 0 = on the beat
+      return { rateHz: 1 / (N_BEATS * info.beatPeriod), accent: Math.pow(1 - beatPhase, 4) };
+    }
+    return { rateHz: 0.12 + energy * 0.10, accent: 0 };   // idle free-run, no beat
+  }
+
   // ── the dance ────────────────────────────────────────────────────────
   // Everything is DAMPED toward a target each frame (factor k, framerate-aware)
   // so the figure grooves smoothly and never snaps or seizures. Ranges are kept
@@ -259,10 +322,10 @@ export function initKineticDancer() {
     // emotive GESTURES: arms drawing up toward the face/chest with deep elbows
     // (hands-to-face / self-embrace), a slow torso curl-and-uncurl, weight
     // shifts — all large, flowing, damped. (Ref: Anyma – Syren, lIdrRRofKm0.)
-    const slow = 0.12 + energy * 0.24;         // Hz — slow; energy nudges tempo
-    phase += dt * slow * 2 * Math.PI;
+    // `phase` is advanced in frame() at the BPM-locked rate (musicClock) so the
+    // gesture TEMPO matches the music; a full gesture spans N_BEATS beats.
     const A = 0.7 + energy * 0.5;              // gesture reach scales with energy
-    const hit = beat * (0.3 + energy * 0.5);   // beat = a subtle surge, not a bounce
+    const hit = beatAccent * (0.45 + energy * 0.5);  // music-locked on-beat accent
     const p = phase;
 
     const tgt = (euler, axis, target) => { euler[axis] += (target - euler[axis]) * k; };
@@ -311,10 +374,16 @@ export function initKineticDancer() {
     tgt(b.head.rotation, 'y', Math.sin(t * 0.11) * 0.08);
     tgt(b.head.rotation, 'z', Math.sin(p * 0.5 + 0.4) * 0.06 * A);
 
-    // beat: a subtle surge deeper into the gesture (MOTION only — flash-safe),
-    // never a bounce.
-    add(b.spine.rotation, 'x', hit * 0.05);
-    add(b.head.rotation, 'x', hit * 0.06);
+    // ON-BEAT accent — MUSIC-LOCKED (beatAccent spikes on each beat). A weighted
+    // pulse (knee dip + body sink + head) so the TEMPO is felt on the beat, not a
+    // club bounce. MOTION only (flash-safe — brightness never reads this).
+    add(b.pelvis.position, 'y', -hit * 0.05);   // sink on the beat
+    add(b.thighL.rotation, 'x', hit * 0.10);    // knees dip
+    add(b.thighR.rotation, 'x', hit * 0.10);
+    add(b.shinL.rotation, 'x', hit * 0.10);
+    add(b.shinR.rotation, 'x', hit * 0.10);
+    add(b.spine.rotation, 'x', hit * 0.06);
+    add(b.head.rotation, 'x', hit * 0.07);
 
     // slow 3/4 sway of the whole figure (never flat-on)
     tgt(b.root.rotation, 'y', Math.sin(p * 0.5) * 0.12);
@@ -333,6 +402,12 @@ export function initKineticDancer() {
     const rawE = readRawEnergy(now);
     energy += (rawE - energy) * 0.12;
     updateBeat(rawE);
+
+    // Advance the gesture phase at the BPM-locked rate (a full gesture spans
+    // N_BEATS beats), and capture the on-beat accent — so movement matches BPM.
+    const clk = musicClock();
+    phase += clk.rateHz * dt * 2 * Math.PI;
+    beatAccent = clk.accent;
 
     dance(dt, now);
 
@@ -380,7 +455,13 @@ export function initKineticDancer() {
 
   document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); else start(); });
 
-  appState.dancer = { start, stop };
+  appState.dancer = {
+    start, stop,
+    // live diagnostics (also handy for tuning): current locked BPM + on-beat pulse
+    get bpm() { const a = appState.music && appState.music.audio; const i = a && trackInfo[a._trackName]; return i ? Math.round(i.bpm) : 0; },
+    get beatAccent() { return +beatAccent.toFixed(2); },
+    get locked() { const m = appState.music, a = m && m.audio; return !!(a && !m.paused && !a.paused && a.currentTime > 0.05 && trackInfo[a._trackName]); },
+  };
 
   raf = requestAnimationFrame(frame);
 }
