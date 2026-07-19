@@ -2,9 +2,10 @@ import { REDUCED, $ } from './dom.js';
 import { appState } from './state.js';
 
 // ── Kinetic dancer (persistent side wireframe humanoid) ─────────────────
-// A procedural tall/slender "Anyma alien" figure — built from smooth tapered
-// wireframe primitives (NO glTF model), rendered as a cyan ADDITIVE wireframe on its own small
-// WebGL canvas (#k-dancer-canvas, fixed on the right, CSS-positioned/sized).
+// A procedural tall/slender "Anyma alien" figure — built from ONE continuous
+// high-poly SKINNED surface (NO glTF model), rendered as a cyan ADDITIVE
+// wireframe (+ a skinned "probe point" cloud) on its own small WebGL canvas
+// (#k-dancer-canvas, fixed on the right, CSS-positioned/sized).
 // It DANCES to the background music across every panel: ambient decoration,
 // no user interaction, no audio node of its own.
 //
@@ -13,6 +14,30 @@ import { appState } from './state.js';
 // tiny context. It reads the OFFLINE music energy the lightshow already
 // computes (appState.lightshow.energy) rather than opening a new AnalyserNode,
 // so the two stay in lockstep and there is no extra audio cost.
+//
+// ── FLUID DEFORMATION (the core of this build) ───────────────────────────
+// Earlier this figure was ~15 RIGID nested Groups, one tapered wireframe tube
+// per bone → joints creased/segmented, never fluid, and wireframe-of-tubes
+// isn't truly high-poly. It is now a SINGLE high-poly BufferGeometry (a merged
+// humanoid surface) driven by a THREE.Bone SKELETON via GPU skinning. Each
+// vertex is weighted to 2–4 bones with a SMOOTH inverse-distance falloff that
+// BLENDS across every joint, so bends are organic and never crease. The same
+// named joints the old rig used are now Bones, so the BPM choreography in
+// dance() rotates them unchanged (`bone.rotation.x/y/z` is the same API).
+//
+// ── "Nanite-like" performance (WebGL analog — NOT real Nanite) ───────────
+// True Nanite / virtualized micro-polygon geometry is an Unreal-Engine-only
+// feature; WebGL has no equivalent. What IS feasible in the browser, and what
+// this file does instead, is the practical equivalent:
+//  (a) a device/canvas-size DETAIL TIER that picks the mesh resolution
+//      (radial + ring segment counts) up front — a small canvas / low-core
+//      device builds fewer segments (a size-based LOD pick, in lieu of a
+//      streaming THREE.LOD swap);
+//  (b) ONE SkinnedMesh = ONE draw call — all deformation is GPU vertex
+//      skinning (bone matrices), not per-frame CPU vertex work;
+//  (c) a bounded high vertex budget (~40k–90k tris on the HIGH tier) that the
+//      GPU chews through in a single pass, DPR capped at 2;
+//  (d) RAF pauses on a hidden tab; dt clamped so a long pause can't lurch.
 //
 // Safety & performance:
 //  • reduced-motion → never runs (no WebGL init at all); CSS hides the canvas.
@@ -29,88 +54,46 @@ export function initKineticDancer() {
 
   const THREE = window.THREE;
 
-  // ── shared materials (2 line mats: additive core + halo) ─────────────
+  // ── shared materials ─────────────────────────────────────────────────
+  // The wireframe now DEFORMS with the skin (it is drawn from the skinned
+  // surface geometry), so it stays a smooth fluid mesh at every pose.
   // WebGL linewidth is always 1px, so "bloom" is faked with an additive halo
-  // pass at 1.04× scale over a brighter additive core.
-  // NOTE: this figure is HIGH-POLY (~10k wire segments). Additive blending
-  // accumulates where lines overlap, so in compact poses (arms/legs together)
-  // the dense mesh blows out into a soft glowing blob. Keep per-line alpha LOW
-  // so the wireframe stays crisp at every pose; the density supplies presence.
-  const coreMat = new THREE.LineBasicMaterial({ color: 0x66f0ff, transparent: true, opacity: 0.42, blending: THREE.AdditiveBlending, depthWrite: false });
-  const haloMat = new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false });
+  // SkinnedMesh at ~1.02× over a brighter additive core.
+  // NOTE: this surface is genuinely HIGH-POLY (tens of thousands of tris).
+  // Additive blending accumulates where lines overlap, so in compact poses
+  // (arms/legs together) a dense mesh blows out into a soft glowing blob. Keep
+  // per-line alpha LOW so the wireframe stays crisp at every pose; the density
+  // supplies presence. `skinning:true` is REQUIRED in r128 for the material to
+  // inject the skinning shader chunks.
+  const coreMat = new THREE.MeshBasicMaterial({ color: 0x66f0ff, wireframe: true, transparent: true, opacity: 0.30, blending: THREE.AdditiveBlending, depthWrite: false, skinning: true });
+  const haloMat = new THREE.MeshBasicMaterial({ color: 0x22d3ee, wireframe: true, transparent: true, opacity: 0.08, blending: THREE.AdditiveBlending, depthWrite: false, skinning: true });
 
-  const disposables = [];   // WireframeGeometry instances to dispose on teardown
+  const disposables = [];   // geometries + materials to dispose on teardown
+  disposables.push(coreMat, haloMat);
 
-  // ── high-poly wireframe helpers ("Anyma alien" silhouette) ──────────────
-  // The figure is a tall, slender, smooth, featureless humanoid (à la Anyma's
-  // Genesys/Eva & Syren stage visuals): elongated tapered limbs, a long neck and
-  // an elongated ovoid head — rendered as a DENSE cyan holographic wireframe
-  // (many small facets on curved surfaces), not a low-poly box mannequin.
-  //
-  // Segment density on the curved surfaces (keeps the wireframe reading as a
-  // fine mesh while staying well within a sane vertex budget for a tiny canvas).
-  const RSEG = 16, HSEG = 6;
-
-  // Shared render path for every bone: a core LineSegments + an additive halo
-  // copy at 1.04× (identical to the old boxes, just on smooth geometry). The
-  // base geometry is disposed immediately; the WireframeGeometry is tracked for
-  // teardown. `len` is stored so attach()/attachUp() can seat children.
-  function boneFromGeo(geo, len) {
-    const g = new THREE.Group();
-    const wire = new THREE.WireframeGeometry(geo); geo.dispose();
-    g.add(new THREE.LineSegments(wire, coreMat));
-    const halo = new THREE.LineSegments(wire, haloMat); halo.scale.setScalar(1.04); g.add(halo);
-    g.userData.len = len; disposables.push(wire); return g;
+  // ── detail tier (Nanite analog (a): size/device-based LOD pick) ──────────
+  // Choose the mesh resolution ONCE from the canvas footprint + device. The
+  // mobile canvas is CSS-hidden ≤900px, so on phones this rarely even runs; the
+  // tier still guards small/embedded canvases and low-core machines from paying
+  // for the full HIGH vertex budget. (A streaming THREE.LOD swap is overkill for
+  // one small always-on-screen figure — a single up-front pick is the right
+  // WebGL-feasible LOD here.)
+  function pickTier() {
+    const w = canvas.clientWidth || 180, h = canvas.clientHeight || 520;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const px = w * h * dpr;
+    const cores = navigator.hardwareConcurrency || 4;
+    // HIGH: ~40k–90k tris; LOW: ~1/3 of that for small canvases / weak devices.
+    if (px < 120000 || cores <= 4) return { radial: 30, ringF: 24, minRing: 10, headDetail: 3 };
+    return { radial: 52, ringF: 46, minRing: 16, headDetail: 4 };
   }
-
-  // A bone is a THREE.Group whose ORIGIN is the proximal joint. Its SMOOTH,
-  // tapered geometry (a high-poly open cone/cylinder, rProx at the joint tapering
-  // to rDist at the distal end) is translated DOWN by len/2 so it hangs from the
-  // joint, exactly like the old box; child bones attach at the distal end
-  // (position.y = -parentLen). Rotating the group pivots about the joint.
-  function makeBone(len, rProx, rDist) {
-    // CylinderGeometry(radiusTop, radiusBottom, height, radialSeg, heightSeg, openEnded)
-    // top (+Y) = proximal (joint) end → put rProx on top so the joint end is thicker.
-    const geo = new THREE.CylinderGeometry(rProx, rDist, len, RSEG, HSEG, true);
-    geo.translate(0, -len / 2, 0);
-    return boneFromGeo(geo, len);
-  }
-  function attach(parent, child) { child.position.set(0, -parent.userData.len, 0); parent.add(child); }
-
-  // Same as makeBone, but the segment RISES from the joint (geometry translated
-  // UP). The limbs (arms/legs) hang down → makeBone; the torso (spine→chest→neck)
-  // rises from the waist → this. Children of an up-bone are seated at +parentLen.
-  function makeBoneUp(len, rProx, rDist) {
-    // translated up: bottom (−Y) = proximal (joint) end → rProx on the bottom.
-    const geo = new THREE.CylinderGeometry(rDist, rProx, len, RSEG, HSEG, true);
-    geo.translate(0, len / 2, 0);
-    return boneFromGeo(geo, len);
-  }
-  function attachUp(parent, child) { child.position.set(0, parent.userData.len, 0); parent.add(child); }
-
-  // Elongated, featureless ovoid head. A geodesic icosphere (even faceting →
-  // dense holographic mesh) scaled taller on Y for the alien skull, then
-  // translated up so it RISES from the neck-top joint like an up-bone. Kept a
-  // touch smaller / sleeker than before so the now-taller body doesn't read as
-  // a bobble-head.
-  function makeHead(r, yScale) {
-    const geo = new THREE.IcosahedronGeometry(r, 2);   // 320 faces — smooth, no face
-    geo.scale(0.88, yScale, 0.88);
-    geo.translate(0, r * yScale, 0);                   // bottom of the ovoid sits at the joint
-    return boneFromGeo(geo, r * yScale * 2);
-  }
-
-  // Hands & feet: NO spheres. A tiny slim tapered tip that continues the
-  // forearm/shin taper smoothly to a fine point (a very short, near-needle
-  // cone). Keeps the hand/foot nodes in the rig graph without any ball-joint
-  // read. `makeBone` already tapers rProx → rDist and hangs from the joint.
-  function makeTip(len, rProx) {
-    return makeBone(len, rProx, rProx * 0.12);   // taper to a near-point
-  }
+  const TIER = pickTier();
 
   // ── runtime state ────────────────────────────────────────────────────
-  let renderer, scene, camera, root;
+  let renderer, scene, camera, rig, skeleton, geo, points, pointsMat;
   let bones = null;                         // the named rig (built in build())
+  let boneList = null;                      // ordered skeleton bone array
+  let triCount = 0, vertCount = 0;
   let running = true, raf = 0, live = false, dead = false;
 
   // dance/energy state (reused across frames; nothing allocated in the loop)
@@ -123,99 +106,373 @@ export function initKineticDancer() {
   const N_BEATS = 4;                  // a full gesture spans this many musical beats
   let headTrail = 0; // secondary-motion memory for the head
 
-  // The rig, once built (~15 bones):
-  //  root → pelvis → spine → chest → neck → head
-  //  chest → shoulderL/R (offset) → upperArmL/R → forearmL/R → handL/R
-  //  pelvis → hipL/R (offset) → thighL/R → shinL/R → footL/R
+  // ── rest-pose joints (rig-local, UNSCALED space) ─────────────────────────
+  // Single source of truth for BOTH the geometry (tube endpoints) and the bone
+  // hierarchy (local offsets). Slender, elongated "Anyma alien" proportions —
+  // reuse the old rig's radii/lengths verbatim so the silhouette (and thus the
+  // tuned camera framing) is unchanged. y grows UP; the figure faces +Z.
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  const J = {
+    waist:     V(0, 0, 0),
+    hipCenter: V(0, -0.30, 0),
+    chestBase: V(0, 0.70, 0),
+    neckBase:  V(0, 1.48, 0),
+    headBase:  V(0, 1.92, 0),
+    headTop:   V(0, 1.92 + 0.225 * 1.7, 0),   // ovoid apex
+    // arms (L = +x). Shoulder sits high on the widening chest; arm hangs down.
+    shoulderL: V(0.27, 1.4332, 0),
+    elbowL:    V(0.27, 0.5932, 0),
+    wristL:    V(0.27, -0.2068, 0),
+    handTipL:  V(0.27, -0.2768, 0),
+    // legs (L = +x). Planted, near-straight stance.
+    hipL:      V(0.155, -0.30, 0),
+    kneeL:     V(0.155, -1.38, 0),
+    ankleL:    V(0.155, -2.42, 0),
+    toeL:      V(0.155, -2.52, 0),
+  };
+  const mir = (v) => V(-v.x, v.y, v.z);   // mirror a joint to the right side
+  J.shoulderR = mir(J.shoulderL); J.elbowR = mir(J.elbowL); J.wristR = mir(J.wristL); J.handTipR = mir(J.handTipL);
+  J.hipR = mir(J.hipL); J.kneeR = mir(J.kneeL); J.ankleR = mir(J.ankleL); J.toeR = mir(J.toeL);
+
+  // ── geometry helpers ─────────────────────────────────────────────────────
+  // A smooth tapered tube (open generalized cylinder) from A→B, rProx→rDist,
+  // authored DIRECTLY in rig-local rest space so it wraps the matching bone.
+  // High segment counts (radial ≥20, rings ≥10) keep it a fine mesh; every tube
+  // is merged into ONE geometry so the whole body is a single draw path.
+  const _tmpAxis = new THREE.Vector3(), _ref = new THREE.Vector3(), _u = new THREE.Vector3(), _v = new THREE.Vector3();
+  function tube(A, B, rProx, rDist, radial, rings, parts) {
+    _tmpAxis.copy(B).sub(A); const L = _tmpAxis.length() || 1e-5; _tmpAxis.divideScalar(L);
+    // orthonormal ring frame (pick a reference axis not parallel to the tube)
+    _ref.set(Math.abs(_tmpAxis.y) > 0.99 ? 1 : 0, Math.abs(_tmpAxis.y) > 0.99 ? 0 : 1, 0);
+    _u.crossVectors(_tmpAxis, _ref).normalize();
+    _v.crossVectors(_tmpAxis, _u).normalize();
+    const nv = radial * (rings + 1);
+    const pos = new Float32Array(nv * 3);
+    const idx = new Uint32Array(radial * rings * 6);
+    let p = 0;
+    for (let i = 0; i <= rings; i++) {
+      const t = i / rings, r = rProx + (rDist - rProx) * t;
+      const cx = A.x + _tmpAxis.x * L * t, cy = A.y + _tmpAxis.y * L * t, cz = A.z + _tmpAxis.z * L * t;
+      for (let j = 0; j < radial; j++) {
+        const a = 2 * Math.PI * j / radial, cs = Math.cos(a), sn = Math.sin(a);
+        pos[p++] = cx + (_u.x * cs + _v.x * sn) * r;
+        pos[p++] = cy + (_u.y * cs + _v.y * sn) * r;
+        pos[p++] = cz + (_u.z * cs + _v.z * sn) * r;
+      }
+    }
+    let q = 0;
+    for (let i = 0; i < rings; i++) {
+      for (let j = 0; j < radial; j++) {
+        const j2 = (j + 1) % radial;
+        const a = i * radial + j, b = i * radial + j2, c = (i + 1) * radial + j2, d = (i + 1) * radial + j;
+        idx[q++] = a; idx[q++] = b; idx[q++] = d;
+        idx[q++] = b; idx[q++] = c; idx[q++] = d;
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    parts.push(g);
+  }
+
+  // Merge indexed parts into one BufferGeometry. Uses BufferGeometryUtils if it
+  // happens to be on window.THREE (examples build); the core r128 CDN bundle
+  // here does NOT ship it, so the default path hand-concatenates the Float32/
+  // index arrays (offsetting indices) — zero extra dependency.
+  function mergeParts(parts) {
+    const BGU = THREE.BufferGeometryUtils;
+    if (BGU && BGU.mergeBufferGeometries) {
+      const m = BGU.mergeBufferGeometries(parts, false);
+      for (const p of parts) p.dispose();
+      return m;
+    }
+    let vcount = 0, icount = 0;
+    for (const p of parts) { vcount += p.attributes.position.count; icount += p.index.count; }
+    const pos = new Float32Array(vcount * 3);
+    const idx = new Uint32Array(icount);
+    let vOff = 0, iOff = 0;
+    for (const p of parts) {
+      pos.set(p.attributes.position.array, vOff * 3);
+      const pi = p.index.array;
+      for (let k = 0; k < pi.length; k++) idx[iOff + k] = pi[k] + vOff;
+      vOff += p.attributes.position.count;
+      iOff += p.index.count;
+      p.dispose();
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    return g;
+  }
+
+  // ── skin weights: SMOOTH joint blend by distance-to-bone-segment ─────────
+  // For every vertex, measure the distance to each weightable bone SEGMENT
+  // (proximal→distal line) and weight by a soft inverse-cube falloff, keeping
+  // the nearest 4 and normalising to sum 1. This is what makes the figure
+  // FLUID: mid-shaft, the vertex's own segment is far closer than any other so
+  // it stays effectively rigid; approaching a JOINT, two segments become nearly
+  // equidistant so their weights cross-fade ~50/50 — a feather whose width
+  // scales with the local limb radius, so bends are organic and never crease.
+  // (Zero-length bones — the root, shoulder & hip offset bones — carry NO
+  // segment, so no vertex ever weights to them; their child limb covers the joint.)
+  function segDist2(px, py, pz, ax, ay, az, bx, by, bz) {
+    const abx = bx - ax, aby = by - ay, abz = bz - az;
+    const apx = px - ax, apy = py - ay, apz = pz - az;
+    const ab2 = abx * abx + aby * aby + abz * abz || 1e-9;
+    let t = (apx * abx + apy * aby + apz * abz) / ab2;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const dx = apx - abx * t, dy = apy - aby * t, dz = apz - abz * t;
+    return dx * dx + dy * dy + dz * dz;
+  }
+  function computeSkin(positions, segs) {
+    const n = positions.length / 3;
+    const skinIndex = new Uint16Array(n * 4);
+    const skinWeight = new Float32Array(n * 4);
+    // per-vertex top-4 accumulators
+    const bi = [0, 0, 0, 0], bw = [0, 0, 0, 0];
+    for (let vi = 0; vi < n; vi++) {
+      const px = positions[vi * 3], py = positions[vi * 3 + 1], pz = positions[vi * 3 + 2];
+      bi[0] = bi[1] = bi[2] = bi[3] = 0;
+      bw[0] = bw[1] = bw[2] = bw[3] = 0;
+      for (let s = 0; s < segs.length; s++) {
+        const seg = segs[s];
+        const d2 = segDist2(px, py, pz, seg.ax, seg.ay, seg.az, seg.bx, seg.by, seg.bz);
+        // soft inverse-cube of distance → smooth joint feather, rigid mid-shaft
+        const w = 1 / Math.pow(d2 + 1e-5, 1.5);
+        // insertion sort into the top-4 (keep the 4 largest weights)
+        if (w > bw[3]) {
+          let k = 3;
+          while (k > 0 && w > bw[k - 1]) { bw[k] = bw[k - 1]; bi[k] = bi[k - 1]; k--; }
+          bw[k] = w; bi[k] = seg.bone;
+        }
+      }
+      const sum = bw[0] + bw[1] + bw[2] + bw[3] || 1;
+      for (let k = 0; k < 4; k++) {
+        skinIndex[vi * 4 + k] = bi[k];
+        skinWeight[vi * 4 + k] = bw[k] / sum;
+      }
+    }
+    return { skinIndex, skinWeight };
+  }
+
+  // ── build ────────────────────────────────────────────────────────────────
+  // The rig, once built:
+  //  rig(static) → rootBone → pelvis → spine → chest → neck → head
+  //  chest → shoulderL/R → upperArmL/R → forearmL/R → handL/R
+  //  pelvis → hipL/R → thighL/R → shinL/R → footL/R
+  // `rig` (a Group) carries the STATIC scale/placement; `rootBone` carries the
+  // dance's whole-figure sway (b.root.rotation.y). Keeping scale/placement on
+  // `rig` — the shared parent of BOTH the skinned meshes and the skeleton —
+  // means the skinned meshes' matrixWorld never changes, so nothing is double-
+  // transformed while the skeleton animates.
   function build() {
     renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'high-performance' });
     // A lost GL context (iOS backgrounding etc.) must not freeze a dead frame:
     // stop cleanly and leave the canvas transparent.
     canvas.addEventListener('webglcontextlost', (ev) => { ev.preventDefault(); stop(); dead = true; }, false);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));   // Nanite analog (c): DPR capped
 
     scene = new THREE.Scene();
 
-    // ── build the skeleton ──
-    // Convention: the PELVIS is the base. Its origin sits at the WAIST; its box
-    // hangs DOWN to the hip line. The torso RISES from the waist (makeBoneUp);
-    // the arms and legs HANG from their joints (makeBone). Root faces +Z toward
-    // the camera. ~15 primary bones.
-    root = new THREE.Group();
+    // static placement group (unchanged tuning from the old `root`)
+    rig = new THREE.Group();
+    rig.position.y = 0.05;
+    rig.scale.setScalar(0.60);   // tall alien scaled down so head→feet + arm-span frame with ~6% inset
+    scene.add(rig);
 
-    // Lithe, MUCH more elongated proportions → tall smooth alien silhouette.
-    // All radii cut ~30–40% vs. the old stocky figure (thin, tubular limbs) and
-    // every segment lengthened, so the height-to-width ratio reads as a slender
-    // dancer, not a mannequin. Limbs taper (rProx → rDist), each distal segment
-    // thinner than the one before it; forearms/shins taper to a fine point that
-    // a tiny tip continues (no sphere hands/feet).
-    const pelvis = makeBone(0.30, 0.155, 0.185);  // waist(origin) → hips (slim, hangs down)
-    const spine = makeBoneUp(0.70, 0.165, 0.140); // long slender torso rises …
-    const chest = makeBoneUp(0.78, 0.150, 0.190); // narrow ribcage widening toward the shoulders
-    const neck = makeBoneUp(0.44, 0.082, 0.072);  // long swan neck
-    const head = makeHead(0.225, 1.7);            // sleeker elongated ovoid (alien skull)
-
-    const upperArmL = makeBone(0.84, 0.086, 0.066);
-    const forearmL = makeBone(0.80, 0.062, 0.012);      // tapers to a fine point (no hand blob)
-    const handL = makeTip(0.07, 0.014);                 // tiny slim tapered tip
-    const upperArmR = makeBone(0.84, 0.086, 0.066);
-    const forearmR = makeBone(0.80, 0.062, 0.012);
-    const handR = makeTip(0.07, 0.014);
-
-    const thighL = makeBone(1.08, 0.120, 0.084);
-    const shinL = makeBone(1.04, 0.080, 0.013);         // tapers to a fine point (no foot blob)
-    const footL = makeTip(0.10, 0.016);                 // tiny slim tapered tip (pointed toe)
-    const thighR = makeBone(1.08, 0.120, 0.084);
-    const shinR = makeBone(1.04, 0.080, 0.013);
-    const footR = makeTip(0.10, 0.016);
-
-    // torso chain: spine origin sits AT the waist (pelvis origin), then rises
-    root.add(pelvis);
-    pelvis.add(spine); spine.position.set(0, 0, 0);   // spine pivots at the waist
-    attachUp(spine, chest);                            // chest above spine
-    attachUp(chest, neck);                             // neck above chest
-    attachUp(neck, head);                              // head above neck
-
-    // shoulders: tiny offset groups near the top of the chest; arms hang OUT/down
-    const shoulderL = new THREE.Group(); shoulderL.position.set(0.27, chest.userData.len * 0.94, 0);
-    const shoulderR = new THREE.Group(); shoulderR.position.set(-0.27, chest.userData.len * 0.94, 0);
-    chest.add(shoulderL); chest.add(shoulderR);
-    attach(shoulderL, upperArmL); attach(upperArmL, forearmL); attach(forearmL, handL);
-    attach(shoulderR, upperArmR); attach(upperArmR, forearmR); attach(forearmR, handR);
-    // (shoulder groups have no bone length; seat the upper arm at the group origin)
-    upperArmL.position.set(0, 0, 0); upperArmR.position.set(0, 0, 0);
-
-    // hips: tiny offset groups at the bottom of the pelvis; legs hang DOWN
-    const hipL = new THREE.Group(); hipL.position.set(0.155, -pelvis.userData.len, 0);
-    const hipR = new THREE.Group(); hipR.position.set(-0.155, -pelvis.userData.len, 0);
-    pelvis.add(hipL); pelvis.add(hipR);
-    attach(hipL, thighL); attach(thighL, shinL); attach(shinL, footL);
-    attach(hipR, thighR); attach(thighR, shinR); attach(shinR, footR);
-    thighL.position.set(0, 0, 0); thighR.position.set(0, 0, 0);   // seat at hip-group origin
-
-    // (No chest "reactor" node — removed. It read as Iron-Man armour, off
-    // register for an elegant alien. The body is just the two additive line
-    // materials now.)
-
-    // Seat the rig so head↔feet centre on the origin. Waist is at root y; the
-    // ovoid head top now rises ~2.6 above and the feet drop ~2.5 below the waist
-    // (markedly taller, slimmer figure), so a tiny lift keeps it centred.
-    root.position.y = 0.05;
-    root.scale.setScalar(0.60); // taller alien → scaled down so head→feet + arm-span still frame with ~6% inset
-    scene.add(root);
-
-    bones = {
-      root, pelvis, spine, chest, neck, head,
-      shoulderL, shoulderR, upperArmL, forearmL, handL, upperArmR, forearmR, handR,
-      hipL, hipR, thighL, shinL, footL, thighR, shinR, footR,
+    // ── skeleton (THREE.Bone hierarchy mirroring the old rig) ──
+    boneList = [];
+    bones = {};
+    const bone = (name, parent, pos) => {
+      const b = new THREE.Bone();
+      b.position.copy(pos);
+      parent.add(b);
+      bones[name] = b;
+      b.userData.idx = boneList.length;
+      boneList.push(b);
+      return b;
     };
+    // torso chain (local offsets = child joint − parent joint; identity at bind)
+    const rootBone = bone('root', rig, V(0, 0, 0));           // whole-figure sway pivot + skeleton root
+    const pelvis = bone('pelvis', rootBone, V(0, 0, 0));      // pivots at the waist
+    const spine = bone('spine', pelvis, V(0, 0, 0));
+    const chest = bone('chest', spine, J.chestBase);
+    const neck = bone('neck', chest, J.neckBase.clone().sub(J.chestBase));
+    bone('head', neck, J.headBase.clone().sub(J.neckBase));
+    // arms
+    const shoulderL = bone('shoulderL', chest, J.shoulderL.clone().sub(J.chestBase));
+    const upperArmL = bone('upperArmL', shoulderL, V(0, 0, 0));
+    const forearmL = bone('forearmL', upperArmL, J.elbowL.clone().sub(J.shoulderL));
+    bone('handL', forearmL, J.wristL.clone().sub(J.elbowL));
+    const shoulderR = bone('shoulderR', chest, J.shoulderR.clone().sub(J.chestBase));
+    const upperArmR = bone('upperArmR', shoulderR, V(0, 0, 0));
+    const forearmR = bone('forearmR', upperArmR, J.elbowR.clone().sub(J.shoulderR));
+    bone('handR', forearmR, J.wristR.clone().sub(J.elbowR));
+    // legs
+    const hipL = bone('hipL', pelvis, J.hipL);
+    const thighL = bone('thighL', hipL, V(0, 0, 0));
+    const shinL = bone('shinL', thighL, J.kneeL.clone().sub(J.hipL));
+    bone('footL', shinL, J.ankleL.clone().sub(J.kneeL));
+    const hipR = bone('hipR', pelvis, J.hipR);
+    const thighR = bone('thighR', hipR, V(0, 0, 0));
+    const shinR = bone('shinR', thighR, J.kneeR.clone().sub(J.hipR));
+    bone('footR', shinR, J.ankleR.clone().sub(J.kneeR));
 
-    // ── camera: the canvas is TALL and NARROW, so frame the FULL figure
-    // vertically. The rig spans ~4.5 units head→feet (scaled by root.scale);
-    // pull the camera back on +Z (the root faces +Z toward us) and aim slightly
-    // below centre so the ovoid head and feet both sit inside the frame. ──
+    // ── high-poly surface (tubes + ovoid head), merged to ONE geometry ──
+    const R = TIER.radial;
+    const rings = (a, b) => Math.max(TIER.minRing, Math.round(a.distanceTo(b) * TIER.ringF));
+    const parts = [];
+    const segs = [];   // weightable bone segments (rest space)
+    // tube(A, B, rProx, rDist, radial, rings) + record its bone segment for skinning
+    const limb = (A, B, rP, rD, name) => {
+      tube(A, B, rP, rD, R, rings(A, B), parts);
+      segs.push({ bone: bones[name].userData.idx, ax: A.x, ay: A.y, az: A.z, bx: B.x, by: B.y, bz: B.z });
+    };
+    // torso (radii verbatim from the old rig)
+    limb(J.waist, J.hipCenter, 0.155, 0.185, 'pelvis');   // waist → hips (hangs down)
+    limb(J.waist, J.chestBase, 0.165, 0.140, 'spine');    // long slender torso
+    limb(J.chestBase, J.neckBase, 0.150, 0.190, 'chest'); // ribcage widening to shoulders
+    limb(J.neckBase, J.headBase, 0.082, 0.072, 'neck');   // swan neck
+    // arms — taper to a fine point + a needle tip (no hand blob)
+    limb(J.shoulderL, J.elbowL, 0.086, 0.066, 'upperArmL');
+    limb(J.elbowL, J.wristL, 0.062, 0.012, 'forearmL');
+    limb(J.wristL, J.handTipL, 0.014, 0.00168, 'handL');
+    limb(J.shoulderR, J.elbowR, 0.086, 0.066, 'upperArmR');
+    limb(J.elbowR, J.wristR, 0.062, 0.012, 'forearmR');
+    limb(J.wristR, J.handTipR, 0.014, 0.00168, 'handR');
+    // legs — taper to a pointed toe
+    limb(J.hipL, J.kneeL, 0.120, 0.084, 'thighL');
+    limb(J.kneeL, J.ankleL, 0.080, 0.013, 'shinL');
+    limb(J.ankleL, J.toeL, 0.016, 0.00192, 'footL');
+    limb(J.hipR, J.kneeR, 0.120, 0.084, 'thighR');
+    limb(J.kneeR, J.ankleR, 0.080, 0.013, 'shinR');
+    limb(J.ankleR, J.toeR, 0.016, 0.00192, 'footR');
+    // elongated featureless ovoid head (geodesic icosphere → dense holographic
+    // mesh, no face); its base sits at the neck-top joint so it skins to `head`.
+    const hg = new THREE.IcosahedronGeometry(0.225, TIER.headDetail);
+    hg.scale(0.88, 1.7, 0.88);
+    hg.translate(0, J.headBase.y + 0.225 * 1.7, 0);   // ovoid centre above the joint
+    if (!hg.index) {                                   // Polyhedron geom is non-indexed → give it a trivial index
+      const c = hg.attributes.position.count;
+      const hi = new Uint32Array(c);
+      for (let i = 0; i < c; i++) hi[i] = i;
+      hg.setIndex(new THREE.BufferAttribute(hi, 1));
+    }
+    parts.push(hg);
+    segs.push({ bone: bones.head.userData.idx, ax: J.headBase.x, ay: J.headBase.y, az: J.headBase.z, bx: J.headTop.x, by: J.headTop.y, bz: J.headTop.z });
+
+    geo = mergeParts(parts);
+    disposables.push(geo);
+    const positions = geo.attributes.position.array;
+    vertCount = geo.attributes.position.count;
+    triCount = geo.index.count / 3;
+
+    // skin weights (smooth joint blend, top-4 per vertex)
+    const { skinIndex, skinWeight } = computeSkin(positions, segs);
+    geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(skinIndex, 4));
+    geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(skinWeight, 4));
+
+    // ── skinned meshes: fluid wireframe core + dim halo (one draw each) ──
+    // Bind order: rig placed & world-matrix current FIRST, so both the bone
+    // inverse-binds and the mesh bindMatrix capture the same static rig space.
+    rig.updateMatrixWorld(true);
+    skeleton = new THREE.Skeleton(boneList);
+
+    const coreMesh = new THREE.SkinnedMesh(geo, coreMat);
+    coreMesh.frustumCulled = false;   // skinned bounds move; don't let it cull out
+    rig.add(coreMesh);
+    coreMesh.bind(skeleton);
+
+    const haloMesh = new THREE.SkinnedMesh(geo, haloMat);
+    haloMesh.frustumCulled = false;
+    rig.add(haloMesh);
+    haloMesh.bind(skeleton);
+    haloMesh.scale.setScalar(1.02);   // faux-bloom shell (applied AFTER bind → clean skinning)
+
+    // ── "probe points": a POINT CLOUD skinned to the SAME vertices ──────────
+    // THREE.Points is not skinned by default, so this ShaderMaterial replicates
+    // three.js's skinning math manually: the skeleton's bone matrices are fed in
+    // as a small `mat4[NB]` uniform (only ~22 bones) and indexed by the shared
+    // skinIndex/skinWeight attributes, with the core mesh's bindMatrix /
+    // bindMatrixInverse. The dots therefore ride the surface fluidly — a
+    // holographic scan of glowing probe points over the deforming wireframe.
+    const NB = boneList.length;
+    const pr = renderer.getPixelRatio();
+    pointsMat = new THREE.ShaderMaterial({
+      uniforms: {
+        boneMatrices: { value: skeleton.boneMatrices },   // Float32Array, updated in place each frame
+        bindMatrix: { value: coreMesh.bindMatrix },
+        bindMatrixInverse: { value: coreMesh.bindMatrixInverse },
+        uSize: { value: 2.6 * pr },
+        uColor: { value: new THREE.Color(0x8af7ff) },
+        uOpacity: { value: 0.14 },
+      },
+      transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true,
+      vertexShader: `
+        #define NB ${NB}
+        uniform mat4 boneMatrices[NB];
+        uniform mat4 bindMatrix;
+        uniform mat4 bindMatrixInverse;
+        uniform float uSize;
+        attribute vec4 skinIndex;
+        attribute vec4 skinWeight;
+        void main() {
+          mat4 bx = boneMatrices[int(skinIndex.x)];
+          mat4 by = boneMatrices[int(skinIndex.y)];
+          mat4 bz = boneMatrices[int(skinIndex.z)];
+          mat4 bw = boneMatrices[int(skinIndex.w)];
+          vec4 sv = bindMatrix * vec4(position, 1.0);
+          vec4 sk = bx * sv * skinWeight.x + by * sv * skinWeight.y + bz * sv * skinWeight.z + bw * sv * skinWeight.w;
+          vec3 tformed = (bindMatrixInverse * sk).xyz;
+          vec4 mv = modelViewMatrix * vec4(tformed, 1.0);
+          gl_PointSize = uSize;
+          gl_Position = projectionMatrix * mv;
+        }
+      `,
+      fragmentShader: `
+        precision mediump float;
+        uniform vec3 uColor;
+        uniform float uOpacity;
+        void main() {
+          vec2 c = gl_PointCoord - vec2(0.5);
+          float d = dot(c, c);
+          if (d > 0.25) discard;               // round soft dot
+          float a = 1.0 - d * 4.0;
+          gl_FragColor = vec4(uColor, a * a * uOpacity);
+        }
+      `,
+    });
+    disposables.push(pointsMat);
+    // DECIMATE the probe cloud — at full density (~29k verts) the additive dots
+    // overlap on the thin tube silhouettes and wash to a pale film. Keep ~1 in
+    // STRIDE vertices so they read as DISTINCT glowing probe points (holographic
+    // scan) across the whole figure, still skinned to the same bones. The
+    // high-poly SURFACE (wireframe/skin) stays full-res for fluid deformation.
+    const STRIDE = 5;
+    const sp = geo.attributes.position, si = geo.attributes.skinIndex, sw = geo.attributes.skinWeight;
+    const nSrc = sp.count, keep = Math.ceil(nSrc / STRIDE);
+    const pPos = new Float32Array(keep * 3), pSI = new Float32Array(keep * 4), pSW = new Float32Array(keep * 4);
+    let j = 0;
+    for (let i = 0; i < nSrc; i += STRIDE) {
+      pPos[j * 3] = sp.getX(i); pPos[j * 3 + 1] = sp.getY(i); pPos[j * 3 + 2] = sp.getZ(i);
+      pSI[j * 4] = si.getX(i); pSI[j * 4 + 1] = si.getY(i); pSI[j * 4 + 2] = si.getZ(i); pSI[j * 4 + 3] = si.getW(i);
+      pSW[j * 4] = sw.getX(i); pSW[j * 4 + 1] = sw.getY(i); pSW[j * 4 + 2] = sw.getZ(i); pSW[j * 4 + 3] = sw.getW(i);
+      j++;
+    }
+    const pgeo = new THREE.BufferGeometry();
+    pgeo.setAttribute('position', new THREE.BufferAttribute(pPos.subarray(0, j * 3), 3));
+    pgeo.setAttribute('skinIndex', new THREE.BufferAttribute(pSI.subarray(0, j * 4), 4));
+    pgeo.setAttribute('skinWeight', new THREE.BufferAttribute(pSW.subarray(0, j * 4), 4));
+    disposables.push(pgeo);
+    points = new THREE.Points(pgeo, pointsMat);
+    points.frustumCulled = false;
+    rig.add(points);
+
+    // ── camera: TALL/NARROW canvas → frame the full figure vertically.
+    // Dimensions match the old rig exactly, so the previously-tuned framing is
+    // preserved unchanged (retune only if the silhouette were to change). ──
     camera = new THREE.PerspectiveCamera(38, 0.5, 0.1, 100);
-    camera.position.set(0, 0.05, 8.4); // pulled back so even an energetic arm flare stays clear of the frame edge
+    camera.position.set(0, 0.05, 8.4);
     camera.lookAt(0, -0.05, 0);
 
     sizeToCanvas();
@@ -313,7 +570,9 @@ export function initKineticDancer() {
   // ── the dance ────────────────────────────────────────────────────────
   // Everything is DAMPED toward a target each frame (factor k, framerate-aware)
   // so the figure grooves smoothly and never snaps or seizures. Ranges are kept
-  // inside safe limits so no bone clips through another.
+  // inside safe limits so no bone clips through another. The bones ARE the rig
+  // now (THREE.Bone), so `bone.rotation.x/y/z` drives GPU skinning → the whole
+  // continuous surface bends fluidly around each joint. Gesture math unchanged.
   function dance(dt, t) {
     const b = bones;
     const k = 1 - Math.pow(0.001, dt);         // framerate-independent damping
@@ -385,7 +644,7 @@ export function initKineticDancer() {
     add(b.spine.rotation, 'x', hit * 0.06);
     add(b.head.rotation, 'x', hit * 0.07);
 
-    // slow 3/4 sway of the whole figure (never flat-on)
+    // slow 3/4 sway of the whole figure (never flat-on) — via the skeleton root
     tgt(b.root.rotation, 'y', Math.sin(p * 0.5) * 0.12);
   }
 
@@ -411,14 +670,25 @@ export function initKineticDancer() {
 
     dance(dt, now);
 
+    // Refresh bone world matrices → skeleton bone matrices BEFORE render, so the
+    // (non-SkinnedMesh) probe-point shader reads a current boneMatrices uniform
+    // regardless of draw order. GPU skinning does the per-vertex work.
+    rig.updateMatrixWorld(true);
+    skeleton.update();
+
     // FLASH SAFETY: brightness (opacity) tracks SLOW energy only, eased at a
     // capped rate. NEVER pulse opacity from `beat` — beats move the body, they
     // do not flash the light.
     // LOW per-line alpha (dense high-poly mesh) so additive overlap never blows
     // out to a soft blob in compact poses — crisp wireframe at every pose.
-    // Still slow energy-driven only (flash-safe), never beat.
-    coreMat.opacity = 0.3 + energy * 0.16;      // slow, bounded
-    haloMat.opacity = 0.06 + energy * 0.06;     // slow, bounded
+    // The surface is very high-poly, so a bright wireframe additively saturates
+    // into a solid pale blob. Keep the wireframe FAINT (structural hint only) and
+    // let the PROBE POINTS carry the figure as a glowing cyan point-cloud (a
+    // dense point cloud stays crisp — points don't overlap-accumulate like the
+    // wire triangles). All opacity slow-energy driven (flash-safe), never beat.
+    coreMat.opacity = 0.015 + energy * 0.02;       // near-invisible wire (structure hint)
+    haloMat.opacity = 0.006 + energy * 0.008;      // barely-there glow
+    pointsMat.uniforms.uOpacity.value = 0.6 + energy * 0.3;     // probe points = the whole figure
 
     renderer.render(scene, camera);
 
@@ -461,6 +731,9 @@ export function initKineticDancer() {
     get bpm() { const a = appState.music && appState.music.audio; const i = a && trackInfo[a._trackName]; return i ? Math.round(i.bpm) : 0; },
     get beatAccent() { return +beatAccent.toFixed(2); },
     get locked() { const m = appState.music, a = m && m.audio; return !!(a && !m.paused && !a.paused && a.currentTime > 0.05 && trackInfo[a._trackName]); },
+    // geometry diagnostics (skinned high-poly budget for the chosen detail tier)
+    get tris() { return triCount; },
+    get verts() { return vertCount; },
   };
 
   raf = requestAnimationFrame(frame);
