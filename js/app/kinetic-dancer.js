@@ -66,10 +66,8 @@ export function initKineticDancer() {
   // supplies presence. `skinning:true` is REQUIRED in r128 for the material to
   // inject the skinning shader chunks.
   const coreMat = new THREE.MeshBasicMaterial({ color: 0x66f0ff, wireframe: true, transparent: true, opacity: 0.30, blending: THREE.AdditiveBlending, depthWrite: false, skinning: true });
-  const haloMat = new THREE.MeshBasicMaterial({ color: 0x22d3ee, wireframe: true, transparent: true, opacity: 0.08, blending: THREE.AdditiveBlending, depthWrite: false, skinning: true });
-
   const disposables = [];   // geometries + materials to dispose on teardown
-  disposables.push(coreMat, haloMat);
+  disposables.push(coreMat);
 
   // ── detail tier (Nanite analog (a): size/device-based LOD pick) ──────────
   // Choose the mesh resolution ONCE from the canvas footprint + device. The
@@ -383,11 +381,8 @@ export function initKineticDancer() {
     rig.add(coreMesh);
     coreMesh.bind(skeleton);
 
-    const haloMesh = new THREE.SkinnedMesh(geo, haloMat);
-    haloMesh.frustumCulled = false;
-    rig.add(haloMesh);
-    haloMesh.bind(skeleton);
-    haloMesh.scale.setScalar(1.02);   // faux-bloom shell (applied AFTER bind → clean skinning)
+    // (Halo shell removed: the 1.02× second SkinnedMesh read as a doubled ghost
+    // outline — "two figures" — and the probe points already carry the glow.)
 
     // ── "probe points": a POINT CLOUD skinned to the SAME vertices ──────────
     // THREE.Points is not skinned by default, so this ShaderMaterial replicates
@@ -687,7 +682,6 @@ export function initKineticDancer() {
     // dense point cloud stays crisp — points don't overlap-accumulate like the
     // wire triangles). All opacity slow-energy driven (flash-safe), never beat.
     coreMat.opacity = 0.015 + energy * 0.02;       // near-invisible wire (structure hint)
-    haloMat.opacity = 0.006 + energy * 0.008;      // barely-there glow
     pointsMat.uniforms.uOpacity.value = 0.6 + energy * 0.3;     // probe points = the whole figure
 
     renderer.render(scene, camera);
@@ -734,6 +728,8 @@ export function initKineticDancer() {
     // geometry diagnostics (skinned high-poly budget for the chosen detail tier)
     get tris() { return triCount; },
     get verts() { return vertCount; },
+    get phase() { return +phase.toFixed(2); },
+    get energy() { return +energy.toFixed(2); },
   };
 
   raf = requestAnimationFrame(frame);
