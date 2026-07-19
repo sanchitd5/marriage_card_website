@@ -48,13 +48,6 @@ export function initMilkdrop() {
       for (let i = presets.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [presets[i], presets[j]] = [presets[j], presets[i]]; }
       if (presets.length) viz.loadPreset(presets[0], 0);
     } catch (e) { /* presets optional */ }
-    // only advance presets while the viz is actually visible (a drop is up)
-    cycleTimer = setInterval(() => {
-      const d = (appState.lightshow && appState.lightshow.drop) || 0;
-      if (!running || d < EPS || !presets.length) return;
-      pi = (pi + 1) % presets.length;
-      try { viz.loadPreset(presets[pi], BLEND); } catch (e) {}
-    }, PRESET_SECONDS * 1000);
     return true;
   }
 
@@ -62,6 +55,17 @@ export function initMilkdrop() {
     if (running) return;
     if (!viz && !setup()) return;
     running = true;
+    // (Re)arm the preset-cycle timer here rather than in setup() — stop() clears
+    // it, and setup() only runs once, so this is what restores cycling on resume.
+    // Only advances presets while the viz is actually visible (a drop is up).
+    if (!cycleTimer) {
+      cycleTimer = setInterval(() => {
+        const d = (appState.lightshow && appState.lightshow.drop) || 0;
+        if (!running || d < EPS || !presets.length) return;
+        pi = (pi + 1) % presets.length;
+        try { viz.loadPreset(presets[pi], BLEND); } catch (e) {}
+      }, PRESET_SECONDS * 1000);
+    }
     (function loop() {
       if (!running) return;
       const d = Math.min(1, (appState.lightshow && appState.lightshow.drop) || 0);
@@ -71,7 +75,11 @@ export function initMilkdrop() {
       raf = requestAnimationFrame(loop);
     })();
   }
-  function stop() { running = false; cancelAnimationFrame(raf); }
+  function stop() {
+    running = false;
+    cancelAnimationFrame(raf);
+    if (cycleTimer) { clearInterval(cycleTimer); cycleTimer = 0; } // don't leak the preset-cycle interval on hidden tabs / after a floor
+  }
 
   start();
   document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); else start(); });

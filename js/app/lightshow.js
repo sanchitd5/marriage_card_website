@@ -352,6 +352,13 @@ export function initLightshow() {
   function floor() {
     floored = true; measuring = false;
     state.drop = 0;              // don't strand the MilkDrop viz visible
+    // reset the beat-reactive CSS vars to their calm defaults — the RAF that
+    // drives them is about to stop, so otherwise a frozen beat glow + lifted
+    // vignette would persist over the CSS fog
+    const rs = document.documentElement.style;
+    rs.setProperty('--beat', '0');
+    rs.setProperty('--energy', '0.3');
+    rs.setProperty('--drop', '0');
     disposeGL();
     const amb = $('#ambient'); if (amb) amb.style.display = '';   // CSS fog stands in
     canvas.style.display = 'none';

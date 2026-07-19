@@ -201,7 +201,7 @@ export function initGsap() {
           ctx.save();
           ctx.globalAlpha = a * 0.9;
           ctx.fillStyle = p.col;
-          ctx.shadowColor = '#ffd700';
+          ctx.shadowColor = document.documentElement.dataset.skin === 'techno' ? '#22d3ee' : '#ffd700';
           ctx.shadowBlur = 8;
           ctx.beginPath();
           for (let i = 0; i < 8; i++) {

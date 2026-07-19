@@ -377,6 +377,18 @@ export function initTheme() {
   const btn = $('#theme-toggle');
   if (!btn) return;
 
+  // Techno is dark-only obsidian: the toggle is CSS-hidden, the stylesheet
+  // ignores data-theme, and the head script already painted the correct
+  // theme-color. Running the Regency day/night engine here would repaint the
+  // meta theme-color cream (#f7f4ee) on a daytime auto-theme — a cream address
+  // bar over the obsidian page — and burn a 60s interval + visibilitychange for
+  // nothing. Pin the obsidian bar and bail.
+  if (document.documentElement.dataset.skin === 'techno') {
+    const m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.content = '#0b0c0f';
+    return;
+  }
+
   const validTheme = t => t === 'dark' || t === 'light';
   const readManualTheme = () => validTheme(appState.themeManual) ? appState.themeManual : null;
   const readAutoTheme = () => {

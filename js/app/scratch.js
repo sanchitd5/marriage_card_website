@@ -120,6 +120,16 @@ export function initScratch() {
   }).observe(frame);
   paintFoil();
 
+  // The foil caption is drawn to canvas; if it paints before the mono/serif face
+  // loads it stays in a fallback font, and the size guard then blocks any
+  // repaint. Repaint once fonts are ready — but only while the foil is still
+  // untouched, so a partial scratch is never erased.
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => {
+      if (!revealed && progress() < 2) { lastW = -1; lastH = -1; paintFoil(); }
+    }).catch(() => {});
+  }
+
   // hooks for the scroll-driven auto-scratch in initGsap
   appState.scratchAPI.eraseNorm = (nx, ny) => {
     ctx.globalCompositeOperation = 'destination-out';
