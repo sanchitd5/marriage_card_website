@@ -270,6 +270,12 @@ function runBuild() {
     if (parts.includes('gen')) return false;
     // The 3D scene asset (dancer model) is a techno-only asset.
     if (theme !== 'techno' && parts.includes('scene')) return false;
+    if (theme !== 'techno') {
+      // The techno playlist (assets/audio/techno/*) is techno-only — don't ship
+      // it (~34 MB of mp3) as dead weight in the Regency build.
+      const ai = parts.indexOf('audio');
+      if (ai !== -1 && parts[ai + 1] === 'techno') return false;
+    }
     if (theme === 'techno') {
       // No Regency palace footage in the techno build (LOCKED).
       if (parts.includes('videos')) return false;

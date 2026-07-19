@@ -32,29 +32,34 @@ export function initGate() {
   const isWide = () => window.matchMedia('(min-width: 768px)').matches;
 
   if (hasVideo) {
-    // Point each stacked reveal video at the right tier/wide variant, ONCE. The
-    // day↔night switch is a crossfade between the two elements, never a reload.
-    (function loadVideoSources() {
+    // Point a reveal video at the right tier/wide variant and start buffering it.
+    // Only the ACTIVE theme's clip is loaded up front; the inactive one is
+    // deferred (loaded lazily only if the guest toggles day↔night) so it never
+    // competes for network + decode with the visible reveal clip and the hero
+    // playing underneath — that triple-decode was what made the reveal stutter
+    // on real devices. `.load()` is idempotent here (src-diff / readyState gated).
+    const srcFor = (v) => {
+      const n = v === nightVideo ? '-night' : '-day';
       const w = isWide() ? '-wide' : '';
-      const suffix = videoSuffix();
-      [['-day', dayVideo], ['-night', nightVideo]].forEach(([n, v]) => {
-        const src = v.querySelector('source');
-        if (!src) return;
-        const want = `assets/videos/gate-reveal${n}${w}${suffix}.mp4`;
-        if ((src.getAttribute('src') || '') !== want) {
-          src.setAttribute('src', want);
-          v.load();
-        }
-      });
-    })();
+      return `assets/videos/gate-reveal${n}${w}${videoSuffix()}.mp4`;
+    };
+    const ensureLoaded = (v) => {
+      const src = v.querySelector('source');
+      if (!src) return;
+      const want = srcFor(v);
+      if ((src.getAttribute('src') || '') !== want) { src.setAttribute('src', want); v.load(); }
+      else if (v.readyState === 0) v.load();
+    };
 
     // Crossfade which reveal video is visible (works before AND during the reveal,
     // so toggling mode mid-open is a smooth dissolve). Night mode also gets its own
     // candlelit closed/open stills, but only until the reveal starts.
     appState.setGateTheme = theme => {
       const active = themeVideo(theme);
+      ensureLoaded(active); // load the now-active clip on demand (defers the other)
       gateVideos.forEach(v => v.classList.toggle('is-active', v === active));
-      if (opened) return; // stills no longer matter once the drapes are opening
+      // mid-reveal toggle: make sure the newly-visible clip is actually playing
+      if (opened) { if (active.paused) active.play().catch(() => {}); return; }
       const n  = theme === 'dark' ? '-night' : '';
       const w  = isWide() ? '-wide' : '';
       const closedImg = $('.gate-still--closed');
@@ -133,18 +138,13 @@ export function initGate() {
     const FADE = 1.3;          // gate fade duration
     const LEAD = 1.6;          // begin fading this many seconds before the clip ends
 
-    // Play BOTH clips from the top so they stay frame-synced; the reveal and the
-    // end-fade timing key off the ACTIVE one (guaranteed to run), so a mode
-    // toggle mid-reveal crossfades cleanly and an unbuffered inactive clip can
-    // never abort the sequence.
+    // Play ONLY the active clip. The inactive theme's clip is invisible during a
+    // day-or-night reveal, so decoding it here just starved the visible reveal +
+    // the hero underneath (the stutter). A mode toggle mid-reveal is handled by
+    // setGateTheme, which loads + plays the newly-visible clip on demand.
     const active = themeVideo(document.documentElement.dataset.theme);
-    let activePlay = null;
-    gateVideos.forEach(v => {
-      try { v.currentTime = 0; } catch (e) { /* not seekable yet */ }
-      const p = v.play();
-      if (v === active) { activePlay = p; return; }
-      if (p && p.catch) p.catch(() => {}); // inactive clip: best-effort, ignore
-    });
+    try { active.currentTime = 0; } catch (e) { /* not seekable yet */ }
+    const activePlay = active.play();
 
     // Fade the WHOLE gate out a bit before the reveal clip ends, so it dissolves
     // onto the already-playing hero underneath (never shows a frozen final frame).
