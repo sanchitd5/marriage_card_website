@@ -277,9 +277,9 @@
 
   <!-- ══════════ RIGHT DOCK (scroll cue + music) ══════════ -->
   <div id="right-dock">
-    <div id="floating-cue" aria-hidden="true">
+    <button id="floating-cue" type="button" aria-label="Scroll to content">
       <span class="cue-chevrons" aria-hidden="true"><i></i><i></i></span>
-    </div>
+    </button>
     <div id="music-dock" hidden>
       <button id="music-toggle" aria-label="Pause the music" aria-pressed="false">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path class="icon-note" d="M9 18V5l12-2v13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="18" cy="16" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
@@ -317,9 +317,9 @@
             <p class="kicker hero-seq">Dearest friends, it is with the greatest pleasure that we announce the union of</p>
           </div>
           <h1 class="hero-names">
-            <span class="hero-name hero-seq" data-text="{{FIRST_A}}">{{FIRST_A}}</span>
+            <span class="hero-name hero-seq">{{FIRST_A}}</span>
             <span class="hero-amp hero-seq">&amp;</span>
-            <span class="hero-name hero-seq" data-text="{{FIRST_B}}">{{FIRST_B}}</span>
+            <span class="hero-name hero-seq">{{FIRST_B}}</span>
           </h1>
           <div class="hero-bottom">
             <p class="hero-date hero-seq">{{HERO_LINE}}</p>

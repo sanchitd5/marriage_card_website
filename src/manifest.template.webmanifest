@@ -3,8 +3,8 @@
   "short_name": "{{PAIR_TITLE}}",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#f7f4ee",
-  "theme_color": "#f7f4ee",
+  "background_color": "{{MANIFEST_BG_COLOR}}",
+  "theme_color": "{{MANIFEST_THEME_COLOR}}",
   "icons": [
     {
       "src": "assets/images/art-seal.jpg",

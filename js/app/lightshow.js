@@ -89,6 +89,9 @@ export function initLightshow() {
 
   function buildScene() {
     renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: 'high-performance' });
+    // A lost GL context (common after iOS backgrounding) would otherwise freeze a
+    // dead/black backdrop; drop to the CSS fog fallback instead.
+    canvas.addEventListener('webglcontextlost', (ev) => { ev.preventDefault(); floor(); }, false);
     renderer.setPixelRatio(TIERS[tier].dpr);
     renderer.setSize(innerWidth, innerHeight, false);
     // correct colour + tone mapping so the mecha's PBR chrome reads (without
@@ -355,10 +358,12 @@ export function initLightshow() {
     // reset the beat-reactive CSS vars to their calm defaults — the RAF that
     // drives them is about to stop, so otherwise a frozen beat glow + lifted
     // vignette would persist over the CSS fog
+    // Write the calm defaults AND sync the quantize trackers, so the skip-no-op
+    // guard in frame() can never later suppress a needed write back to these.
     const rs = document.documentElement.style;
-    rs.setProperty('--beat', '0');
-    rs.setProperty('--energy', '0.3');
-    rs.setProperty('--drop', '0');
+    rs.setProperty('--beat', '0.00'); lastBQ = '0.00';
+    rs.setProperty('--energy', '0.30'); lastEQ = '0.30';
+    rs.setProperty('--drop', '0.00'); lastDQ = '0.00';
     disposeGL();
     const amb = $('#ambient'); if (amb) amb.style.display = '';   // CSS fog stands in
     canvas.style.display = 'none';
@@ -382,6 +387,7 @@ export function initLightshow() {
   // ---- main loop ----
   let smoothE = 0.3, glowBright = 0.4, ignite = 0, beat = 0, dropLevel = 0;
   const rootStyle = document.documentElement.style;
+  let lastEQ = '', lastBQ = '', lastDQ = ''; // last :root values written (skip no-op writes)
   let last = 0;
   function frame(ts) {
     if (!running || floored) return;
@@ -408,8 +414,14 @@ export function initLightshow() {
     beat = Math.max(beat * 0.9, burst * ignite); // linger a little so the shimmer reads
 
     // expose to the DOM for beat-reactive UI (small-area glow only → flash-safe)
-    rootStyle.setProperty('--energy', e.toFixed(3));
-    rootStyle.setProperty('--beat', beat.toFixed(3));
+    // Quantize + skip no-op writes: each :root custom-prop write forces a
+    // document-wide style recalc (plus the text-shadow repaints those vars
+    // drive), so only touch the DOM when the bucketed value actually changes.
+    // 0.02 steps are imperceptible in the glow/shimmer.
+    const eq = (Math.round(e * 50) / 50).toFixed(2);
+    const bq = (Math.round(beat * 50) / 50).toFixed(2);
+    if (eq !== lastEQ) { rootStyle.setProperty('--energy', eq); lastEQ = eq; }
+    if (bq !== lastBQ) { rootStyle.setProperty('--beat', bq); lastBQ = bq; }
 
     // drop level: rises in SUSTAINED loud/high-energy sections, eases out in the
     // quiet — drives the MilkDrop viz (only on drops). Hysteresis avoids
@@ -447,7 +459,8 @@ export function initLightshow() {
         dancerK = Math.max(dancerK, d.k);
       }
     }
-    rootStyle.setProperty('--drop', dancerK.toFixed(3));
+    const dq = (Math.round(dancerK * 50) / 50).toFixed(2);
+    if (dq !== lastDQ) { rootStyle.setProperty('--drop', dq); lastDQ = dq; }
     const haze = 1 - 0.3 * dancerK; // milder dim since the dancer is always up for now
     motes.material.opacity = (0.4 + e * 0.5) * haze;
 

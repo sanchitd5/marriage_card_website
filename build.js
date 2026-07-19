@@ -202,9 +202,11 @@ export function buildHtmlTokens(names, reveal = revealDate) {
 }
 
 // ---- Manifest tokens (JSON, only need raw values) ---------------------
-export function buildManifestTokens(names) {
+export function buildManifestTokens(names, theme) {
   return {
     PAIR_TITLE: names.pairTitle,
+    MANIFEST_THEME_COLOR: theme === 'techno' ? '#0b0c0f' : '#f7f4ee',
+    MANIFEST_BG_COLOR: theme === 'techno' ? '#0b0c0f' : '#f7f4ee',
   };
 }
 
@@ -238,7 +240,7 @@ function runBuild() {
   const theme = parseTheme(process.env.WEDDING_THEME);
   const names = composeNames(fromGroomSide);
   const htmlTokens = buildHtmlTokens(names);
-  const manifestTokens = buildManifestTokens(names);
+  const manifestTokens = buildManifestTokens(names, theme);
 
   // Couple-photo gate: the photos always ship; the browser reveals the gallery
   // at this moment using authoritative server time (no redeploy needed).

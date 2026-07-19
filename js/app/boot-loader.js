@@ -125,6 +125,12 @@
       audio.addEventListener('loadedmetadata', finish, { once: true });
       audio.addEventListener('canplaythrough', finish, { once: true });
       audio.addEventListener('error', finish, { once: true });
+      // Browsers that defer audio fetch without a gesture (iOS Low Power Mode,
+      // data-saver) fire suspend/stalled instead of loadedmetadata; settle after
+      // a short grace so a normal fast load still settles via loadedmetadata.
+      function settleDeferred() { setTimeout(finish, 1500); }
+      audio.addEventListener('suspend', settleDeferred, { once: true });
+      audio.addEventListener('stalled', settleDeferred, { once: true });
       audio.src = track;
       try { audio.load(); } catch (e) { finish(); }
     });

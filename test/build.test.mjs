@@ -172,8 +172,18 @@ test('buildHtmlTokens: FAMILY_BLESSING_NAMES uses fallback when a side has no na
   const t = buildHtmlTokens(composeNames(true, fx)); // fx bride families = []
   assert.equal(t.FAMILY_BLESSING_NAMES, 'Two families, united in love');
 });
-test('buildManifestTokens: raw pair title only', () => {
-  assert.deepEqual(buildManifestTokens(composeNames(true, fx)), { PAIR_TITLE: 'A$1 & B' });
+test('buildManifestTokens: raw pair title + Regency default colours', () => {
+  assert.deepEqual(buildManifestTokens(composeNames(true, fx)), {
+    PAIR_TITLE: 'A$1 & B',
+    MANIFEST_THEME_COLOR: '#f7f4ee',
+    MANIFEST_BG_COLOR: '#f7f4ee',
+  });
+});
+
+test('buildManifestTokens: techno theme → obsidian colours', () => {
+  const t = buildManifestTokens(composeNames(true, fx), 'techno');
+  assert.equal(t.MANIFEST_THEME_COLOR, '#0b0c0f');
+  assert.equal(t.MANIFEST_BG_COLOR, '#0b0c0f');
 });
 
 // ---- Template integration (read-only, no writes) ----------------------
