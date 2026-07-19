@@ -2,8 +2,8 @@ import { REDUCED, $ } from './dom.js';
 import { appState } from './state.js';
 
 // ── Kinetic dancer (persistent side wireframe humanoid) ─────────────────
-// A procedural "Iron-Man-suit" figure — built from primitive wireframe boxes
-// (NO glTF model), rendered as a cyan ADDITIVE wireframe on its own small
+// A procedural tall/slender "Anyma alien" figure — built from smooth tapered
+// wireframe primitives (NO glTF model), rendered as a cyan ADDITIVE wireframe on its own small
 // WebGL canvas (#k-dancer-canvas, fixed on the right, CSS-positioned/sized).
 // It DANCES to the background music across every panel: ambient decoration,
 // no user interaction, no audio node of its own.
@@ -29,12 +29,15 @@ export function initKineticDancer() {
 
   const THREE = window.THREE;
 
-  // ── shared materials (2 line mats + 1 chest-core mat) ────────────────
+  // ── shared materials (2 line mats: additive core + halo) ─────────────
   // WebGL linewidth is always 1px, so "bloom" is faked with an additive halo
   // pass at 1.04× scale over a brighter additive core.
-  const coreMat = new THREE.LineBasicMaterial({ color: 0x66f0ff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
-  const haloMat = new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false });
-  const coreCoreMat = new THREE.LineBasicMaterial({ color: 0x9ff8ff, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false }); // icy cyan (no warm cast)
+  // NOTE: this figure is HIGH-POLY (~10k wire segments). Additive blending
+  // accumulates where lines overlap, so in compact poses (arms/legs together)
+  // the dense mesh blows out into a soft glowing blob. Keep per-line alpha LOW
+  // so the wireframe stays crisp at every pose; the density supplies presence.
+  const coreMat = new THREE.LineBasicMaterial({ color: 0x66f0ff, transparent: true, opacity: 0.42, blending: THREE.AdditiveBlending, depthWrite: false });
+  const haloMat = new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false });
 
   const disposables = [];   // WireframeGeometry instances to dispose on teardown
 
@@ -87,21 +90,22 @@ export function initKineticDancer() {
 
   // Elongated, featureless ovoid head. A geodesic icosphere (even faceting →
   // dense holographic mesh) scaled taller on Y for the alien skull, then
-  // translated up so it RISES from the neck-top joint like an up-bone.
+  // translated up so it RISES from the neck-top joint like an up-bone. Kept a
+  // touch smaller / sleeker than before so the now-taller body doesn't read as
+  // a bobble-head.
   function makeHead(r, yScale) {
     const geo = new THREE.IcosahedronGeometry(r, 2);   // 320 faces — smooth, no face
-    geo.scale(0.92, yScale, 0.92);
+    geo.scale(0.88, yScale, 0.88);
     geo.translate(0, r * yScale, 0);                   // bottom of the ovoid sits at the joint
     return boneFromGeo(geo, r * yScale * 2);
   }
 
-  // Small smooth rounded/tapered form for hands & feet — a scaled geodesic
-  // icosphere offset from the joint (oy down for hands, oz forward for feet).
-  function makeBlob(rx, ry, rz, oy, oz) {
-    const geo = new THREE.IcosahedronGeometry(1, 1);   // 80 faces
-    geo.scale(rx, ry, rz);
-    geo.translate(0, oy, oz);
-    return boneFromGeo(geo, ry * 2);
+  // Hands & feet: NO spheres. A tiny slim tapered tip that continues the
+  // forearm/shin taper smoothly to a fine point (a very short, near-needle
+  // cone). Keeps the hand/foot nodes in the rig graph without any ball-joint
+  // read. `makeBone` already tapers rProx → rDist and hangs from the joint.
+  function makeTip(len, rProx) {
+    return makeBone(len, rProx, rProx * 0.12);   // taper to a near-point
   }
 
   // ── runtime state ────────────────────────────────────────────────────
@@ -110,8 +114,10 @@ export function initKineticDancer() {
   let running = true, raf = 0, live = false, dead = false;
 
   // dance/energy state (reused across frames; nothing allocated in the loop)
-  let energy = 0.18, prevFast = 0, energySlow = 0.18, beat = 0, phase = 0;
-  let coreOpacity = 0.55, headTrail = 0; // secondary-motion memory for the head
+  // Idle-energy baseline lifted to ~0.28 so the groove amplitude reads even
+  // without music (the figure still visibly dances when silent).
+  let energy = 0.28, prevFast = 0, energySlow = 0.28, beat = 0, phase = 0;
+  let headTrail = 0; // secondary-motion memory for the head
 
   // The rig, once built (~15 bones):
   //  root → pelvis → spine → chest → neck → head
@@ -133,27 +139,31 @@ export function initKineticDancer() {
     // the camera. ~15 primary bones.
     root = new THREE.Group();
 
-    // Slim, elongated proportions → tall smooth alien silhouette. Limbs taper
-    // (rProx → rDist), each distal limb thinner than the one before it.
-    const pelvis = makeBone(0.30, 0.24, 0.30);    // waist(origin) → hips (slim, hangs down)
-    const spine = makeBoneUp(0.55, 0.26, 0.22);   // slender torso rises …
-    const chest = makeBoneUp(0.62, 0.24, 0.30);   // narrow ribcage widening toward the shoulders
-    const neck = makeBoneUp(0.30, 0.13, 0.115);   // long swan neck
-    const head = makeHead(0.27, 1.6);             // elongated featureless ovoid (alien skull)
+    // Lithe, MUCH more elongated proportions → tall smooth alien silhouette.
+    // All radii cut ~30–40% vs. the old stocky figure (thin, tubular limbs) and
+    // every segment lengthened, so the height-to-width ratio reads as a slender
+    // dancer, not a mannequin. Limbs taper (rProx → rDist), each distal segment
+    // thinner than the one before it; forearms/shins taper to a fine point that
+    // a tiny tip continues (no sphere hands/feet).
+    const pelvis = makeBone(0.30, 0.155, 0.185);  // waist(origin) → hips (slim, hangs down)
+    const spine = makeBoneUp(0.70, 0.165, 0.140); // long slender torso rises …
+    const chest = makeBoneUp(0.78, 0.150, 0.190); // narrow ribcage widening toward the shoulders
+    const neck = makeBoneUp(0.44, 0.082, 0.072);  // long swan neck
+    const head = makeHead(0.225, 1.7);            // sleeker elongated ovoid (alien skull)
 
-    const upperArmL = makeBone(0.70, 0.135, 0.105);
-    const forearmL = makeBone(0.64, 0.10, 0.075);       // thinner than the upper arm (taper)
-    const handL = makeBlob(0.085, 0.15, 0.06, -0.13, 0.02);  // small rounded hand
-    const upperArmR = makeBone(0.70, 0.135, 0.105);
-    const forearmR = makeBone(0.64, 0.10, 0.075);
-    const handR = makeBlob(0.085, 0.15, 0.06, -0.13, 0.02);
+    const upperArmL = makeBone(0.84, 0.086, 0.066);
+    const forearmL = makeBone(0.80, 0.062, 0.012);      // tapers to a fine point (no hand blob)
+    const handL = makeTip(0.07, 0.014);                 // tiny slim tapered tip
+    const upperArmR = makeBone(0.84, 0.086, 0.066);
+    const forearmR = makeBone(0.80, 0.062, 0.012);
+    const handR = makeTip(0.07, 0.014);
 
-    const thighL = makeBone(0.92, 0.185, 0.13);
-    const shinL = makeBone(0.88, 0.125, 0.09);          // thinner than the thigh (taper)
-    const footL = makeBlob(0.09, 0.075, 0.22, -0.04, 0.11);  // small tapered foot, points forward
-    const thighR = makeBone(0.92, 0.185, 0.13);
-    const shinR = makeBone(0.88, 0.125, 0.09);
-    const footR = makeBlob(0.09, 0.075, 0.22, -0.04, 0.11);
+    const thighL = makeBone(1.08, 0.120, 0.084);
+    const shinL = makeBone(1.04, 0.080, 0.013);         // tapers to a fine point (no foot blob)
+    const footL = makeTip(0.10, 0.016);                 // tiny slim tapered tip (pointed toe)
+    const thighR = makeBone(1.08, 0.120, 0.084);
+    const shinR = makeBone(1.04, 0.080, 0.013);
+    const footR = makeTip(0.10, 0.016);
 
     // torso chain: spine origin sits AT the waist (pelvis origin), then rises
     root.add(pelvis);
@@ -163,8 +173,8 @@ export function initKineticDancer() {
     attachUp(neck, head);                              // head above neck
 
     // shoulders: tiny offset groups near the top of the chest; arms hang OUT/down
-    const shoulderL = new THREE.Group(); shoulderL.position.set(0.34, chest.userData.len * 0.92, 0);
-    const shoulderR = new THREE.Group(); shoulderR.position.set(-0.34, chest.userData.len * 0.92, 0);
+    const shoulderL = new THREE.Group(); shoulderL.position.set(0.27, chest.userData.len * 0.94, 0);
+    const shoulderR = new THREE.Group(); shoulderR.position.set(-0.27, chest.userData.len * 0.94, 0);
     chest.add(shoulderL); chest.add(shoulderR);
     attach(shoulderL, upperArmL); attach(upperArmL, forearmL); attach(forearmL, handL);
     attach(shoulderR, upperArmR); attach(upperArmR, forearmR); attach(forearmR, handR);
@@ -172,32 +182,28 @@ export function initKineticDancer() {
     upperArmL.position.set(0, 0, 0); upperArmR.position.set(0, 0, 0);
 
     // hips: tiny offset groups at the bottom of the pelvis; legs hang DOWN
-    const hipL = new THREE.Group(); hipL.position.set(0.20, -pelvis.userData.len, 0);
-    const hipR = new THREE.Group(); hipR.position.set(-0.20, -pelvis.userData.len, 0);
+    const hipL = new THREE.Group(); hipL.position.set(0.155, -pelvis.userData.len, 0);
+    const hipR = new THREE.Group(); hipR.position.set(-0.155, -pelvis.userData.len, 0);
     pelvis.add(hipL); pelvis.add(hipR);
     attach(hipL, thighL); attach(thighL, shinL); attach(shinL, footL);
     attach(hipR, thighR); attach(thighR, shinR); attach(shinR, footR);
     thighL.position.set(0, 0, 0); thighR.position.set(0, 0, 0);   // seat at hip-group origin
 
-    // CHEST CORE (arc reactor): the brightest element, mid-chest, toward camera.
-    // A small high-poly icosphere so it reads as a glowing faceted node.
-    const coreGeo = new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(0.11, 1));
-    disposables.push(coreGeo);
-    const chestCore = new THREE.LineSegments(coreGeo, coreCoreMat);
-    chestCore.position.set(0, chest.userData.len * 0.5, 0.24);
-    chest.add(chestCore);
+    // (No chest "reactor" node — removed. It read as Iron-Man armour, off
+    // register for an elegant alien. The body is just the two additive line
+    // materials now.)
 
     // Seat the rig so head↔feet centre on the origin. Waist is at root y; the
-    // ovoid head top now rises ~2.33 above and the feet drop ~2.2 below the
-    // waist (taller, slimmer figure), so a tiny lift keeps it vertically centred.
+    // ovoid head top now rises ~2.6 above and the feet drop ~2.5 below the waist
+    // (markedly taller, slimmer figure), so a tiny lift keeps it centred.
     root.position.y = 0.05;
-    root.scale.setScalar(0.68); // smaller than before → the taller alien still frames head→feet with headroom
+    root.scale.setScalar(0.60); // taller alien → scaled down so head→feet + arm-span still frame with ~6% inset
     scene.add(root);
 
     bones = {
       root, pelvis, spine, chest, neck, head,
       shoulderL, shoulderR, upperArmL, forearmL, handL, upperArmR, forearmR, handR,
-      hipL, hipR, thighL, shinL, footL, thighR, shinR, footR, chestCore,
+      hipL, hipR, thighL, shinL, footL, thighR, shinR, footR,
     };
 
     // ── camera: the canvas is TALL and NARROW, so frame the FULL figure
@@ -205,7 +211,7 @@ export function initKineticDancer() {
     // pull the camera back on +Z (the root faces +Z toward us) and aim slightly
     // below centre so the ovoid head and feet both sit inside the frame. ──
     camera = new THREE.PerspectiveCamera(38, 0.5, 0.1, 100);
-    camera.position.set(0, 0.05, 8.4); // pulled back so even wide/T-pose hands stay clear of the frame edge
+    camera.position.set(0, 0.05, 8.4); // pulled back so even an energetic arm flare stays clear of the frame edge
     camera.lookAt(0, -0.05, 0);
 
     sizeToCanvas();
@@ -227,7 +233,7 @@ export function initKineticDancer() {
   function readRawEnergy(t) {
     const ls = appState.lightshow;
     if (ls && typeof ls.energy === 'number') return ls.energy;
-    return 0.18 + 0.06 * Math.sin(t * 0.5);   // idle breath when the lightshow is absent
+    return 0.28 + 0.06 * Math.sin(t * 0.5);   // idle breath (raised baseline) when the lightshow is absent
   }
 
   // Adaptive energy-flux beat detector on the RAW signal (the lightshow's
@@ -248,61 +254,70 @@ export function initKineticDancer() {
   function dance(dt, t) {
     const b = bones;
     const k = 1 - Math.pow(0.001, dt);         // framerate-independent damping
-    const bpmHz = 0.7 + energy * 1.6;          // faster groove with more energy
-    phase += dt * bpmHz * 2 * Math.PI;
-    const amp = 0.35 + energy * 0.65;          // bigger moves with more energy
-    const hit = beat * (0.4 + energy * 0.6);   // beat accent magnitude
+    // SLOW, weighty tempo — the Anyma "Genesys" figure moves like an awakening
+    // statue (contemporary dance), NOT a club bounce. Motion is a cycle of
+    // emotive GESTURES: arms drawing up toward the face/chest with deep elbows
+    // (hands-to-face / self-embrace), a slow torso curl-and-uncurl, weight
+    // shifts — all large, flowing, damped. (Ref: Anyma – Syren, lIdrRRofKm0.)
+    const slow = 0.12 + energy * 0.24;         // Hz — slow; energy nudges tempo
+    phase += dt * slow * 2 * Math.PI;
+    const A = 0.7 + energy * 0.5;              // gesture reach scales with energy
+    const hit = beat * (0.3 + energy * 0.5);   // beat = a subtle surge, not a bounce
+    const p = phase;
 
-    // damping helpers (operate in place on Euler / Vector3)
     const tgt = (euler, axis, target) => { euler[axis] += (target - euler[axis]) * k; };
     const set = (vec, axis, target) => { vec[axis] += (target - vec[axis]) * k; };
     const add = (obj, axis, extra) => { obj[axis] += extra * k * 3; };
 
-    // pelvis LEADS the groove (hip bounce + weight shift + a little twist)
-    set(b.pelvis.position, 'y', 0.15 + Math.abs(Math.sin(2 * phase)) * 0.08 * amp); // gentler bob — stable anchor across panels
-    set(b.pelvis.position, 'x', Math.sin(phase) * 0.12 * amp);
-    tgt(b.pelvis.rotation, 'z', -Math.sin(phase) * 0.12 * amp);
-    tgt(b.pelvis.rotation, 'y', Math.sin(phase) * 0.25 * amp);
+    // gesture drivers (0..1), slow. reachL/R rise+fall out of phase so the arms
+    // alternate/overlap; `curl` is the slow torso breathing undulation.
+    const reachL = 0.5 - 0.5 * Math.cos(p);
+    const reachR = 0.5 - 0.5 * Math.cos(p + 2.1);
+    const curl = 0.5 - 0.5 * Math.cos(p * 0.5);
 
-    // torso COUNTER-rotates against the pelvis (contrapposto)
-    tgt(b.spine.rotation, 'y', -Math.sin(phase) * 0.18 * amp);
-    tgt(b.chest.rotation, 'z', Math.sin(phase) * 0.10 * amp);
-    tgt(b.chest.rotation, 'x', 0);   // baseline so the beat "pop" (below) eases back
+    // pelvis: a slow sink/rise (breathing) + gentle weight shift — no bounce
+    set(b.pelvis.position, 'y', 0.12 - curl * 0.06 * A);
+    set(b.pelvis.position, 'x', Math.sin(p * 0.5) * 0.10 * A);
+    tgt(b.pelvis.rotation, 'z', Math.sin(p * 0.5) * 0.10 * A);
+    tgt(b.pelvis.rotation, 'y', Math.sin(p * 0.5 + 0.5) * 0.14 * A);
 
-    // arms groove, phase-offset and ANTI-PHASE L↔R (right uses phase+PI). Break
-    // symmetry slightly (different amps/offsets) so it never reads as a mirror.
-    const armRaiseL = (0.25 + energy * 0.7) + Math.sin(phase + 0.6) * 0.35 * amp;
-    const armRaiseR = (0.25 + energy * 0.7) + Math.sin(phase + Math.PI + 0.72) * 0.33 * amp;
-    tgt(b.upperArmL.rotation, 'z', armRaiseL);          // raise out to the side
-    tgt(b.upperArmR.rotation, 'z', -armRaiseR);         // negate (mirror side)
-    tgt(b.upperArmL.rotation, 'x', Math.sin(phase + 1.1) * 0.5 * amp);
-    tgt(b.upperArmR.rotation, 'x', Math.sin(phase + Math.PI + 1.02) * 0.47 * amp);
-    // elbow: ALWAYS negative so it never hyperextends
-    tgt(b.forearmL.rotation, 'x', -0.5 - (0.5 + 0.5 * Math.sin(phase + 2)) * 0.7 * amp);
-    tgt(b.forearmR.rotation, 'x', -0.5 - (0.5 + 0.5 * Math.sin(phase + Math.PI + 2)) * 0.66 * amp);
+    // torso: slow curl forward and uncurl — an awakening undulation
+    tgt(b.spine.rotation, 'x', 0.10 + curl * 0.22 * A);
+    tgt(b.spine.rotation, 'y', -Math.sin(p * 0.5) * 0.12 * A);
+    tgt(b.chest.rotation, 'x', 0.06 + curl * 0.16 * A);
+    tgt(b.chest.rotation, 'z', Math.sin(p * 0.5) * 0.08 * A);
 
-    // legs: subtle. Knee ONLY bends one way (max(0,...) → never inverts).
-    tgt(b.thighL.rotation, 'x', Math.sin(phase) * 0.25 * amp);
-    tgt(b.thighR.rotation, 'x', Math.sin(phase + Math.PI) * 0.25 * amp);
-    tgt(b.shinL.rotation, 'x', Math.max(0, -Math.sin(phase)) * 0.5 * amp);
-    tgt(b.shinR.rotation, 'x', Math.max(0, -Math.sin(phase + Math.PI)) * 0.5 * amp);
+    // ARMS: slow draw UP toward the head/chest with deepening elbows (hands-to-
+    // face / self-embrace), then release down. Asymmetric L↔R. Elbows always
+    // bent (never hyperextend).
+    tgt(b.upperArmL.rotation, 'z', 0.15 + reachL * 0.65 * A);
+    tgt(b.upperArmL.rotation, 'x', 0.20 + reachL * 1.05 * A);
+    tgt(b.forearmL.rotation, 'x', -0.6 - reachL * 1.15 * A);
+    tgt(b.upperArmR.rotation, 'z', -(0.15 + reachR * 0.65 * A));
+    tgt(b.upperArmR.rotation, 'x', 0.20 + reachR * 1.05 * A);
+    tgt(b.forearmR.rotation, 'x', -0.6 - reachR * 1.15 * A);
 
-    // head: slow yaw drift + secondary motion (trails the chest's twist)
-    headTrail += (b.chest.rotation.y - headTrail) * 0.08;   // delayed chest yaw
-    tgt(b.head.rotation, 'y', Math.sin(t * 0.13) * 0.08 + headTrail * 0.6);
-    tgt(b.head.rotation, 'x', 0);   // baseline; beat nod added below
-    tgt(b.head.rotation, 'z', Math.sin(phase + 0.4) * 0.05 * amp);
+    // legs: planted, weighted stance with a tiny sway (the figure is grounded/
+    // crouched, not stepping). Knees bend one way only.
+    tgt(b.thighL.rotation, 'x', 0.05 + Math.sin(p * 0.5) * 0.05 * A);
+    tgt(b.thighR.rotation, 'x', 0.08 - Math.sin(p * 0.5) * 0.05 * A);
+    tgt(b.shinL.rotation, 'x', 0.06);
+    tgt(b.shinR.rotation, 'x', 0.09);
 
-    // BEAT ACCENTS — MOTION only (add on top of the groove; a moving side
-    // element is not a flash). These fade out with `beat`.
-    add(b.head.rotation, 'x', hit * 0.30);          // head nod
-    add(b.chest.rotation, 'x', -hit * 0.10);        // chest pop
-    add(b.upperArmL.rotation, 'z', hit * 0.5);      // arms flare
-    add(b.upperArmR.rotation, 'z', -hit * 0.5);
-    add(b.pelvis.position, 'y', hit * 0.06);        // little jump
+    // head: bows into the gesture as the arms reach up (looking into the hands),
+    // lifts as they lower; slow drift + secondary motion.
+    headTrail += (b.chest.rotation.x - headTrail) * 0.06;
+    tgt(b.head.rotation, 'x', 0.05 + Math.max(reachL, reachR) * 0.32 * A);
+    tgt(b.head.rotation, 'y', Math.sin(t * 0.11) * 0.08);
+    tgt(b.head.rotation, 'z', Math.sin(p * 0.5 + 0.4) * 0.06 * A);
 
-    // 3/4 view: rock the whole root gently with the groove (not flat-on)
-    tgt(b.root.rotation, 'y', Math.sin(phase) * 0.08);
+    // beat: a subtle surge deeper into the gesture (MOTION only — flash-safe),
+    // never a bounce.
+    add(b.spine.rotation, 'x', hit * 0.05);
+    add(b.head.rotation, 'x', hit * 0.06);
+
+    // slow 3/4 sway of the whole figure (never flat-on)
+    tgt(b.root.rotation, 'y', Math.sin(p * 0.5) * 0.12);
   }
 
   // ── main loop ──────────────────────────────────────────────────────────
@@ -323,11 +338,12 @@ export function initKineticDancer() {
 
     // FLASH SAFETY: brightness (opacity) tracks SLOW energy only, eased at a
     // capped rate. NEVER pulse opacity from `beat` — beats move the body, they
-    // do not flash the light. The arc reactor is the brightest element.
-    coreOpacity += ((0.55 + energy * 0.35) - coreOpacity) * 0.05;
-    coreCoreMat.opacity = coreOpacity;
-    coreMat.opacity = 0.6 + energy * 0.3;       // slow, bounded
-    haloMat.opacity = 0.18 + energy * 0.14;     // slow, bounded
+    // do not flash the light.
+    // LOW per-line alpha (dense high-poly mesh) so additive overlap never blows
+    // out to a soft blob in compact poses — crisp wireframe at every pose.
+    // Still slow energy-driven only (flash-safe), never beat.
+    coreMat.opacity = 0.3 + energy * 0.16;      // slow, bounded
+    haloMat.opacity = 0.06 + energy * 0.06;     // slow, bounded
 
     renderer.render(scene, camera);
 

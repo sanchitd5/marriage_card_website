@@ -941,3 +941,22 @@ html.k-deck .gframe--veiled { border: 1px solid rgba(var(--accent-rgb), .22); }
   html.k-deck .gframe--veiled { padding: 2rem 1.5rem; gap: 1rem; }
   html.k-deck .veil-seal { opacity: 1; color: var(--accent); }
 }
+
+/* ═══════ 9.5 PUNCH-LIST — round 7 ═══════ */
+/* #1 — back the FULL dancer column with dark (not just the far edge) so the
+   dense wireframe reads crisp + uniform on every panel incl. footer, where the
+   backdrop haze was washing it soft. Middle stays transparent for atmosphere. */
+#k-dancer-scrim {
+  background: linear-gradient(90deg,
+    var(--bg) 0%, var(--bg) 32%, rgba(11,12,15,0) 44%,
+    rgba(11,12,15,0) 52%, rgba(6,7,10,.5) 60%, rgba(6,7,10,.62) 100%);
+}
+
+/* #1 (final) — near-opaque backing behind the dancer so the light-show glow can
+   never bleed through and bloom the wireframe soft (the footer defect). Middle
+   stays transparent for atmosphere behind the content. */
+#k-dancer-scrim {
+  background: linear-gradient(90deg,
+    var(--bg) 0%, var(--bg) 30%, rgba(11,12,15,0) 44%, rgba(11,12,15,0) 50%,
+    rgba(6,7,10,.6) 58%, rgba(6,7,10,.9) 70%, rgba(6,7,10,.92) 100%);
+}
