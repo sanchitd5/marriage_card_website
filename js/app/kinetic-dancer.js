@@ -488,7 +488,10 @@ export function initKineticDancer() {
   // never ran, synthesize a calm idle breath so the figure still grooves.
   function readRawEnergy(t) {
     const ls = appState.lightshow;
-    if (ls && typeof ls.energy === 'number') return ls.energy;
+    // NOTE: Number.isFinite, NOT typeof === 'number' — typeof NaN is 'number',
+    // and a NaN energy (lightshow floored / music paused) would propagate into
+    // phase + opacity and make the whole figure VANISH. Clamp to [0,1].
+    if (ls && Number.isFinite(ls.energy)) return Math.max(0, Math.min(1, ls.energy));
     return 0.28 + 0.06 * Math.sin(t * 0.5);   // idle breath (raised baseline) when the lightshow is absent
   }
 
@@ -554,7 +557,7 @@ export function initKineticDancer() {
     const m = appState.music, a = m && m.audio;
     const playing = !!(a && !m.paused && !a.paused && a.currentTime > 0.05);
     const info = playing && a._trackName && trackInfo[a._trackName];
-    if (info) {
+    if (info && Number.isFinite(info.beatPeriod) && info.beatPeriod > 0.05) {
       const beatPos = (a.currentTime - info.t0) / info.beatPeriod;
       const beatPhase = beatPos - Math.floor(beatPos);   // 0 = on the beat
       return { rateHz: 1 / (N_BEATS * info.beatPeriod), accent: Math.pow(1 - beatPhase, 4) };
@@ -580,7 +583,7 @@ export function initKineticDancer() {
     // shifts — all large, flowing, damped. (Ref: Anyma – Syren, lIdrRRofKm0.)
     // `phase` is advanced in frame() at the BPM-locked rate (musicClock) so the
     // gesture TEMPO matches the music; a full gesture spans N_BEATS beats.
-    const A = 0.7 + energy * 0.5;              // gesture reach scales with energy
+    const A = 0.85 + energy * 0.35;           // gesture reach (floored so it's lively even at 0 energy)
     const hit = beatAccent * (0.45 + energy * 0.5);  // music-locked on-beat accent
     const p = phase;
 
@@ -657,13 +660,15 @@ export function initKineticDancer() {
     // energy: read raw (music envelope or idle), smooth, derive beat
     const rawE = readRawEnergy(now);
     energy += (rawE - energy) * 0.12;
-    updateBeat(rawE);
+    if (!Number.isFinite(energy)) energy = 0.28;          // never let NaN corrupt the figure
 
     // Advance the gesture phase at the BPM-locked rate (a full gesture spans
     // N_BEATS beats), and capture the on-beat accent — so movement matches BPM.
     const clk = musicClock();
-    phase += clk.rateHz * dt * 2 * Math.PI;
-    beatAccent = clk.accent;
+    const rate = Number.isFinite(clk.rateHz) ? clk.rateHz : 0.42;
+    phase += rate * dt * 2 * Math.PI;
+    if (!Number.isFinite(phase)) phase = 0;               // guard against any NaN creep
+    beatAccent = Number.isFinite(clk.accent) ? clk.accent : 0;
 
     dance(dt, now);
 
