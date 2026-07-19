@@ -96,3 +96,12 @@ so the two figures don't clash.
 Reduced-motion and no-JS paths reveal all content statically, set scramble
 targets to their final text, drop the cursor/grain/pulse, and keep the gate
 tappable. The HUD clock ticks in every path. Verified at 390px and 1440px.
+
+## Dancer model attribution
+
+The kinetic side dancer loads a rigged glTF: **"Armadrillo"** by **kimni88**
+(https://sketchfab.com/3d-models/armadrillo-6dc598423875484fb9dc8d7cbff1f122),
+licensed **CC-BY-4.0** (http://creativecommons.org/licenses/by/4.0/). Shipped
+under `assets/scene/armadrillo/` (full licence in that folder's `license.txt`).
+It's driven procedurally by the beat-locked choreography (no baked animation
+clips) and rendered as a cyan wireframe to match the theme.
