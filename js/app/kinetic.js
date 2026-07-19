@@ -258,13 +258,21 @@ export function initKinetic() {
   gsap.set(acts[0], { autoAlpha: 1 });
   acts[0].classList.add('act-current');
   if (hudSecEl && acts[0].getAttribute('data-hud')) hudSecEl.textContent = acts[0].getAttribute('data-hud');
+  document.documentElement.dataset.panel = panelSlug(acts[0]);
 
   function ringsActive(v) {
     const r = appState.rings;
     if (!r) return;
     if (r.setInView) r.setInView(v); else (v ? r.start : r.stop)?.();
   }
+  // slug of the active panel, published on <html data-panel> so kinetic.css can
+  // art-direct each panel's layout + the dancer's per-panel treatment.
+  // (function declaration → hoisted, so the init block above can call it too.)
+  function panelSlug(act) {
+    return (act.getAttribute('data-hud') || '').replace(/^\d+\s*[—-]\s*/, '').trim().toLowerCase().replace(/\s+/g, '-') || 'panel';
+  }
   function enterReveals(act) {
+    document.documentElement.dataset.panel = panelSlug(act);
     if (hudSecEl && act.getAttribute('data-hud')) hudSecEl.textContent = act.getAttribute('data-hud');
     if (act.querySelector('#k-rings-stage')) ringsActive(true);
     if (revealedActs.has(act)) { gsap.set($$('.fade-up', act), { autoAlpha: 1, y: 0 }); return; }

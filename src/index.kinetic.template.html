@@ -207,6 +207,10 @@
        Own low-DPR canvas, fixed and OUTSIDE #smooth-wrapper. Hidden on mobile +
        reduced-motion (kinetic.css). Driven by kinetic-dancer.js. -->
   <canvas id="k-dancer-canvas" aria-hidden="true"></canvas>
+  <!-- obsidian→transparent scrim over the dancer's left edge so panel content
+       (left column) always reads over the figure; the figure stays clear on the
+       far right. -->
+  <div id="k-dancer-scrim" aria-hidden="true"></div>
 
   <div id="smooth-wrapper">
     <div id="smooth-content">

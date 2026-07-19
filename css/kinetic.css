@@ -490,3 +490,150 @@ html:not(.k-deck) #k-panel-controls { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .k-menu-item, .k-menu-item::before, .k-wz-btn { transition: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   ART-DIRECTION REDESIGN (per-panel composition pass)
+   Golden split: content lives in the LEFT ~60% column; the wireframe dancer
+   owns the right ~38% (dimmed + scrimmed so content always wins). Each panel
+   gets a distinct anchor. Borderless HUD language (hairline label/value rows)
+   replaces filled cards. Scoped to the kinetic control panel (html.k-deck).
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Type: exploit the wide-mono / tight-display contrast ── */
+html[data-variant="kinetic"] .hero-names,
+html[data-variant="kinetic"] .display-head,
+html[data-variant="kinetic"] .script-head { letter-spacing: -0.025em; line-height: 1.04; }
+html[data-variant="kinetic"] .kicker,
+html[data-variant="kinetic"] .k-eyebrow { letter-spacing: .16em; }
+
+/* ── Dancer: drop to atmosphere + obsidian scrim on its left edge ── */
+#k-dancer-canvas.is-live { opacity: .55; }
+#k-dancer-scrim {
+  position: fixed; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(90deg, var(--bg) 0%, var(--bg) 38%, rgba(11,12,15,0) 80%);
+}
+html:not(.k-deck) #k-dancer-scrim { display: none; }
+@media (max-width: 899px) { #k-dancer-scrim { display: none; } }
+/* per-panel dancer treatment */
+html.k-deck[data-panel="interlude"] #k-dancer-canvas.is-live { opacity: .14; }
+html.k-deck[data-panel="archive"]   #k-dancer-canvas.is-live { opacity: .42; }
+html.k-deck[data-panel="rsvp"]      #k-dancer-canvas.is-live { opacity: .32; }
+
+/* ── Golden-split left column (≥900; the dancer is hidden below that) ── */
+@media (min-width: 900px) {
+  html.k-deck .hero,
+  html.k-deck .band,
+  html.k-deck .footer {
+    align-items: stretch;                          /* .wrap controls its own width */
+    padding-left: clamp(4rem, 11vw, 12rem);        /* clear the left menu */
+    padding-right: min(40vw, 600px);               /* reserve the figure's column */
+  }
+  html.k-deck .wrap,
+  html.k-deck .wrap--narrow {
+    max-width: 52rem; width: 100%; margin: 0; text-align: left;
+  }
+  /* menu legibility over any bright panel (interlude painting) */
+  .k-menu-item { text-shadow: 0 1px 8px rgba(0,0,0,.85); }
+
+  /* INTERLUDE keeps its portrait|quote split, so it opts OUT of the reserve
+     and the dancer nearly vanishes there. */
+  html.k-deck[data-panel="interlude"] .interlude { padding: 0; }
+  html.k-deck[data-panel="interlude"] .interlude > .wrap--narrow {
+    max-width: none; text-align: left;
+  }
+
+  /* ARCHIVE anchors low-left; RSVP sits a touch lower for gravity. */
+  html.k-deck[data-panel="archive"] .gallery { justify-content: safe flex-end; padding-bottom: clamp(4rem,10vh,8rem); }
+}
+
+/* ── Borderless HUD: strip filled cards → hairline label/value language ── */
+/* Countdown counter tiles → borderless value/label, one row */
+html.k-deck .count-cell {
+  background: none; border: 0; border-top: 1px solid rgba(var(--accent-rgb), .35);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+  padding: .7rem .2rem 0; align-items: flex-start;
+}
+@media (min-width: 900px) {
+  html.k-deck[data-panel="countdown"] .countdown .wrap { display: block; }
+  html.k-deck[data-panel="countdown"] .count-grid {
+    display: flex; gap: clamp(1rem, 3vw, 2.2rem); grid-template-columns: none; margin: 1.6rem 0 2.4rem;
+  }
+  html.k-deck[data-panel="countdown"] .count-cell { flex: 1; min-width: 0; }
+  html.k-deck[data-panel="countdown"] .scratch { max-width: 34rem; margin: 0; width: 100%; }
+}
+
+/* RUN OF SHOW: three floating cards → one borderless tracklist (fixes the
+   card-on-dancer collision + the boxing inconsistency; it IS a tracklist). */
+html.k-deck[data-panel="run-of-show"] .event-grid {
+  display: flex; flex-direction: column; gap: 0; max-width: 46rem;
+  grid-template-columns: none;
+}
+html.k-deck[data-panel="run-of-show"] .event-card {
+  display: grid; grid-template-columns: 6.5rem 1fr; column-gap: 1.6rem; align-items: baseline;
+  background: none; border: 0; border-top: 1px solid var(--hairline);
+  border-radius: 0; box-shadow: none; min-height: 0;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+  padding: 1.35rem 0;
+}
+html.k-deck[data-panel="run-of-show"] .event-card:last-child { border-bottom: 1px solid var(--hairline); }
+html.k-deck[data-panel="run-of-show"] .event-no { grid-column: 1; grid-row: 1 / span 6; margin: 0; align-self: start; color: var(--accent); }
+html.k-deck[data-panel="run-of-show"] .event-name { grid-column: 2; margin: 0 0 .35rem; font-size: clamp(1.35rem, 2.4vw, 1.7rem); }
+html.k-deck[data-panel="run-of-show"] .event-when,
+html.k-deck[data-panel="run-of-show"] .event-venue,
+html.k-deck[data-panel="run-of-show"] .event-dress { grid-column: 2; margin: .12rem 0; }
+html.k-deck[data-panel="run-of-show"] .event-actions { grid-column: 2; margin-top: .7rem; }
+/* the headliner: a cyan left tick instead of a filled card */
+html.k-deck[data-panel="run-of-show"] .event-card--main { position: relative; padding-left: 1rem; }
+html.k-deck[data-panel="run-of-show"] .event-card--main::before {
+  content: ""; position: absolute; left: 0; top: 1.35rem; bottom: 1.35rem; width: 2px;
+  background: var(--accent); box-shadow: 0 0 8px rgba(var(--accent-rgb), .6);
+}
+
+/* ARCHIVE sealed panel → lighter HUD frame (not a filled modal) */
+html.k-deck .gframe--veiled {
+  background: none; border: 1px solid var(--hairline);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+
+/* ── Mobile: fixed bottom controls bar overlapped panel content + the music
+      FAB. Give panels bottom clearance and lift the dock above the bar. ── */
+@media (max-width: 720px) {
+  html.k-deck .hero,
+  html.k-deck .band,
+  html.k-deck .footer { padding-bottom: 5.5rem; }
+  html.k-deck #right-dock { bottom: 5.4rem; }
+}
+
+/* ── Consistency: left-anchor the panels that techno centres (hero/footer/
+      gallery) so the whole deck reads as one left-column system ── */
+@media (min-width: 900px) {
+  /* Footer + gallery are smaller text → flush-left with the column. The HERO is
+     NOT flush-left: its huge names would collide with the left menu, so it stays
+     centred within the left column (classic title panel, clears the menu). */
+  html.k-deck .footer .wrap--narrow,
+  html.k-deck .gallery .wrap {
+    align-items: flex-start; text-align: left; margin: 0; max-width: 52rem;
+  }
+  html.k-deck .footer-invocation { align-items: flex-start; text-align: left; }
+  html.k-deck .footer-rule { margin-left: 0; }
+
+  /* Archive: left-anchor the veil frame + a sensible width so it isn't a
+     centred modal floating in dead space */
+  html.k-deck .gallery-grid { justify-items: start; }
+  html.k-deck .gframe--veiled { max-width: 30rem; margin: 0; text-align: left; align-items: flex-start; }
+
+  /* Interlude menu legibility: dark scrim strip behind the left menu over the
+     bright painting (WCAG contrast) */
+  html.k-deck[data-panel="interlude"] #k-panel-menu {
+    padding: .9rem 1.4rem .9rem .4rem;
+    background: linear-gradient(90deg, rgba(6,7,10,.9) 0%, rgba(6,7,10,.7) 55%, rgba(6,7,10,0) 100%);
+  }
+}
+
+/* footer: left-align the invocation crest with the rest of the left-anchored
+   RSVP content (techno centres it) */
+@media (min-width: 900px) {
+  html.k-deck .footer-invocation { align-items: flex-start; }
+  html.k-deck .footer-invocation .invocation-motif,
+  html.k-deck .footer-monogram { margin-left: 0; }
+}
