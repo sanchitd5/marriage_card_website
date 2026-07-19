@@ -34,7 +34,7 @@ export function initKineticDancer() {
   // pass at 1.04× scale over a brighter additive core.
   const coreMat = new THREE.LineBasicMaterial({ color: 0x66f0ff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
   const haloMat = new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false });
-  const coreCoreMat = new THREE.LineBasicMaterial({ color: 0xd8fbff, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false });
+  const coreCoreMat = new THREE.LineBasicMaterial({ color: 0x9ff8ff, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false }); // icy cyan (no warm cast)
 
   const disposables = [];   // WireframeGeometry instances to dispose on teardown
 
@@ -153,6 +153,7 @@ export function initKineticDancer() {
     // head top rises ~1.67 above and the feet drop ~1.7 below the waist, so a
     // tiny lift keeps the figure vertically centred for the tall canvas.
     root.position.y = 0.05;
+    root.scale.setScalar(0.82); // shrink so wide/T-pose arm-span stays clear of the frame edge
     scene.add(root);
 
     bones = {
@@ -166,7 +167,7 @@ export function initKineticDancer() {
     // +Z (the root faces +Z toward us) and aim slightly below centre so the
     // helmet and feet both sit inside the frame with a little headroom. ──
     camera = new THREE.PerspectiveCamera(38, 0.5, 0.1, 100);
-    camera.position.set(0, 0.05, 6.4);
+    camera.position.set(0, 0.05, 8.4); // pulled back so even wide/T-pose hands stay clear of the frame edge
     camera.lookAt(0, -0.05, 0);
 
     sizeToCanvas();
@@ -220,7 +221,7 @@ export function initKineticDancer() {
     const add = (obj, axis, extra) => { obj[axis] += extra * k * 3; };
 
     // pelvis LEADS the groove (hip bounce + weight shift + a little twist)
-    set(b.pelvis.position, 'y', 0.15 + Math.abs(Math.sin(2 * phase)) * 0.12 * amp);
+    set(b.pelvis.position, 'y', 0.15 + Math.abs(Math.sin(2 * phase)) * 0.08 * amp); // gentler bob — stable anchor across panels
     set(b.pelvis.position, 'x', Math.sin(phase) * 0.12 * amp);
     tgt(b.pelvis.rotation, 'z', -Math.sin(phase) * 0.12 * amp);
     tgt(b.pelvis.rotation, 'y', Math.sin(phase) * 0.25 * amp);

@@ -637,3 +637,269 @@ html.k-deck .gframe--veiled {
   html.k-deck .footer-invocation .invocation-motif,
   html.k-deck .footer-monogram { margin-left: 0; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   9.5 PUNCH-LIST (adversarial review round). Fixes: dancer consistency,
+   events fit, contrast, RSVP void, HUD framing of the two boxes, button
+   affordance, mobile floor + overflow.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* B2/B3 — the dancer is ONE constant motif: same brightness on every panel,
+   shifted right so it never crosses content, additive glow. Overrides the
+   earlier per-panel dimming. */
+#k-dancer-canvas { mix-blend-mode: screen; transform: translateX(8%); }
+#k-dancer-canvas.is-live,
+html.k-deck[data-panel="interlude"] #k-dancer-canvas.is-live,
+html.k-deck[data-panel="archive"]   #k-dancer-canvas.is-live,
+html.k-deck[data-panel="rsvp"]       #k-dancer-canvas.is-live { opacity: .3; }
+html.k-deck[data-panel="interlude"] #k-dancer-canvas { transform: translateX(42%); } /* clear the quote */
+html.k-deck[data-panel="rsvp"]       #k-dancer-canvas { transform: translateX(24%); }
+
+/* B6 — informational text to AA; brighter inactive nav + body-weight venue text */
+html.k-deck .k-menu-item { color: #98a2b1; }
+html.k-deck .event-when,
+html.k-deck .event-venue { color: var(--body); }
+/* mobile: uniform obsidian floor (dancer hidden there) so text contrast is even
+   across panels rather than riding a variable backdrop */
+@media (max-width: 899px) {
+  #k-dancer-scrim { display: block; background: linear-gradient(180deg, rgba(6,7,10,.5), rgba(6,7,10,.72)); }
+}
+
+/* P2 — countdown digits: crisp cyan glow (not the beat-driven greenish bloom) */
+html.k-deck .count-num { color: var(--text); text-shadow: 0 0 10px rgba(var(--accent-rgb), .4); }
+
+/* P4 — GET DIRECTIONS / ADD TO CALENDAR read as real controls */
+html.k-deck .btn-quiet {
+  border: 1px solid rgba(var(--accent-rgb), .3);
+  padding: .5rem .95rem; border-radius: 2px; text-decoration: none;
+  transition: border-color .3s var(--k-ease), color .3s var(--k-ease), background .3s var(--k-ease);
+}
+html.k-deck .btn-quiet:hover { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb), .06); }
+
+/* P1 — HUD framing on the scratch card + sealed archive box (corner brackets) */
+html.k-deck .scratch-frame,
+html.k-deck .gframe--veiled { position: relative; }
+html.k-deck .scratch-frame::before,
+html.k-deck .gframe--veiled::before {
+  content: ""; position: absolute; top: -1px; left: -1px; width: 15px; height: 15px;
+  border-top: 1px solid var(--accent); border-left: 1px solid var(--accent); opacity: .65; pointer-events: none;
+}
+html.k-deck .scratch-frame::after,
+html.k-deck .gframe--veiled::after {
+  content: ""; position: absolute; bottom: -1px; right: -1px; width: 15px; height: 15px;
+  border-bottom: 1px solid var(--accent); border-right: 1px solid var(--accent); opacity: .65; pointer-events: none;
+}
+
+@media (min-width: 900px) {
+  /* B1 — RUN OF SHOW: tighten so all three tracks + header fit one frame;
+     hard bottom clearance so nothing reaches the Back/Next chrome */
+  html.k-deck[data-panel="run-of-show"] .events .display-head { font-size: clamp(2.2rem, 3.6vw, 3rem); margin-bottom: 1rem; line-height: 1.02; }
+  html.k-deck[data-panel="run-of-show"] .events .kicker { margin-bottom: .5rem; }
+  html.k-deck[data-panel="run-of-show"] .event-card { padding: .95rem 0; }
+  html.k-deck[data-panel="run-of-show"] .event-name { font-size: 1.3rem; margin-bottom: .15rem; }
+  html.k-deck[data-panel="run-of-show"] .event-when,
+  html.k-deck[data-panel="run-of-show"] .event-venue,
+  html.k-deck[data-panel="run-of-show"] .event-dress { margin: .04rem 0; font-size: .82rem; }
+  html.k-deck[data-panel="run-of-show"] .event-actions { margin-top: .5rem; }
+  html.k-deck[data-panel="run-of-show"] .events { padding-bottom: 4rem; }
+
+  /* P3 — interlude: vertically centre the quote; soften the menu scrim to a
+     gradient (not a visible box) */
+  html.k-deck[data-panel="interlude"] .interlude > .wrap--narrow { align-items: center; }
+  html.k-deck[data-panel="interlude"] #k-panel-menu {
+    background: linear-gradient(90deg, rgba(6,7,10,.92) 0%, rgba(6,7,10,.55) 60%, rgba(6,7,10,0) 100%);
+    padding: 1rem 3.2rem 1rem .4rem;
+  }
+
+  /* B5 — RSVP: vertically centre content, scale the closing line, so the panel
+     isn't 65% void (the dancer, now constant, fills the right) */
+  html.k-deck[data-panel="rsvp"] .footer { justify-content: safe center; }
+  html.k-deck .footer-line { font-size: clamp(1.1rem, 1.7vw, 1.45rem); max-width: 34rem; line-height: 1.35; }
+  html.k-deck .footer-sign span { font-size: clamp(1.3rem, 2.2vw, 1.8rem); }
+}
+
+/* B1/B7 — mobile RUN OF SHOW: single-column rows, full-width stacked actions,
+   and real bottom clearance so Track 03 never collides with the nav bar */
+@media (max-width: 720px) {
+  html.k-deck[data-panel="run-of-show"] .events { padding-bottom: 7rem; }
+  html.k-deck[data-panel="run-of-show"] .event-card { grid-template-columns: 1fr; gap: 0; }
+  html.k-deck[data-panel="run-of-show"] .event-no { grid-row: auto; margin-bottom: .3rem; }
+  html.k-deck[data-panel="run-of-show"] .event-actions { display: flex; flex-direction: column; gap: .5rem; align-items: stretch; }
+  html.k-deck[data-panel="run-of-show"] .btn-quiet { width: 100%; text-align: center; }
+}
+
+/* B2 (root cause) — panel backgrounds were veiling the dancer inconsistently
+   (band--tint + footer have their own fills). Make every panel transparent in
+   deck mode so the dancer reads at the SAME brightness through all of them. */
+html.k-deck .band--tint,
+html.k-deck .footer { background: transparent; }
+/* RSVP: truly centre the closing block (not top-anchored) */
+@media (min-width: 900px) {
+  html.k-deck[data-panel="rsvp"] .footer { justify-content: center; }
+}
+
+/* B5 — centre the RSVP block vertically in the flex-column footer (auto margins) */
+@media (min-width: 900px) {
+  html.k-deck[data-panel="rsvp"] .footer .wrap--narrow { margin-top: auto; margin-bottom: auto; }
+}
+
+/* B4 — the coord readout was pinned top-left (never followed the cursor) and
+   piled onto the wordmark. It references nothing meaningful → cut it; the
+   crosshair lines + ring are the cursor. */
+#k-cursor .k-cursor-read { display: none; }
+
+/* ═══════ 9.5 PUNCH-LIST — round 2 ═══════ */
+
+/* B3/consistency — ONE dancer everywhere: same flat opacity, same anchor, no
+   mix-blend (screen made it ride the backdrop → inconsistent). Removes the
+   extreme interlude/rsvp right-shifts that fragmented / hid the figure. */
+#k-dancer-canvas { mix-blend-mode: normal; transform: translateX(8%); }
+html.k-deck[data-panel="interlude"] #k-dancer-canvas,
+html.k-deck[data-panel="archive"]   #k-dancer-canvas,
+html.k-deck[data-panel="rsvp"]       #k-dancer-canvas { transform: translateX(8%); }
+#k-dancer-canvas.is-live,
+html.k-deck[data-panel="interlude"] #k-dancer-canvas.is-live,
+html.k-deck[data-panel="archive"]   #k-dancer-canvas.is-live,
+html.k-deck[data-panel="rsvp"]       #k-dancer-canvas.is-live { opacity: .34; }
+
+/* Interlude: the quote sits over the dancer now — keep the quote plate legible
+   with a soft backing, and feather the menu scrim (was a hard rectangle). */
+@media (min-width: 900px) {
+  html.k-deck[data-panel="interlude"] #k-panel-menu {
+    background: none; padding: 1rem 3.2rem 1rem .4rem;
+  }
+  html.k-deck[data-panel="interlude"] #k-panel-menu::before {
+    content: ""; position: absolute; inset: -2rem -5rem -2rem -3rem; z-index: -1;
+    background: radial-gradient(ellipse at left center, rgba(6,7,10,.92) 0%, rgba(6,7,10,.55) 45%, rgba(6,7,10,0) 80%);
+  }
+}
+
+/* B5 — footer: with the brighter uniform dancer, nudge content toward centre so
+   the panel isn't hard-left + right-void */
+@media (min-width: 900px) {
+  html.k-deck[data-panel="rsvp"] .footer { padding-left: clamp(6rem, 16vw, 18rem); }
+}
+
+/* mobile archive: centre the SEALED cluster inside its box */
+html.k-deck .gframe--veiled { justify-content: center; }
+
+/* B1 — mobile RUN OF SHOW: real clearance (nav ~5rem + FAB) + move the music
+   FAB to the TOP-right on mobile so it never overlaps the tracklist/nav */
+@media (max-width: 720px) {
+  html.k-deck[data-panel="run-of-show"] .events { padding-bottom: 9.5rem; }
+  html.k-deck #right-dock { top: 3.6rem; bottom: auto; right: 1rem; }
+}
+
+/* ═══════ 9.5 PUNCH-LIST — round 2b: mobile events fit ═══════ */
+@media (max-width: 720px) {
+  /* compact the tracklist so all three fit without fighting the nav; FAB goes to
+     the empty bottom-right corner of the nav bar (content clears it) */
+  html.k-deck #right-dock { top: auto; bottom: 1.15rem; right: .9rem; }
+  html.k-deck[data-panel="run-of-show"] .events .display-head { font-size: 1.9rem; margin-bottom: .5rem; line-height: 1.05; }
+  html.k-deck[data-panel="run-of-show"] .events .kicker { font-size: .58rem; margin-bottom: .3rem; }
+  html.k-deck[data-panel="run-of-show"] .event-card { grid-template-columns: 1fr; padding: .7rem 0; }
+  html.k-deck[data-panel="run-of-show"] .event-no { grid-row: auto; margin-bottom: .2rem; }
+  html.k-deck[data-panel="run-of-show"] .event-name { font-size: 1.1rem; margin-bottom: .1rem; }
+  html.k-deck[data-panel="run-of-show"] .event-when,
+  html.k-deck[data-panel="run-of-show"] .event-venue,
+  html.k-deck[data-panel="run-of-show"] .event-dress { font-size: .72rem; margin: .02rem 0; }
+  html.k-deck[data-panel="run-of-show"] .event-dress span { display: inline; }
+  html.k-deck[data-panel="run-of-show"] .event-actions { display: flex; flex-direction: row; gap: .5rem; margin-top: .4rem; }
+  html.k-deck[data-panel="run-of-show"] .btn-quiet { flex: 1; padding: .45rem .3rem; font-size: .56rem; text-align: center; }
+  html.k-deck[data-panel="run-of-show"] .events { padding-bottom: 5.5rem; }
+}
+
+/* ═══════ 9.5 PUNCH-LIST — round 3 ═══════ */
+
+/* #1/#3 — dancer brighter so it holds its column (incl. footer/rsvp) at every pose */
+#k-dancer-canvas.is-live,
+html.k-deck[data-panel="interlude"] #k-dancer-canvas.is-live,
+html.k-deck[data-panel="archive"]   #k-dancer-canvas.is-live,
+html.k-deck[data-panel="rsvp"]       #k-dancer-canvas.is-live { opacity: .44; }
+
+/* #2 — interlude: a full-height left-gutter scrim so BOTH the top wordmark and
+   all six nav rows stay legible over the bright painting (not just the menu) */
+@media (min-width: 900px) {
+  html.k-deck[data-panel="interlude"]::before {
+    content: ""; position: fixed; left: 0; top: 0; bottom: 0; width: min(32vw, 380px);
+    z-index: 56; pointer-events: none;
+    background: linear-gradient(90deg, rgba(6,7,10,.96) 0%, rgba(6,7,10,.82) 40%, rgba(6,7,10,.4) 70%, rgba(6,7,10,0) 100%);
+  }
+  html.k-deck[data-panel="interlude"] #k-panel-menu::before { display: none; }
+}
+
+/* #6 — the crosshair is a fine-pointer desktop device; hide it on narrow
+   viewports too (kills the centre gridline through NEXT on the mobile shots;
+   real touch devices already hide it) */
+@media (max-width: 900px) { #k-cursor { display: none; } }
+
+/* #4 — mobile track labels: keep "TRACK 0X" on one line with a clean gap, no
+   dangling middot on the headliner */
+@media (max-width: 720px) {
+  html.k-deck[data-panel="run-of-show"] .event-no { white-space: nowrap; margin-bottom: .35rem; line-height: 1.2; }
+}
+
+/* #5 — gallery: contain the grid (veil OR revealed photos) so the heading stays
+   in view and nothing hard-clips; the grid scrolls within, panel doesn't */
+@media (min-width: 900px) {
+  html.k-deck .gallery .wrap { max-width: 60rem; }
+  html.k-deck .gallery-grid {
+    max-height: 60vh; overflow-y: auto; overflow-x: hidden; scrollbar-width: none;
+    padding-right: .5rem; -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 4%, #000 96%, transparent 100%);
+            mask-image: linear-gradient(180deg, transparent 0, #000 4%, #000 96%, transparent 100%);
+  }
+  html.k-deck .gallery-grid::-webkit-scrollbar { width: 0; }
+}
+@media (max-width: 899px) {
+  html.k-deck .gallery-grid { max-height: 62vh; overflow-y: auto; scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 5%, #000 95%, transparent 100%);
+            mask-image: linear-gradient(180deg, transparent 0, #000 5%, #000 95%, transparent 100%); }
+  html.k-deck .gallery-grid::-webkit-scrollbar { width: 0; }
+}
+
+/* ═══════ 9.5 PUNCH-LIST — round 4 ═══════ */
+
+/* #2/#3 — dancer: brighter so it reads pure cyan over any backdrop (kills the
+   footer olive cast + faintness); milkdrop backdrop dimmed further so nothing
+   green shows between the wireframe lines */
+#k-dancer-canvas.is-live,
+html.k-deck[data-panel="interlude"] #k-dancer-canvas.is-live,
+html.k-deck[data-panel="archive"]   #k-dancer-canvas.is-live,
+html.k-deck[data-panel="rsvp"]       #k-dancer-canvas.is-live { opacity: .5; }
+html[data-variant="kinetic"] #milkdrop { filter: saturate(0.28) hue-rotate(160deg) brightness(0.32) contrast(1.02); }
+
+/* #4 — interlude: nudge the figure right so its forearm clears "BETWEEN THE SETS" */
+html.k-deck[data-panel="interlude"] #k-dancer-canvas { transform: translateX(15%); }
+
+/* #1 — mobile RUN OF SHOW: stack TRACK label above the title with a real gap
+   (display:block guarantees it), and keep both action buttons on one line each */
+@media (max-width: 720px) {
+  html.k-deck[data-panel="run-of-show"] .event-card { display: block; }
+  html.k-deck[data-panel="run-of-show"] .event-no { display: block; margin: 0 0 .4rem; white-space: nowrap; }
+  html.k-deck[data-panel="run-of-show"] .event-name { display: block; margin: 0 0 .35rem; }
+  html.k-deck[data-panel="run-of-show"] .event-actions { display: flex; gap: .5rem; }
+  html.k-deck[data-panel="run-of-show"] .btn-quiet { flex: 1 1 0; min-width: 0; white-space: nowrap; font-size: .54rem; padding: .5rem .2rem; }
+}
+
+/* ═══════ 9.5 PUNCH-LIST — round 5 ═══════ */
+
+/* #1 — dancer brighter (footer no longer reads dim) + uniform cyan everywhere */
+#k-dancer-canvas.is-live,
+html.k-deck[data-panel="interlude"] #k-dancer-canvas.is-live,
+html.k-deck[data-panel="archive"]   #k-dancer-canvas.is-live,
+html.k-deck[data-panel="rsvp"]       #k-dancer-canvas.is-live { opacity: .62; }
+
+/* #2 — mobile RUN OF SHOW: set the date/venue VALUE lines in the sans display
+   face (mono was orphan-wrapping "…in the / morning"); mono stays on the labels */
+@media (max-width: 720px) {
+  html.k-deck[data-panel="run-of-show"] .event-when,
+  html.k-deck[data-panel="run-of-show"] .event-venue,
+  html.k-deck[data-panel="run-of-show"] .event-dress { font-family: var(--font-display); letter-spacing: 0; text-wrap: pretty; }
+  html.k-deck[data-panel="run-of-show"] .event-dress span { font-family: var(--font-mono); }
+}
+
+/* #3 — archive: the sealed frame drew unevenly (corner brackets made it read
+   2-sided). Drop the brackets on the veil and close all four sides uniformly. */
+html.k-deck .gframe--veiled::before,
+html.k-deck .gframe--veiled::after { display: none; }
+html.k-deck .gframe--veiled { border: 1px solid rgba(var(--accent-rgb), .22); }

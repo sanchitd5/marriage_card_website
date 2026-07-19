@@ -414,6 +414,9 @@ export function initKinetic() {
   // ── Crosshair cursor ──
   const cursor = $('#k-cursor');
   if (cursor && finePointer) {
+    // Hide the crosshair until the pointer first moves — otherwise it sits at the
+    // 0,0 origin and its coord readout piles onto the top-left wordmark.
+    cursor.style.opacity = '0';
     const h = $('.k-cursor-h', cursor);
     const v = $('.k-cursor-v', cursor);
     const ring = $('.k-cursor-ring', cursor);
@@ -426,6 +429,7 @@ export function initKinetic() {
     }
     const pad4 = n => String(Math.max(0, Math.round(n))).padStart(4, '0');
     window.addEventListener('pointermove', e => {
+      if (cursor.style.opacity !== '1') cursor.style.opacity = '1';   // reveal on first move
       const { clientX: x, clientY: y } = e;
       if (h) h.style.transform = `translateY(${y}px)`;
       if (v) v.style.transform = `translateX(${x}px)`;
