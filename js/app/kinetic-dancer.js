@@ -101,7 +101,7 @@ export function initKineticDancer() {
   let beatAccent = 0;                 // on-beat pulse (0..1), music-locked
   let ENV = null;                     // the offline envelope JSON (fetched once)
   const trackInfo = {};               // per-track { beatPeriod, bpm, t0 } (cached)
-  const N_BEATS = 4;                  // a full gesture spans this many musical beats
+  const N_BEATS = 2;                  // a full sway/gesture spans this many beats (groovier)
   let headTrail = 0; // secondary-motion memory for the head
 
   // ── rest-pose joints (rig-local, UNSCALED space) ─────────────────────────
@@ -583,69 +583,62 @@ export function initKineticDancer() {
     // shifts — all large, flowing, damped. (Ref: Anyma – Syren, lIdrRRofKm0.)
     // `phase` is advanced in frame() at the BPM-locked rate (musicClock) so the
     // gesture TEMPO matches the music; a full gesture spans N_BEATS beats.
-    const A = 0.85 + energy * 0.35;           // gesture reach (floored so it's lively even at 0 energy)
-    const hit = beatAccent * (0.45 + energy * 0.5);  // music-locked on-beat accent
+    const A = 0.9 + energy * 0.4;              // gesture reach (floored → lively even at 0 energy)
+    const hit = beatAccent * (0.5 + energy * 0.5);   // music-locked on-beat accent
     const p = phase;
+    const s = Math.sin(p);                     // the master sway (left↔right)
 
     const tgt = (euler, axis, target) => { euler[axis] += (target - euler[axis]) * k; };
     const set = (vec, axis, target) => { vec[axis] += (target - vec[axis]) * k; };
     const add = (obj, axis, extra) => { obj[axis] += extra * k * 3; };
 
-    // gesture drivers (0..1), slow. reachL/R rise+fall out of phase so the arms
-    // alternate/overlap; `curl` is the slow torso breathing undulation.
+    // arms rise/fall out of phase so they ALTERNATE (one up as the other drops)
     const reachL = 0.5 - 0.5 * Math.cos(p);
-    const reachR = 0.5 - 0.5 * Math.cos(p + 2.1);
-    const curl = 0.5 - 0.5 * Math.cos(p * 0.5);
+    const reachR = 0.5 - 0.5 * Math.cos(p + 2.4);
 
-    // pelvis: a slow sink/rise (breathing) + gentle weight shift — no bounce
-    set(b.pelvis.position, 'y', 0.12 - curl * 0.06 * A);
-    set(b.pelvis.position, 'x', Math.sin(p * 0.5) * 0.10 * A);
-    tgt(b.pelvis.rotation, 'z', Math.sin(p * 0.5) * 0.10 * A);
-    tgt(b.pelvis.rotation, 'y', Math.sin(p * 0.5 + 0.5) * 0.14 * A);
+    // WHOLE-FIGURE SWAY — the big readable move. The pelvis (base of the whole
+    // skeleton) translates side-to-side + bobs, so the entire silhouette grooves,
+    // not just the thin limbs.
+    set(b.pelvis.position, 'x', s * 0.24 * A);                       // sway L↔R (visible mass shift)
+    set(b.pelvis.position, 'y', 0.12 + Math.abs(s) * 0.10 * A);      // bob up on each side
+    tgt(b.pelvis.rotation, 'z', s * 0.18 * A);                       // hip drop into the sway
+    tgt(b.pelvis.rotation, 'y', s * 0.22 * A);
 
-    // torso: slow curl forward and uncurl — an awakening undulation
-    tgt(b.spine.rotation, 'x', 0.10 + curl * 0.22 * A);
-    tgt(b.spine.rotation, 'y', -Math.sin(p * 0.5) * 0.12 * A);
-    tgt(b.chest.rotation, 'x', 0.06 + curl * 0.16 * A);
-    tgt(b.chest.rotation, 'z', Math.sin(p * 0.5) * 0.08 * A);
+    // torso COUNTER-sways over the hips (contrapposto S-curve) + a breathing curl
+    tgt(b.spine.rotation, 'x', 0.08 + (0.5 - 0.5 * Math.cos(p)) * 0.14 * A);
+    tgt(b.spine.rotation, 'z', -s * 0.14 * A);
+    tgt(b.chest.rotation, 'z', s * 0.14 * A);
+    tgt(b.chest.rotation, 'y', -s * 0.14 * A);
 
-    // ARMS: slow draw UP toward the head/chest with deepening elbows (hands-to-
-    // face / self-embrace), then release down. Asymmetric L↔R. Elbows always
-    // bent (never hyperextend).
-    tgt(b.upperArmL.rotation, 'z', 0.15 + reachL * 0.65 * A);
-    tgt(b.upperArmL.rotation, 'x', 0.20 + reachL * 1.05 * A);
-    tgt(b.forearmL.rotation, 'x', -0.6 - reachL * 1.15 * A);
-    tgt(b.upperArmR.rotation, 'z', -(0.15 + reachR * 0.65 * A));
-    tgt(b.upperArmR.rotation, 'x', 0.20 + reachR * 1.05 * A);
-    tgt(b.forearmR.rotation, 'x', -0.6 - reachR * 1.15 * A);
+    // ARMS — big alternating raises toward the head/chest, deep bent elbows
+    tgt(b.upperArmL.rotation, 'z', 0.20 + reachL * 1.00 * A);
+    tgt(b.upperArmL.rotation, 'x', 0.15 + reachL * 1.15 * A);
+    tgt(b.forearmL.rotation, 'x', -0.5 - reachL * 1.25 * A);
+    tgt(b.upperArmR.rotation, 'z', -(0.20 + reachR * 1.00 * A));
+    tgt(b.upperArmR.rotation, 'x', 0.15 + reachR * 1.15 * A);
+    tgt(b.forearmR.rotation, 'x', -0.5 - reachR * 1.25 * A);
 
-    // legs: planted, weighted stance with a tiny sway (the figure is grounded/
-    // crouched, not stepping). Knees bend one way only.
-    tgt(b.thighL.rotation, 'x', 0.05 + Math.sin(p * 0.5) * 0.05 * A);
-    tgt(b.thighR.rotation, 'x', 0.08 - Math.sin(p * 0.5) * 0.05 * A);
-    tgt(b.shinL.rotation, 'x', 0.06);
-    tgt(b.shinR.rotation, 'x', 0.09);
+    // legs WEIGHT-SHIFT with the sway — the un-weighted knee bends up (steps in
+    // place). Knees only bend one way (max(0,…)).
+    tgt(b.thighL.rotation, 'x', 0.05 + Math.max(0, s) * 0.22 * A);
+    tgt(b.thighR.rotation, 'x', 0.05 + Math.max(0, -s) * 0.22 * A);
+    tgt(b.shinL.rotation, 'x', 0.05 + Math.max(0, s) * 0.40 * A);
+    tgt(b.shinR.rotation, 'x', 0.05 + Math.max(0, -s) * 0.40 * A);
 
-    // head: bows into the gesture as the arms reach up (looking into the hands),
-    // lifts as they lower; slow drift + secondary motion.
-    headTrail += (b.chest.rotation.x - headTrail) * 0.06;
-    tgt(b.head.rotation, 'x', 0.05 + Math.max(reachL, reachR) * 0.32 * A);
-    tgt(b.head.rotation, 'y', Math.sin(t * 0.11) * 0.08);
-    tgt(b.head.rotation, 'z', Math.sin(p * 0.5 + 0.4) * 0.06 * A);
+    // head — bobs/tilts with the sway + bows into the arm gesture
+    headTrail += (b.chest.rotation.z - headTrail) * 0.08;
+    tgt(b.head.rotation, 'z', s * 0.14 * A - headTrail * 0.4);
+    tgt(b.head.rotation, 'x', 0.05 + Math.max(reachL, reachR) * 0.24 * A);
+    tgt(b.head.rotation, 'y', -s * 0.10 * A);
 
-    // ON-BEAT accent — MUSIC-LOCKED (beatAccent spikes on each beat). A weighted
-    // pulse (knee dip + body sink + head) so the TEMPO is felt on the beat, not a
-    // club bounce. MOTION only (flash-safe — brightness never reads this).
-    add(b.pelvis.position, 'y', -hit * 0.05);   // sink on the beat
-    add(b.thighL.rotation, 'x', hit * 0.10);    // knees dip
-    add(b.thighR.rotation, 'x', hit * 0.10);
-    add(b.shinL.rotation, 'x', hit * 0.10);
-    add(b.shinR.rotation, 'x', hit * 0.10);
+    // ON-BEAT accent — MUSIC-LOCKED dip (knees + body sink) so the TEMPO is felt.
+    add(b.pelvis.position, 'y', -hit * 0.06);
+    add(b.thighL.rotation, 'x', hit * 0.12);
+    add(b.thighR.rotation, 'x', hit * 0.12);
     add(b.spine.rotation, 'x', hit * 0.06);
-    add(b.head.rotation, 'x', hit * 0.07);
 
-    // slow 3/4 sway of the whole figure (never flat-on) — via the skeleton root
-    tgt(b.root.rotation, 'y', Math.sin(p * 0.5) * 0.12);
+    // slow 3/4 turn of the whole figure (never flat-on)
+    tgt(b.root.rotation, 'y', Math.sin(p * 0.5) * 0.16);
   }
 
   // ── main loop ──────────────────────────────────────────────────────────
