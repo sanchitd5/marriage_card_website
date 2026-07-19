@@ -75,7 +75,10 @@ and never animated or off-centre.
 
 ## Components
 
-Layout/ground: `TechnoProvider`, `Band`. Type: `Kicker`, `ScriptHead`,
-`DisplayHead`, `WaveformDivider`, `NatarajaMotif`, `Invocation`. Composite:
-`Hero`, `Countdown`, `EventCard` (+`QuietButton`), `ScratchReveal`, `GalleryVeil`,
-`SealButton`, `Footer`.
+Layout/ground: `TechnoProvider`, `Band`, `Atmosphere`, `SectionHeader`. Type:
+`Kicker`, `ScriptHead`, `DisplayHead`, `WaveformDivider`, `NatarajaMotif`,
+`Invocation`. Composite: `Hero`, `Countdown`, `EventCard` (+`QuietButton`),
+`ScratchReveal`, `Interlude`, `GalleryVeil`, `Gallery`, `SealButton`, `Footer`.
+
+See `guidelines/page-structure.md` for the full-page section order and
+`guidelines/aesthetic.md` for the colour/type/emphasis rules.

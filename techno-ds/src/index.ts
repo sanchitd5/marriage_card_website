@@ -42,3 +42,15 @@ export type { GalleryVeilProps } from './components/GalleryVeil';
 
 export { Footer } from './components/Footer';
 export type { FooterProps } from './components/Footer';
+
+export { SectionHeader } from './components/SectionHeader';
+export type { SectionHeaderProps } from './components/SectionHeader';
+
+export { Interlude } from './components/Interlude';
+export type { InterludeProps } from './components/Interlude';
+
+export { Gallery } from './components/Gallery';
+export type { GalleryProps, GalleryItem } from './components/Gallery';
+
+export { Atmosphere } from './components/Atmosphere';
+export type { AtmosphereProps } from './components/Atmosphere';

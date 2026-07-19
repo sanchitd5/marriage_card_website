@@ -7,5 +7,10 @@
   "srcDir": "src",
   "tsconfig": "tsconfig.json",
   "cssEntry": "dist/styles.css",
-  "readmeHeader": ".design-sync/conventions.md"
+  "readmeHeader": ".design-sync/conventions.md",
+  "overrides": {
+    "Interlude": { "cardMode": "column" },
+    "Countdown": { "cardMode": "column" },
+    "Hero": { "cardMode": "column" }
+  }
 }
