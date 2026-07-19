@@ -273,7 +273,8 @@ export function initKineticDancer() {
   // instead on the projected positions of the actual BONES — they trace the real
   // figure. Iterate: measure the bones' projected vertical span, scale to fill
   // ~FIT_H of the canvas, and shift the top-level rig so the span is centred.
-  const FIT_H = 0.5;                     // fraction of canvas height the figure fills (margin for raised arms)
+  const FIT_H = 0.86;                    // fraction of canvas HEIGHT the figure may fill
+  const FIT_W = 0.82;                    // fraction of canvas WIDTH (this creature is wide → usually binds)
   const _corner = new THREE.Vector3(), _c = new THREE.Vector3();
   let _frameBones = null;
   function frameModel() {
@@ -292,16 +293,26 @@ export function initKineticDancer() {
       cx /= _frameBones.length; cz /= _frameBones.length;
       rig.position.x -= cx; rig.position.z -= cz;
       rig.updateMatrixWorld(true);
+      let xmin = Infinity, xmax = -Infinity;
       for (const bn of _frameBones) {
         bn.getWorldPosition(_corner).project(camera);
         if (_corner.y < ymin) ymin = _corner.y;
         if (_corner.y > ymax) ymax = _corner.y;
+        if (_corner.x < xmin) xmin = _corner.x;
+        if (_corner.x > xmax) xmax = _corner.x;
       }
-      const frac = (ymax - ymin) / 2;                  // NDC span (0..2) → fraction of canvas height
+      const fracY = (ymax - ymin) / 2;                 // NDC vertical span → fraction of canvas height
+      const fracX = (xmax - xmin) / 2;                 // NDC horizontal span → fraction of canvas width
       const yc = (ymax + ymin) / 2;                    // projected vertical centre (NDC)
-      if (frac < 1e-3) break;
+      const aspect = camera.aspect || 1;
+      if (fracY < 1e-3) break;
       rig.position.y -= yc * worldPerNDC;              // bring the on-screen centre to the middle
-      const k = FIT_H / frac;
+      // fit BOTH dimensions — this creature is WIDE, so width usually binds and
+      // must not crop off the narrow canvas sides. worldPerNDC is the height
+      // scale; horizontal world-per-NDC = worldPerNDC * aspect.
+      const kY = FIT_H / fracY;
+      const kX = fracX > 1e-3 ? FIT_W / fracX : Infinity;
+      const k = Math.min(kY, kX);
       s *= k;
       rig.scale.setScalar(s);
       if (Math.abs(k - 1) < 0.01 && Math.abs(yc) < 0.01) break;
