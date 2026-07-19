@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>{{PAIR_TITLE}} — Shubh Vivah{{TITLE_DATE}}</title>
+  <meta name="description" content="Dearest friends, it is with the greatest pleasure that we announce the wedding of {{FULL_A}} and {{FULL_B}} — {{MONTH_YEAR}}{{META_LOCATION}}.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{{SITE_URL}}/">
+  <meta property="og:locale" content="en_IN">
+  <meta property="og:title" content="{{PAIR_TITLE_RAW}} — Shubh Vivah">
+  <meta property="og:description" content="You are cordially invited to the most anticipated affair of the season. {{DATE_RANGE}}.">
+  <meta property="og:image" content="{{SITE_URL}}/assets/images/{{SHARE_IMG}}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Invitation card for {{FIRST_A}} and {{FIRST_B}}'s wedding celebration, {{DATE_RANGE}}.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{PAIR_TITLE_RAW}} — Shubh Vivah">
+  <meta name="twitter:description" content="You are cordially invited to the most anticipated affair of the season. {{DATE_RANGE}}.">
+  <meta name="twitter:image" content="{{SITE_URL}}/assets/images/{{SHARE_IMG}}">
+  <meta name="theme-color" content="#0B0C0F">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="{{PAIR_TITLE}}">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="canonical" href="{{SITE_URL}}/">
+
+  <style>
+    /* Boot loader — obsidian ground, a cyan progress ring around the couple's
+       monogram, mono percentage. Colours hardcoded: the main stylesheet's
+       custom props are not applied yet at first paint. (Shared with techno.) */
+    #theme-boot-loader { display: none; }
+    html.theme-decision-pending #theme-boot-loader {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: grid;
+      place-items: center;
+      background: radial-gradient(circle at 50% 42%, #14161c 0%, #0b0c0f 60%);
+      color: #9aa3b2;
+      font-family: "Space Mono", ui-monospace, monospace;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      font-size: .72rem;
+    }
+    #theme-boot-loader .boot-inner { display: grid; place-items: center; gap: 1rem; }
+    #theme-boot-loader .boot-crest { position: relative; width: 8rem; height: 8rem; display: grid; place-items: center; }
+    #theme-boot-loader .boot-crest::before {
+      content: ""; position: absolute; inset: 9%; border-radius: 50%;
+      border: 1px solid #262a33; box-shadow: inset 0 0 32px rgba(34, 211, 238, .06);
+    }
+    #theme-boot-loader .boot-ring {
+      position: absolute; inset: 0; border-radius: 50%;
+      background: conic-gradient(#22d3ee calc(var(--boot-p, 0) * 1%), #262a33 0);
+      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 1.5px));
+              mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 1.5px));
+      transition: background .25s linear; filter: drop-shadow(0 0 6px rgba(34, 211, 238, .35));
+    }
+    #theme-boot-loader .boot-monogram {
+      position: relative; z-index: 1; font-family: "Space Grotesk", ui-sans-serif, sans-serif;
+      font-weight: 500; font-size: 2.4rem; line-height: 1; letter-spacing: .12em; color: #f4f6fb;
+    }
+    #theme-boot-loader .boot-monogram em { font-style: normal; color: #22d3ee; margin-inline: .06em; }
+    #theme-boot-loader .boot-pct { font-size: .8rem; letter-spacing: .14em; color: #22d3ee; font-variant-numeric: tabular-nums; }
+    #theme-boot-loader .boot-tag { font-family: "Space Mono", ui-monospace, monospace; letter-spacing: .22em; font-size: .62rem; color: #9aa3b2; }
+  </style>
+
+  <script>
+    document.documentElement.classList.add('js');
+    document.documentElement.classList.add('theme-decision-pending');
+    // Kinetic is a TECHNO-BASED skin: it reuses every techno runtime engine
+    // (lightshow, milkdrop, scratch foil, gallery veil, audio path) by carrying
+    // data-skin="techno". data-variant="kinetic" is the CSS/JS hook for the
+    // saifullah.dev console layer (scramble reveal, crosshair cursor, HUD).
+    document.documentElement.dataset.skin = 'techno';
+    document.documentElement.dataset.variant = 'kinetic';
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('reduce-motion');
+    (function () {
+      // Kinetic is obsidian-only (no day/night toggle). Fix the theme to dark so
+      // the shared modules that read dataset.theme resolve consistently.
+      document.documentElement.dataset.theme = 'dark';
+      document.documentElement.dataset.autoNight = '1';
+      window.__getWeddingAutoTheme = function () { return 'dark'; };
+      window.__weddingThemeDecisionReady = true;
+      window.dispatchEvent(new Event('wedding-theme-ready'));
+    })();
+  </script>
+  <!-- Fonts are VENDORED + subset (self-hosted woff2 in assets/fonts/) — no CDN.
+       Preload the display + mono + shloka faces so the console paints without a swap. -->
+  <link rel="preload" href="assets/fonts/space-grotesk-700.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/space-mono-700.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/noto-serif-devanagari-500.woff2" as="font" type="font/woff2" crossorigin>
+  <!-- techno.css is the BASE (obsidian palette, section layout, scratch/gallery/
+       gate primitives); kinetic.css layers the console HUD + kinetic motion. -->
+  <link rel="stylesheet" href="css/techno.css">
+  <link rel="stylesheet" href="css/kinetic.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🕉️%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+  <!-- Nataraja / cosmic-dance invocation motif (shared with techno). Abstract
+       emblem, not a figurative deity. Static by intent. -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <symbol id="nataraja-motif" viewBox="0 0 100 100">
+      <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="50" cy="50" r="46" stroke-width="1"/>
+        <circle cx="50" cy="50" r="38" stroke-width=".5" opacity=".55"/>
+        <path stroke-width="1.7" d="M50 3.5 V10"/>
+        <path stroke-width=".8" d="M96.5 50 H91 M50 96.5 V91 M3.5 50 H9"/>
+        <path stroke-width="1.5" d="M56 31 A20 20 0 1 0 56 69 A15 20 0 1 1 56 31"/>
+        <circle cx="50" cy="50" r="1.8" fill="currentColor" stroke="none"/>
+      </g>
+    </symbol>
+  </svg>
+
+  <div id="theme-boot-loader" aria-live="polite" aria-label="Preparing your invitation">
+    <div class="boot-inner">
+      <span class="boot-crest" aria-hidden="true">
+        <span class="boot-ring"></span>
+        <span class="boot-monogram">{{INITIAL_A}}<em>&amp;</em>{{INITIAL_B}}</span>
+      </span>
+      <span class="boot-pct">0%</span>
+      <span class="boot-tag">Booting…</span>
+    </div>
+  </div>
+  <script src="js/app/boot-loader.js"></script>
+
+  <!-- ══════════ CROSSHAIR CURSOR (saifullah signature) ══════════ -->
+  <!-- Full-viewport crosshair lines + a magnetic ring that eases toward the
+       pointer. Pointer-events:none. Hidden on touch + reduced-motion (CSS). JS
+       (kinetic.js) tracks mousemove. -->
+  <div id="k-cursor" aria-hidden="true">
+    <span class="k-cursor-h"></span>
+    <span class="k-cursor-v"></span>
+    <span class="k-cursor-ring"></span>
+    <span class="k-cursor-read"></span>
+  </div>
+
+  <!-- ══════════ HUD FRAME (instrument chrome) ══════════ -->
+  <!-- Fixed hairline console frame: corner ticks + live readouts (local time,
+       a section marker). Decorative; kinetic.js writes the live values. -->
+  <div id="k-hud" aria-hidden="true">
+    <span class="k-hud-corner k-hud-tl"></span>
+    <span class="k-hud-corner k-hud-tr"></span>
+    <span class="k-hud-corner k-hud-bl"></span>
+    <span class="k-hud-corner k-hud-br"></span>
+    <span class="k-hud-brand">{{INITIAL_A}}&amp;{{INITIAL_B}} · SHUBH_VIVAH</span>
+    <span class="k-hud-sec" id="k-hud-sec">00 — INVOCATION</span>
+    <span class="k-hud-time" id="k-hud-time">--:--:--</span>
+  </div>
+
+  <!-- ══════════ INTRO GATE — the console lock ══════════ -->
+  <!-- Kinetic gate: a saifullah-style boot console. A status word cycles
+       (STANDBY → SYNCING → CALIBRATING → LOCKED IN) with a fill bar + %, over
+       the obsidian light-stage, then a monogram seal the guest taps to enter.
+       kinetic.js (initKineticGate) drives the sequence + CSS-only reveal. -->
+  <div id="gate" class="gate--techno gate--kinetic" role="dialog" aria-modal="true" aria-label="Wedding invitation. Tap to enter.">
+    <div class="gate-stage" aria-hidden="true">
+      <div class="gate-grid"></div>
+      <div class="gate-shaft"></div>
+      <div class="gate-scanlines"></div>
+    </div>
+    <div class="gate-card k-console">
+      <p class="k-console-head" aria-hidden="true">
+        <span class="k-dot"></span> WEDDING_OS <span class="k-console-ver">v12.12.26</span>
+      </p>
+      <p class="invocation gate-invocation">
+        <svg class="invocation-motif" aria-hidden="true" focusable="false"><use href="#nataraja-motif"/></svg>
+        <span class="shloka" lang="sa">आङ्गिकं भुवनं यस्य वाचिकं सर्ववाङ्मयम्&nbsp;।</span>
+        <span class="shloka-roman" aria-hidden="true">āṅgikaṃ bhuvanaṃ yasya · vācikaṃ sarva-vāṅmayam</span>
+      </p>
+      <div class="k-console-boot" aria-hidden="true">
+        <div class="k-console-track"><span class="k-console-fill" id="k-boot-fill"></span></div>
+        <p class="k-console-line"><span class="k-console-status" id="k-boot-status">STANDBY</span><span class="k-console-pct" id="k-boot-pct">0%</span></p>
+      </div>
+      <p class="gate-line">Dearest friends, a love story is about to&nbsp;boot</p>
+      <button id="seal" class="seal seal--techno seal--kinetic" data-magnetic aria-label="Enter the invitation">
+        <span class="seal-ring" aria-hidden="true"></span>
+        <span class="seal-monogram">{{INITIAL_A}}<em>&amp;</em>{{INITIAL_B}}</span>
+        <span class="seal-ripple" aria-hidden="true"></span>
+      </button>
+      <p class="gate-hint"><span class="k-tap">Tap</span><span class="k-click">Click</span> to enter</p>
+    </div>
+  </div>
+
+  <!-- ══════════ RIGHT DOCK (scroll cue + music) ══════════ -->
+  <div id="right-dock">
+    <button id="floating-cue" type="button" aria-label="Scroll to content" data-magnetic>
+      <span class="cue-chevrons" aria-hidden="true"><i></i><i></i></span>
+    </button>
+    <div id="music-dock" hidden>
+      <button id="music-toggle" aria-label="Pause the music" aria-pressed="false" data-magnetic>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path class="icon-note" d="M9 18V5l12-2v13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="18" cy="16" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Full-screen light-show canvases (techno engine, reused). Fixed and OUTSIDE
+       #smooth-wrapper so the ScrollSmoother transform never drags them. -->
+  <canvas id="milkdrop" aria-hidden="true"></canvas>
+  <canvas id="lightshow" aria-hidden="true"></canvas>
+  <div class="ls-vignette" aria-hidden="true"></div>
+  <!-- Film-grain overlay (saifullah): a static noise texture over everything.
+       Pure CSS (kinetic.css), above the canvas, below content. -->
+  <div class="k-grain" aria-hidden="true"></div>
+
+  <div id="smooth-wrapper">
+    <div id="smooth-content">
+
+      <!-- ══════════ HERO ══════════ -->
+      <header class="hero" id="hero" data-hud="00 — INVOCATION">
+        <div class="hero-media" data-speed="0.9" aria-hidden="true">
+          <div class="hero-grid"></div>
+          <div class="hero-shaft"></div>
+        </div>
+        <div class="hero-veil"></div>
+        <div class="hero-inner">
+          <div class="hero-top">
+            <p class="invocation hero-invocation">
+              <svg class="invocation-motif" aria-hidden="true" focusable="false"><use href="#nataraja-motif"/></svg>
+              <span class="shloka" lang="sa">तं नुमः सात्त्विकं शिवम्&nbsp;॥</span>
+            </p>
+            <p class="kicker k-eyebrow" data-scramble>Dearest friends, we announce the union of</p>
+          </div>
+          <h1 class="hero-names">
+            <span class="hero-name" data-scramble-name>{{FIRST_A}}</span>
+            <span class="hero-amp" data-scramble-name>&amp;</span>
+            <span class="hero-name" data-scramble-name>{{FIRST_B}}</span>
+          </h1>
+          <div class="hero-bottom">
+            <p class="hero-date" data-scramble>{{HERO_LINE}}</p>
+            <div class="hero-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <p class="hero-tag" id="hero-hashtag">
+              <span class="hero-tag-text" data-tags="{{TAG_PRIMARY}},{{TAG_SECONDARY}}">{{TAG_PRIMARY}}</span>
+            </p>
+          </div>
+        </div>
+        <div class="scroll-cue">
+          <span class="cue-mouse" aria-hidden="true"><span></span></span>
+          <span class="cue-chevrons" aria-hidden="true"><i></i><i></i></span>
+          <span class="cue-label">Scroll</span>
+        </div>
+      </header>
+
+      <!-- ══════════ COUNTDOWN + SCRATCH ══════════ -->
+      <section class="band band--tint countdown" id="countdown" data-hud="01 — COUNTDOWN">
+        <div class="wrap">
+          <p class="k-index" aria-hidden="true">01 / 05</p>
+          <p class="kicker fade-up">The most anticipated set of the season</p>
+          <h2 class="script-head fade-up" data-scramble>Until the drop</h2>
+          <div class="count-grid" role="timer" aria-live="off">
+            <div class="count-cell fade-up"><span class="count-num" id="cd-days">–</span><span class="count-label">Days</span></div>
+            <div class="count-cell fade-up"><span class="count-num" id="cd-hours">–</span><span class="count-label">Hours</span></div>
+            <div class="count-cell fade-up"><span class="count-num" id="cd-mins">–</span><span class="count-label">Minutes</span></div>
+            <div class="count-cell fade-up"><span class="count-num" id="cd-secs">–</span><span class="count-label">Seconds</span></div>
+          </div>
+          <div class="scratch fade-up">
+            <p class="scratch-prompt">“Some dates drop without warning. This one you get to see coming.”</p>
+            <p class="scratch-hint">A gentle scratch of your fingertip will do</p>
+            <div class="scratch-frame">
+              <div class="scratch-under">
+                <span class="scratch-date">{{SCRATCH_DATE}}</span>
+                <span class="scratch-sub">{{SCRATCH_SUB}}</span>
+              </div>
+              <canvas id="scratch-canvas" aria-label="Scratch-off panel hiding the wedding date"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════════ EVENTS ══════════ -->
+      <section class="band events" id="events" data-hud="02 — RUN OF SHOW">
+        <div class="wrap">
+          <p class="k-index" aria-hidden="true">02 / 05</p>
+          <p class="kicker fade-up">The running order</p>
+          <h2 class="display-head fade-up" data-scramble>Three sets,<br><em>two hearts</em></h2>
+          <div class="event-grid">
+
+            <article class="event-card" data-tilt data-magnetic>
+              <p class="event-no">Track 01</p>
+              <h3 class="event-name">Haldi</h3>
+              <p class="event-when"><time datetime="{{EVENT_HALDI_DT}}">{{EVENT_HALDI_WHEN}}</time></p>
+              <p class="event-venue">{{EVENT_HALDI_VENUE}}</p>
+              <p class="event-dress"><span>Dress code</span> Shades of yellow</p>
+              <div class="event-actions">
+                <a class="btn-quiet" href="{{EVENT_HALDI_MAP}}" target="_blank" rel="noopener" {{REVEAL_ONLY}}>Get directions</a>
+                <button class="btn-quiet" data-ics="haldi">Add to calendar</button>
+              </div>
+            </article>
+
+            <article class="event-card" data-tilt data-magnetic>
+              <p class="event-no">Track 02</p>
+              <h3 class="event-name">Cocktail &amp; Engagement</h3>
+              <p class="event-when"><time datetime="{{EVENT_COCKTAIL_DT}}">{{EVENT_COCKTAIL_WHEN}}</time></p>
+              <p class="event-venue">{{EVENT_COCKTAIL_VENUE}}</p>
+              <p class="event-dress"><span>Dress code</span> Dazzling as you dare</p>
+              <div class="event-actions">
+                <a class="btn-quiet" href="{{EVENT_COCKTAIL_MAP}}" target="_blank" rel="noopener" {{REVEAL_ONLY}}>Get directions</a>
+                <button class="btn-quiet" data-ics="cocktail">Add to calendar</button>
+              </div>
+            </article>
+
+            <article class="event-card event-card--main" data-tilt data-magnetic>
+              <p class="event-no">Track 03 · Headline</p>
+              <h3 class="event-name">The Wedding</h3>
+              <p class="event-when"><time datetime="{{EVENT_WEDDING_DT}}">{{EVENT_WEDDING_WHEN}}</time></p>
+              <p class="event-venue">{{EVENT_WEDDING_VENUE}}</p>
+              <p class="event-dress"><span>Dress code</span> Traditional grandeur</p>
+              <div class="event-actions">
+                <a class="btn-quiet" href="{{EVENT_WEDDING_MAP}}" target="_blank" rel="noopener" {{REVEAL_ONLY}}>Get directions</a>
+                <button class="btn-quiet" data-ics="wedding">Add to calendar</button>
+              </div>
+            </article>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════════ INTERLUDE ══════════ -->
+      <section class="band band--tint interlude" data-hud="03 — INTERLUDE">
+        <div class="wrap wrap--narrow">
+          <p class="k-index" aria-hidden="true">03 / 05</p>
+          <div class="interlude-art">
+            <img src="assets/images/art-couple.jpg" alt="{{FIRST_A}} and {{FIRST_B}}" loading="lazy" decoding="async">
+          </div>
+          <p class="interlude-line">“Two frequencies, phase-locked long before they ever met.”</p>
+        </div>
+      </section>
+
+      <!-- ══════════ GALLERY ══════════ -->
+      <section class="band gallery" id="gallery" data-hud="04 — ARCHIVE">
+        <div class="wrap">
+          <p class="k-index" aria-hidden="true">04 / 05</p>
+          <p class="kicker fade-up">A courtship, in frames</p>
+          <h2 class="display-head fade-up" data-scramble>The story <em>so far</em></h2>
+          <div class="gallery-grid" id="gallery-grid"><!-- populated by js --></div>
+        </div>
+      </section>
+
+      <!-- ══════════ FOOTER ══════════ -->
+      <footer class="footer" data-hud="05 — RSVP">
+        <div class="wrap wrap--narrow">
+          <p class="k-index" aria-hidden="true">05 / 05</p>
+          <p class="invocation footer-invocation">
+            <svg class="invocation-motif" aria-hidden="true" focusable="false"><use href="#nataraja-motif"/></svg>
+            <span class="shloka" lang="sa">तं नुमः सात्त्विकं शिवम्&nbsp;॥</span>
+            <span class="shloka-roman" aria-hidden="true">taṃ numaḥ sāttvikaṃ śivam</span>
+          </p>
+          <p class="footer-monogram">{{INITIAL_A}}<em>&amp;</em>{{INITIAL_B}}</p>
+          <span class="footer-rule" aria-hidden="true"></span>
+          <p class="footer-line">Some love stories cannot merely be told, they must be witnessed. We would be honoured to have you on the floor with us.</p>
+          <p class="footer-sign">Yours, in the greatest anticipation,<br><span>{{FIRST_A}} &amp; {{FIRST_B}}</span></p>
+          <p class="footer-tag">{{HASHTAG}}</p>
+        </div>
+      </footer>
+
+    </div>
+  </div>
+
+  <!-- CSS-only ambience fallback (hidden when the JS light show runs) -->
+  <div class="ambient" id="ambient" aria-hidden="true">
+    <span class="ambient-grid"></span>
+    <span class="ambient-scanlines"></span>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollTrigger.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollSmoother.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/SplitText.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/Flip.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/vanilla-tilt@1.8.1/dist/vanilla-tilt.min.js" defer></script>
+  <!-- three.js drives the techno Path-A WebGL backdrop (reused as the kinetic
+       base atmosphere), plus loaders for the drop-triggered 3D scene. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/butterchurn@2.6.7/lib/butterchurn.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/butterchurn-presets@2.4.7/lib/butterchurnPresets.min.js" defer></script>
+  <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/GLTFLoader.js" defer></script>
+  <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/DRACOLoader.js" defer></script>
+  <script type="module" src="js/main.kinetic.js"></script>
+</body>
+</html>

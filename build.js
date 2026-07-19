@@ -28,12 +28,23 @@ export function parseFromGroomSide(rawFlag) {
 
 // ---- Theme flag (visual skin) -----------------------------------------
 // WEDDING_THEME selects the visual skin, mirroring FROM_GROOM_SIDE. Default
-// 'regency' (the original Bridgerton build); only the literal 'techno' opts
-// into the friends-facing techno skin. Kept a pure helper so both the pipeline
-// and unit tests read the same value. The theme picks a template + stylesheet
-// and, for techno, drops the Regency video tree (rendered scene replaces it).
+// 'regency' (the original Bridgerton build); 'techno' opts into the
+// friends-facing techno skin, and 'kinetic' is a techno-based variant that
+// reuses every techno asset (audio playlist, 3D scene, obsidian colours, no
+// Regency video) and differs ONLY in which HTML template it renders. Kept a
+// pure helper so both the pipeline and unit tests read the same value.
 export function parseTheme(rawFlag) {
-  return rawFlag === 'techno' ? 'techno' : 'regency';
+  if (rawFlag === 'kinetic') return 'kinetic';
+  if (rawFlag === 'techno') return 'techno';
+  return 'regency';
+}
+
+// Techno-based themes share ALL asset/plumbing decisions (techno audio, 3D
+// scene, obsidian manifest colours, dropped Regency video); they differ only
+// in the HTML template rendered. Use this everywhere an asset choice hinges on
+// "is this a techno build?" so 'kinetic' tracks 'techno' automatically.
+export function isTechnoBased(theme) {
+  return theme === 'techno' || theme === 'kinetic';
 }
 
 // ---- Couple-photo reveal gate -----------------------------------------
@@ -205,8 +216,8 @@ export function buildHtmlTokens(names, reveal = revealDate) {
 export function buildManifestTokens(names, theme) {
   return {
     PAIR_TITLE: names.pairTitle,
-    MANIFEST_THEME_COLOR: theme === 'techno' ? '#0b0c0f' : '#f7f4ee',
-    MANIFEST_BG_COLOR: theme === 'techno' ? '#0b0c0f' : '#f7f4ee',
+    MANIFEST_THEME_COLOR: isTechnoBased(theme) ? '#0b0c0f' : '#f7f4ee',
+    MANIFEST_BG_COLOR: isTechnoBased(theme) ? '#0b0c0f' : '#f7f4ee',
   };
 }
 
@@ -267,18 +278,19 @@ function runBuild() {
   // The techno skin renders its backdrop scene instead of shipping video, so it
   // drops the whole Regency assets/videos/ tree (LOCKED: no palace footage in
   // the techno build). A techno Path-B plate, when added, lives outside videos/.
+  const technoBased = isTechnoBased(theme);
   const copyFilter = (src) => {
     const parts = src.split(path.sep);
     if (parts.includes('gen')) return false;
     // The 3D scene asset (dancer model) is a techno-only asset.
-    if (theme !== 'techno' && parts.includes('scene')) return false;
-    if (theme !== 'techno') {
+    if (!technoBased && parts.includes('scene')) return false;
+    if (!technoBased) {
       // The techno playlist (assets/audio/techno/*) is techno-only — don't ship
       // it (~34 MB of mp3) as dead weight in the Regency build.
       const ai = parts.indexOf('audio');
       if (ai !== -1 && parts[ai + 1] === 'techno') return false;
     }
-    if (theme === 'techno') {
+    if (technoBased) {
       // No Regency palace footage in the techno build (LOCKED).
       if (parts.includes('videos')) return false;
       // Ship only the techno playlist (assets/audio/techno/*), not the Regency
@@ -294,8 +306,13 @@ function runBuild() {
     fs.cpSync(from, path.join(dist, dir), { recursive: true, filter: copyFilter });
   }
 
-  // Render index.html (theme picks the template; techno uses its own skin).
-  const templateFile = theme === 'techno' ? 'index.techno.template.html' : 'index.template.html';
+  // Render index.html (theme picks the template; techno & kinetic each use
+  // their own skin, but kinetic reuses every techno asset — only the HTML
+  // template differs).
+  const templateFile =
+    theme === 'kinetic' ? 'index.kinetic.template.html'
+    : theme === 'techno' ? 'index.techno.template.html'
+    : 'index.template.html';
   const htmlTemplate = fs.readFileSync(path.join(srcDir, templateFile), 'utf8');
   fs.writeFileSync(path.join(dist, 'index.html'), applyTokens(htmlTemplate, htmlTokens));
 
@@ -314,8 +331,8 @@ function runBuild() {
   // The techno skin has its OWN playlist under assets/audio/techno/; names are
   // emitted with the `techno/` prefix so ui.js's `assets/audio/${name}.mp3`
   // resolves. Regency keeps the top-level tracks.
-  const songPrefix = theme === 'techno' ? 'techno/' : '';
-  const audioDir = theme === 'techno'
+  const songPrefix = technoBased ? 'techno/' : '';
+  const audioDir = technoBased
     ? path.join(root, 'assets', 'audio', 'techno')
     : path.join(root, 'assets', 'audio');
   const songs = fs.existsSync(audioDir)

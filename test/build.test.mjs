@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import {
   parseFromGroomSide,
   parseTheme,
+  isTechnoBased,
   composeNames,
   htmlEscape,
   joinFamilies,
@@ -50,14 +51,25 @@ test('parseFromGroomSide: "true" and any other string stay true', () => {
 });
 
 // ---- parseTheme -------------------------------------------------------
-test('parseTheme: undefined / anything but "techno" → regency', () => {
+test('parseTheme: undefined / anything but a known theme → regency', () => {
   assert.equal(parseTheme(undefined), 'regency');
   assert.equal(parseTheme(''), 'regency');
   assert.equal(parseTheme('Regency'), 'regency');
+  assert.equal(parseTheme('garbage'), 'regency');
   assert.equal(parseTheme('TECHNO'), 'regency'); // case-sensitive by design
 });
 test('parseTheme: only literal "techno" opts into the techno skin', () => {
   assert.equal(parseTheme('techno'), 'techno');
+});
+test('parseTheme: only literal "kinetic" opts into the kinetic skin', () => {
+  assert.equal(parseTheme('kinetic'), 'kinetic');
+});
+
+// ---- isTechnoBased ----------------------------------------------------
+test('isTechnoBased: techno & kinetic are techno-based, regency is not', () => {
+  assert.equal(isTechnoBased('techno'), true);
+  assert.equal(isTechnoBased('kinetic'), true);
+  assert.equal(isTechnoBased('regency'), false);
 });
 
 // ---- composeNames -----------------------------------------------------
@@ -184,6 +196,14 @@ test('buildManifestTokens: techno theme → obsidian colours', () => {
   const t = buildManifestTokens(composeNames(true, fx), 'techno');
   assert.equal(t.MANIFEST_THEME_COLOR, '#0b0c0f');
   assert.equal(t.MANIFEST_BG_COLOR, '#0b0c0f');
+});
+
+test('buildManifestTokens: kinetic theme → same obsidian colours as techno', () => {
+  const names = composeNames(true, fx);
+  assert.deepEqual(
+    buildManifestTokens(names, 'kinetic'),
+    buildManifestTokens(names, 'techno'),
+  );
 });
 
 // ---- Template integration (read-only, no writes) ----------------------

@@ -1,0 +1,353 @@
+/* ═══════════════════════════════════════════════════════════════
+   Sanchit & Riya · Shubh Vivah — KINETIC layer (over TECHNO base)
+   "A precision-engineering console booting a love story."
+   techno.css loads FIRST (obsidian palette, section layout, gate /
+   scratch / gallery / seal primitives). This file only LAYERS the
+   saifullah.dev console look on top: a magnetic crosshair cursor,
+   hairline instrument HUD, film-grain, a terminal boot readout in
+   the gate, section-index markers, and scramble-text chrome.
+   Reuse the techno :root vars (var(--accent), --hairline, --label,
+   --font-mono, …). Add/override ONLY what the console look needs;
+   rules that could collide with techno base are scoped under
+   html[data-variant="kinetic"]; additive .k-* rules stay unscoped.
+
+   Motion identity: saifullah's UI ease is cubic-bezier(.16,1,.3,1)
+   at ~.6s — reserved for HUD/cursor transitions (--k-ease below).
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  /* saifullah "settle" ease — used ONLY for the cursor ring + HUD trail so the
+     console furniture glides while techno's own --ease-luxe drives the content */
+  --k-ease: cubic-bezier(.16, 1, .3, 1);
+  --k-ease-dur: .6s;
+}
+
+/* ═══ CROSSHAIR CURSOR (#k-cursor) ═══════════════════════════════
+   Full-viewport hairline crosshair + a small magnetic ring and a mono
+   coord readout. Pointer-events:none; sits just under the boot loader
+   (9999) so it never eats clicks. JS (kinetic.js) writes the transforms;
+   CSS supplies the resting look + a soft settle on the ring/readout only.
+   Hidden on touch and under reduced-motion (native cursor restored). */
+#k-cursor {
+  position: fixed; inset: 0;
+  z-index: 9998;              /* below the boot loader (9999), above all else */
+  pointer-events: none;
+}
+/* the two hairlines span the whole viewport (100% of the fixed #k-cursor, NOT
+   100vw — avoids a scrollbar-width horizontal overflow). JS translates them. */
+.k-cursor-h {
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 1px;
+  background: rgba(var(--accent-rgb), .18);
+}
+.k-cursor-v {
+  position: absolute; top: 0; left: 0;
+  width: 1px; height: 100%;
+  background: rgba(var(--accent-rgb), .18);
+}
+/* small hairline ring — the "magnetic" element JS eases toward the pointer.
+   Negative margins centre it on the transform origin (JS sets translate(x,y)). */
+.k-cursor-ring {
+  position: absolute; top: 0; left: 0;
+  width: 26px; height: 26px; margin: -13px 0 0 -13px;
+  border: 1px solid rgba(var(--accent-rgb), .55);
+  border-radius: 50%;
+  /* the ONE transitioned piece — a subtle settle as it catches up to the pointer */
+  transition: width var(--k-ease-dur) var(--k-ease),
+              height var(--k-ease-dur) var(--k-ease),
+              margin var(--k-ease-dur) var(--k-ease),
+              opacity var(--k-ease-dur) var(--k-ease);
+}
+/* tiny mono coordinate label, offset from the ring toward lower-right */
+.k-cursor-read {
+  position: absolute; top: 0; left: 0; margin: 12px 0 0 16px;
+  font-family: var(--font-mono);
+  font-size: .6rem; letter-spacing: .12em;
+  line-height: 1; white-space: nowrap;
+  color: var(--label); opacity: .5;
+  transition: opacity var(--k-ease-dur) var(--k-ease);
+}
+
+/* hide the native cursor ONLY where the custom crosshair is active (fine pointer
+   with hover) — never on touch, so tap targets keep their default affordance */
+@media (hover: hover) and (pointer: fine) {
+  html[data-variant="kinetic"] { cursor: none; }
+}
+/* touch / coarse pointers: no crosshair, restore the native cursor */
+@media (hover: none), (pointer: coarse) {
+  #k-cursor { display: none; }
+}
+
+/* ═══ HUD INSTRUMENT FRAME (#k-hud) ══════════════════════════════
+   Fixed hairline chrome: four corner ticks + three whisper-quiet mono
+   readouts (brand, section marker, local time). Decorative, pointer-
+   events:none; above content but BELOW the gate (60) and cursor. This
+   is instrument chrome — keep it faint, never a decorative border. */
+#k-hud {
+  position: fixed; inset: 0;
+  z-index: 58;               /* > #smooth-wrapper (2) & #right-dock (55), < #gate (60) */
+  pointer-events: none;
+}
+/* L-shaped corner ticks — two borders on a small box, ~14px inset from each edge */
+.k-hud-corner {
+  position: absolute;
+  width: 18px; height: 18px;
+  border: 0 solid var(--hairline);
+}
+.k-hud-tl { top: 14px; left: 14px;  border-top-width: 1px; border-left-width: 1px; }
+.k-hud-tr { top: 14px; right: 14px; border-top-width: 1px; border-right-width: 1px; }
+.k-hud-bl { bottom: 14px; left: 14px;  border-bottom-width: 1px; border-left-width: 1px; }
+.k-hud-br { bottom: 14px; right: 14px; border-bottom-width: 1px; border-right-width: 1px; }
+
+/* shared readout voice — mono, wide-tracked, upper, label-dim */
+.k-hud-brand, .k-hud-sec, .k-hud-time {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: .62rem; letter-spacing: .2em;
+  line-height: 1; text-transform: uppercase;
+  color: var(--label);
+}
+.k-hud-brand { top: 1.05rem; left: 2.4rem; }              /* clear of the TL tick */
+.k-hud-sec   { bottom: 1.05rem; left: 2.4rem; }           /* clear of the BL tick */
+.k-hud-time  { top: 1.05rem; right: 2.4rem; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ═══ FILM GRAIN (.k-grain) ══════════════════════════════════════
+   A static fractal-noise texture so the obsidian never reads as flat.
+   Layered ABOVE the light-show canvases (#milkdrop/#lightshow z0,
+   .ls-vignette z1) but BELOW page content: z-index:2 matches
+   #smooth-wrapper, and .k-grain precedes it in the DOM, so the content
+   paints on top while the grain still covers the canvas haze. (techno's
+   own body::after grain sits higher at z40 — this is an extra, softer
+   pass tuned to the console look, deliberately kept faint.) */
+.k-grain {
+  position: fixed; inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: .045;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='kn'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23kn)'/%3E%3C/svg%3E");
+  animation: k-grain-drift 1.1s steps(1) infinite;
+}
+/* stepped position jitter reads as live film grain (steps(1) = hard jumps) */
+@keyframes k-grain-drift {
+  0%   { background-position:   0    0; }
+  12%  { background-position: -12%  -8%; }
+  25%  { background-position:   9%  -14%; }
+  37%  { background-position: -6%   11%; }
+  50%  { background-position:  13%   6%; }
+  62%  { background-position: -11%  -5%; }
+  75%  { background-position:   5%  13%; }
+  87%  { background-position: -9%   -11%; }
+  100% { background-position:   0    0; }
+}
+
+/* ═══ GATE CONSOLE (.gate--kinetic / .k-console) ═════════════════
+   techno already paints the obsidian stage + card. Here the card body
+   becomes a terminal readout: a WEDDING_OS header with a pulsing dot,
+   a boot progress bar with %, and a rounded-square "console" seal. */
+
+/* Opaque console lock. techno's #gate is deliberately translucent so its
+   abstract WebGL backdrop shows through before the tap — but the kinetic hero
+   is large TEXT (the couple's names), which would bleed through that translucent
+   gate behind the console. A boot console should fully occlude, so make the
+   kinetic gate solid obsidian (the gate-stage grid/shaft still reads on top). */
+html[data-variant="kinetic"] #gate {
+  background:
+    radial-gradient(120% 90% at 50% 40%, #101319 0%, var(--bg) 58%, var(--bg-deep) 100%);
+}
+
+/* header line: OS name + pulsing status dot + cyan version, mono & wide */
+.k-console-head {
+  display: flex; align-items: center; justify-content: center; gap: .5em;
+  font-family: var(--font-mono);
+  font-size: .6rem; letter-spacing: .28em;
+  text-transform: uppercase;
+  color: var(--label);
+  margin-bottom: 1rem;
+}
+.k-console-ver { color: var(--accent); letter-spacing: .14em; }
+.k-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px rgba(var(--accent-rgb), .7);
+  animation: k-dot-pulse 1.6s ease-in-out infinite;
+}
+@keyframes k-dot-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+
+/* boot block — a thin hairline track with a cyan fill (JS animates width),
+   and a single justified status/percent line beneath it */
+.k-console-boot { margin: 1.2rem 0 1.3rem; }
+.k-console-track {
+  position: relative;
+  width: 100%; height: 2px;
+  background: var(--hairline);
+  overflow: hidden;
+  margin-bottom: .55rem;
+}
+.k-console-fill {
+  display: block; height: 100%; width: 0;      /* JS animates width 0 → 100% */
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(var(--accent-rgb), .55);   /* soft cyan glow on the fill */
+  transition: width .3s var(--k-ease);
+}
+.k-console-line {
+  display: flex; align-items: baseline; justify-content: space-between;
+  font-family: var(--font-mono);
+}
+.k-console-status {
+  font-size: .6rem; letter-spacing: .2em;
+  text-transform: uppercase; color: var(--accent);
+}
+.k-console-pct {
+  font-size: .6rem; letter-spacing: .08em;
+  color: var(--muted); font-variant-numeric: tabular-nums;
+}
+
+/* seal — keep techno's large tappable target, but swap the round ring for a
+   rounded-SQUARE "console" frame (subtle). Scoped so it beats .seal--techno. */
+html[data-variant="kinetic"] .seal--kinetic { border-radius: 16px; }
+html[data-variant="kinetic"] .seal--kinetic .seal-ring { border-radius: 11px; }
+html[data-variant="kinetic"] .seal--kinetic .seal-ripple { border-radius: 18px; }
+
+/* ═══ SECTION INDEX (.k-index) ═══════════════════════════════════
+   A console list marker ("01 / 05") above each section kicker: a short
+   cyan leading rule + dim-cyan mono numerals. aria-hidden chrome. */
+.k-index {
+  display: block;
+  margin-bottom: .9rem;
+  font-family: var(--font-mono);
+  font-size: .62rem; letter-spacing: .28em;
+  color: rgba(var(--accent-rgb), .6);
+}
+.k-index::before {
+  content: ""; display: inline-block;
+  width: 1.4em; height: 1px; margin-right: .7em;
+  vertical-align: middle;
+  background: rgba(var(--accent-rgb), .55);
+}
+/* defensive: on desktop techno turns .countdown .wrap and .interlude .wrap--narrow
+   into grids — make the index span the full row so it never steals a column and
+   breaks the split beneath it (harmless when those wraps aren't grids) */
+html[data-variant="kinetic"] .countdown .k-index,
+html[data-variant="kinetic"] .interlude .k-index { grid-column: 1 / -1; }
+
+/* ═══ SCRAMBLE-TEXT CHROME ═══════════════════════════════════════
+   JS swaps characters, toggling .is-scrambling mid-decode. Mono during
+   the swap = "terminal decoding", resolving back to the rest font. Keep
+   the display font at REST (names must not stay monospace). */
+html[data-variant="kinetic"] .is-scrambling { font-family: var(--font-mono); }
+/* stop layout jump while characters swap: the names hold a stable box and never
+   wrap mid-decode. (Left as inline-block on .hero-name only — .hero-amp keeps
+   techno's display:flex, which draws its flanking hairlines on mobile.) */
+html[data-variant="kinetic"] .hero-name { display: inline-block; white-space: nowrap; }
+html[data-variant="kinetic"] .hero-amp { white-space: nowrap; }
+
+/* ═══ MAGNETIC TARGETS ([data-magnetic]) ═════════════════════════
+   JS drives the transform; CSS only hints the compositor. */
+html[data-variant="kinetic"] [data-magnetic] { will-change: transform; }
+
+/* ═══ REDUCED MOTION ═════════════════════════════════════════════
+   No grain drift, no dot pulse, no crosshair — native cursor restored,
+   everything static. (Content visibility: techno.css only hides .fade-up
+   under html.js and reveals it under .reduce-motion, so a no-JS visitor
+   already sees all content — no safety-net override needed here.) */
+@media (prefers-reduced-motion: reduce) {
+  .k-grain { animation: none; }
+  .k-dot { animation: none; }
+  #k-cursor { display: none; }
+  html[data-variant="kinetic"] { cursor: auto; }   /* wins over cursor:none above */
+}
+
+/* ═══ RESPONSIVE — mobile HUD declutter ══════════════════════════
+   On small screens keep only the corner ticks + the live time; the brand
+   and section readouts would crowd the ~375px frame. */
+@media (max-width: 640px) {
+  /* the live time collides with section content inside the narrow crop-frame,
+     so on mobile keep only the corner ticks — the chrome stays whisper-quiet */
+  .k-hud-brand, .k-hud-sec, .k-hud-time { display: none; }
+  .k-hud-corner { width: 14px; height: 14px; }   /* smaller ticks, tighter frame */
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ADVERSARIAL-REVIEW FIXES (pass 2)
+   Scoped to kinetic; each addresses a specific finding from the design
+   critique. techno/regency are untouched (kinetic.css loads only here).
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* [#2/#3] The inline "11 & 12" ampersand inherited the name-lockup's shrunk,
+   baseline-shifted cyan treatment and read as a typo ("11₈12"). Reset it to
+   normal size/baseline/colour inline; the oversized cyan ampersand is reserved
+   for the name lockup + the monogram only (one deliberate rule). */
+html[data-variant="kinetic"] .hero-date .hero-amp {
+  font-size: inherit;
+  color: inherit;
+  vertical-align: baseline;
+  display: inline;
+  margin: 0;
+  padding: 0;
+  transform: none;
+}
+html[data-variant="kinetic"] .hero-date .hero-amp::before,
+html[data-variant="kinetic"] .hero-date .hero-amp::after { content: none; }
+
+/* [#8] Kicker/eyebrow sentences sat at ~--label (reads as disabled placeholder).
+   Lift the READABLE labels to --muted (~7.8:1); the tiny mono micro-labels
+   (TRACK/DRESS/count-label) stay quiet by design, carrying the "instrument"
+   register through tracking, not dimness. */
+html[data-variant="kinetic"] .kicker,
+html[data-variant="kinetic"] .scratch-hint { color: var(--muted); }
+
+/* [#7 — safe part only] Lift the card surfaces so they read as material, not a
+   flat wash. (Deliberately NOT desaturating the cyan or adding a serif: obsidian
+   + electric cyan + geometric sans is faithful to BOTH named references — the
+   techno base and saifullah.dev — so warming it would betray the brief.) */
+html[data-variant="kinetic"] .event-card {
+  background: linear-gradient(180deg, rgba(26, 30, 39, .72), rgba(13, 15, 20, .55));
+  border-color: var(--hairline);
+}
+html[data-variant="kinetic"] .count-cell {
+  background: linear-gradient(180deg, rgba(26, 30, 39, .6), rgba(13, 15, 20, .35));
+}
+
+/* [#7 — backdrop] The techno milkdrop viz reads loud + green behind the hero
+   type and tips toward "gamer". Dim + de-saturate it for kinetic so the type
+   stays dominant and the field reads as quiet obsidian atmosphere, not a
+   reactive light wall. (JS drives #milkdrop opacity per frame; a CSS filter
+   composes with it without fighting the inline style.) */
+html[data-variant="kinetic"] #milkdrop {
+  filter: saturate(0.35) hue-rotate(155deg) brightness(0.5) contrast(1.02);
+}
+
+/* [#11] Widow/orphan control on the display quotes ("…with us.", "…coming."). */
+html[data-variant="kinetic"] .scratch-prompt,
+html[data-variant="kinetic"] .interlude-line,
+html[data-variant="kinetic"] .footer-line { text-wrap: balance; }
+
+/* [#12] Pointer-aware enter copy: fine-pointer users click, everyone else taps.
+   Template ships both words in spans; show one per input modality. */
+html[data-variant="kinetic"] .gate-hint .k-click { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  html[data-variant="kinetic"] .gate-hint .k-tap { display: none; }
+  html[data-variant="kinetic"] .gate-hint .k-click { display: inline; }
+}
+
+@media (min-width: 1024px) {
+  /* [#6] Desktop countdown read hollow: techno stacks the 4 cells vertically in
+     a narrow column (one tiny digit far-left, label far-right). For the kinetic
+     HUD a tight 2×2 instrument cluster with centred tiles reads as a real
+     counter. Overrides only techno's desktop countdown rules. */
+  html[data-variant="kinetic"] .countdown .count-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 1fr;
+    gap: .8rem;
+  }
+  html[data-variant="kinetic"] .countdown .count-cell {
+    flex-direction: column; align-items: center; justify-content: center;
+    padding: 1.15rem .8rem; gap: .5rem;
+  }
+
+  /* [#5] The section index clipped at the left viewport edge on the interlude
+     (its desktop grid zeroes wrap padding). The fixed HUD marker already labels
+     this section, so drop the redundant clipped index here. */
+  html[data-variant="kinetic"] .interlude .k-index { display: none; }
+}
