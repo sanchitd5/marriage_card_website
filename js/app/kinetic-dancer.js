@@ -81,9 +81,10 @@ export function initKineticDancer() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const px = w * h * dpr;
     const cores = navigator.hardwareConcurrency || 4;
-    // HIGH: ~40k–90k tris; LOW: ~1/3 of that for small canvases / weak devices.
-    if (px < 120000 || cores <= 4) return { radial: 30, ringF: 24, minRing: 10, headDetail: 3 };
-    return { radial: 52, ringF: 46, minRing: 16, headDetail: 4 };
+    // Medium density so the SKINNED WIREFRAME reads as a clean wireframe (a very
+    // dense wire additively washes to a solid pale blob). Still detailed.
+    if (px < 120000 || cores <= 4) return { radial: 12, ringF: 12, minRing: 6, headDetail: 2 };
+    return { radial: 16, ringF: 16, minRing: 8, headDetail: 3 };
   }
   const TIER = pickTier();
 
@@ -681,8 +682,12 @@ export function initKineticDancer() {
     // let the PROBE POINTS carry the figure as a glowing cyan point-cloud (a
     // dense point cloud stays crisp — points don't overlap-accumulate like the
     // wire triangles). All opacity slow-energy driven (flash-safe), never beat.
-    coreMat.opacity = 0.015 + energy * 0.02;       // near-invisible wire (structure hint)
-    pointsMat.uniforms.uOpacity.value = 0.6 + energy * 0.3;     // probe points = the whole figure
+    // The WIREFRAME (built-in GPU skinning — reliable on every GPU) is the
+    // primary visible, deforming figure; the probe points are a faint accent on
+    // top (their custom-shader skinning can render bind-pose/static on some GPUs,
+    // so it must NOT be the sole visible layer or the dance looks frozen).
+    coreMat.opacity = 0.5 + energy * 0.3;
+    pointsMat.uniforms.uOpacity.value = 0.22 + energy * 0.16;
 
     renderer.render(scene, camera);
 
