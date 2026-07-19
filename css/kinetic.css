@@ -407,3 +407,70 @@ html[data-variant="kinetic"] .krings-line { max-width: 30rem; margin-inline: aut
 @media (prefers-reduced-motion: reduce) {
   #k-rings-canvas { display: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   NON-SCROLLING SCENE DECK (html.k-deck — added by kinetic.js in the
+   full-motion path only; reduced-motion / no-JS keep a normal scrolling
+   page). The page never scrolls: each act is a fixed full-viewport layer
+   and a wheel / swipe / arrow key swaps the current one in place.
+   ═══════════════════════════════════════════════════════════════════ */
+html.k-deck, html.k-deck body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+/* the ScrollSmoother wrapper is inert here — acts are positioned directly */
+html.k-deck #smooth-wrapper,
+html.k-deck #smooth-content { transform: none !important; height: auto; }
+
+/* every act is a full-viewport layer; only .act-current takes pointer input.
+   Tall acts (e.g. events on a small phone) may exceed the viewport, so allow
+   internal scroll as a safety — kinetic.js only advances the deck once the act
+   is scrolled to its edge. */
+html.k-deck .hero,
+html.k-deck .band,
+html.k-deck .footer {
+  position: fixed; inset: 0;
+  min-height: 0; height: 100svh; margin: 0;
+  overflow-x: hidden; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  pointer-events: none;
+  z-index: 1;
+  /* keep vertical centring, but when an act is taller than the viewport let the
+     overflow spill DOWNWARD only (never clip the top) — the internal scroll then
+     reaches it before the deck advances */
+  justify-content: safe center;
+}
+html.k-deck .hero::-webkit-scrollbar,
+html.k-deck .band::-webkit-scrollbar,
+html.k-deck .footer::-webkit-scrollbar { width: 0; height: 0; }
+html.k-deck .act-current { pointer-events: auto; z-index: 2; }
+
+/* the floating scroll-dock cue is meaningless without a scrolling page */
+html.k-deck #floating-cue { display: none; }
+
+/* progress rail — one dot per act on the left edge; click to jump. Sits below
+   the HUD (58) / cursor, above content. */
+#k-deck-nav {
+  position: fixed; left: clamp(.85rem, 2vw, 1.5rem); top: 50%;
+  transform: translateY(-50%);
+  z-index: 57;
+  display: flex; flex-direction: column; gap: .75rem;
+}
+html:not(.k-deck) #k-deck-nav { display: none; }   /* only in deck mode */
+#k-deck-nav button {
+  width: 9px; height: 9px; padding: 0; border-radius: 50%;
+  border: 1px solid var(--hairline); background: transparent;
+  cursor: pointer; transition: border-color .3s var(--k-ease), background .3s var(--k-ease), box-shadow .3s var(--k-ease);
+}
+#k-deck-nav button:hover { border-color: var(--accent); }
+#k-deck-nav button.is-current {
+  border-color: var(--accent); background: var(--accent);
+  box-shadow: 0 0 8px rgba(var(--accent-rgb), .7);
+}
+@media (max-width: 640px) {
+  #k-deck-nav { left: .7rem; gap: .6rem; }
+  #k-deck-nav button { width: 7px; height: 7px; }
+}
+@media (prefers-reduced-motion: reduce) { #k-deck-nav button { transition: none; } }

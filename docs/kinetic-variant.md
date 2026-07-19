@@ -44,6 +44,22 @@ per-theme difference is the template: `src/index.kinetic.template.html`.
 Kinetic is obsidian-only (no day/night toggle) and uses vanilla JS scramble
 (GSAP's ScrambleTextPlugin is a paid Club plugin and is not loaded).
 
+## Non-scrolling scene deck
+
+In the full-motion path the page **does not scroll**: `kinetic.js` adds
+`html.k-deck`, stacks every act (`.hero` / `.band` / `.footer`) as a fixed
+full-viewport layer, and a **wheel / vertical swipe / arrow key / left-rail dot**
+swaps the current act in place (cross-fade + slide, `expo`/`power` eases). Each
+act reveals on enter (fade-up stagger, heading scramble, countdown settle,
+interlude timeline) and the rings act is driven by the deck via
+`appState.rings.setInView(true/false)` (its IntersectionObserver is disabled
+under `k-deck`). A `#k-deck-nav` rail marks progress; the HUD section marker
+updates per act. Content-fit safety: a tall act (e.g. events on a small phone)
+scrolls **internally** to its edge before the next gesture advances the deck, so
+nothing is clipped unreachably. **Reduced-motion / no-GSAP / no-JS keep a normal
+scrolling page** (no `k-deck`), so all content stays reachable — the deck is a
+progressive enhancement, not a hard requirement.
+
 ## Signature elements
 
 - **Boot-console gate** — `WEDDING_OS v12.12.26`, a status word cycling

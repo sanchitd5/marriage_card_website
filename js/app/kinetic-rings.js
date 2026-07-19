@@ -242,19 +242,27 @@ export function initKineticRings() {
     return;
   }
 
-  // ---- active-gate: run RAF + pointer listeners only while #rings is on
-  //      screen AND the tab is visible; pause otherwise to spare the GPU ----
-  if (section && 'IntersectionObserver' in window) {
+  // ---- active-gate: run RAF + pointer listeners only while the rings are the
+  //      on-screen act AND the tab is visible; pause otherwise to spare the GPU.
+  // Single entry point so both the scroll (IntersectionObserver) and the
+  // non-scrolling deck can drive it. In deck mode the page never scrolls, so the
+  // IO can't tell whether #rings is the current act — the deck calls setInView().
+  function setInView(v) {
+    if (dead || v === inView) return;
+    inView = v;
+    if (inView) { attachPointer(); start(); }
+    else { stop(); detachPointer(); }
+  }
+  const deckMode = document.documentElement.classList.contains('k-deck');
+  if (deckMode) {
+    // wait for the deck (kinetic.js) to call appState.rings.setInView(true/false)
+  } else if (section && 'IntersectionObserver' in window) {
     const io = new IntersectionObserver((entries) => {
-      const vis = entries.some((en) => en.isIntersecting);
-      if (vis === inView) return;
-      inView = vis;
-      if (inView) { attachPointer(); start(); }
-      else { stop(); detachPointer(); }
+      setInView(entries.some((en) => en.isIntersecting));
     }, { threshold: 0.05 });
     io.observe(section);
   } else {
-    inView = true; attachPointer(); start();  // no IO → always live
+    setInView(true);  // no IO → always live
   }
 
   document.addEventListener('visibilitychange', () => {
@@ -268,5 +276,5 @@ export function initKineticRings() {
     window.addEventListener('resize', onResize, { passive: true });
   }
 
-  appState.rings = { start, stop, get live() { return live; } };
+  appState.rings = { start, stop, setInView, get live() { return live; } };
 }

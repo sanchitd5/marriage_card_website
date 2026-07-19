@@ -240,35 +240,128 @@ export function initKinetic() {
     return;
   }
 
-  // ── Smooth scroll (effects:true powers the hero data-speed parallax) ──
-  appState.smoother = ScrollSmoother.create({ smooth: 1.15, effects: true, smoothTouch: false, normalizeScroll: false });
-  if ($('#gate')) appState.smoother.scrollTop(0);
+  // ── NON-SCROLLING SCENE DECK ────────────────────────────────────────
+  // The page never scrolls; a wheel / vertical swipe / arrow key swaps the
+  // current full-viewport "act" in place. (Reduced-motion + no-GSAP paths
+  // returned above and keep a normal scrolling page, so all content stays
+  // reachable — the deck is a full-motion enhancement.)
+  document.documentElement.classList.add('k-deck');
+  const acts = [$('#hero'), ...$$('#smooth-content .band'), $('.footer')].filter(Boolean);
+  const hudSecEl = $('#k-hud-sec');
+  const revealedActs = new WeakSet();
+  revealedActs.add(acts[0]); // the hero copy is revealed by heroReveal(), not here
 
-  // ── fade-up reveal primitive (saifullah expo feel) ──
-  ScrollTrigger.batch('.fade-up', {
-    start: 'top 82%',
-    once: true,
-    onEnter: b => gsap.fromTo(b,
-      { y: 48, autoAlpha: 0 },
-      { y: 0, autoAlpha: 1, duration: 1, stagger: 0.1, ease: 'expo.out', overwrite: true }),
-  });
+  // stack every act (CSS fixes them full-viewport); show only the first
+  gsap.set(acts, { autoAlpha: 0 });
+  gsap.set(acts[0], { autoAlpha: 1 });
+  acts[0].classList.add('act-current');
+  if (hudSecEl && acts[0].getAttribute('data-hud')) hudSecEl.textContent = acts[0].getAttribute('data-hud');
 
-  // ── interlude: portrait eases in, quote follows (not a .fade-up, so it
-  //    needs its own reveal or techno.css leaves it at opacity:0) ──
-  if ($('.interlude-art')) {
-    gsap.timeline({
-      defaults: { ease: 'power3.out' },
-      scrollTrigger: { trigger: '.interlude-art', start: 'top 80%', once: true },
-    })
-      .fromTo('.interlude-art', { autoAlpha: 0, y: 60, scale: 0.96 }, { autoAlpha: 1, y: 0, scale: 1, duration: 1.6 })
-      .fromTo('.interlude-line', { autoAlpha: 0, y: 28 }, { autoAlpha: 1, y: 0, duration: 1.1 }, '-=.8');
+  function ringsActive(v) {
+    const r = appState.rings;
+    if (!r) return;
+    if (r.setInView) r.setInView(v); else (v ? r.start : r.stop)?.();
+  }
+  function enterReveals(act) {
+    if (hudSecEl && act.getAttribute('data-hud')) hudSecEl.textContent = act.getAttribute('data-hud');
+    if (act.querySelector('#k-rings-stage')) ringsActive(true);
+    if (revealedActs.has(act)) { gsap.set($$('.fade-up', act), { autoAlpha: 1, y: 0 }); return; }
+    revealedActs.add(act);
+    const ups = $$('.fade-up', act);
+    if (ups.length) gsap.fromTo(ups, { y: 36, autoAlpha: 0 },
+      { y: 0, autoAlpha: 1, duration: 0.9, stagger: 0.08, ease: 'expo.out', overwrite: true });
+    $$('[data-scramble]', act).forEach(el => scramble(el, { duration: 1.0 }));
+    if (act.querySelector('.interlude-art')) {
+      gsap.timeline({ defaults: { ease: 'power3.out' } })
+        .fromTo('.interlude-art', { autoAlpha: 0, y: 60, scale: 0.96 }, { autoAlpha: 1, y: 0, scale: 1, duration: 1.4 })
+        .fromTo('.interlude-line', { autoAlpha: 0, y: 28 }, { autoAlpha: 1, y: 0, duration: 1.0 }, '-=.7');
+    }
+    const nums = $$('.count-num', act);
+    if (nums.length) gsap.fromTo(nums, { scale: 0.88, autoAlpha: 0 },
+      { scale: 1, autoAlpha: 1, duration: 1.2, ease: 'luxe', stagger: 0.12 });
+  }
+  function leaveAct(act) { if (act.querySelector('#k-rings-stage')) ringsActive(false); }
+
+  let idx = 0, busy = false, entered = !$('#gate');
+  function go(n) {
+    n = Math.max(0, Math.min(acts.length - 1, n));
+    if (n === idx || busy) return;
+    const dir = n > idx ? 1 : -1;
+    busy = true;
+    const cur = acts[idx], nxt = acts[n];
+    leaveAct(cur);
+    nxt.classList.add('act-current');
+    gsap.set(nxt, { autoAlpha: 0, yPercent: 6 * dir });
+    gsap.timeline({ onComplete() { cur.classList.remove('act-current'); gsap.set(cur, { yPercent: 0 }); busy = false; } })
+      .to(cur, { autoAlpha: 0, yPercent: -6 * dir, duration: 0.45, ease: 'power2.in' })
+      .to(nxt, { autoAlpha: 1, yPercent: 0, duration: 0.6, ease: 'power2.out' }, '-=0.15')
+      .add(() => enterReveals(nxt), '<');
+    idx = n;
+    updateNav();
   }
 
-  // ── countdown digits settle ──
-  gsap.fromTo('.count-num', { scale: 0.88, autoAlpha: 0 }, {
-    scale: 1, autoAlpha: 1, duration: 1.4, ease: 'luxe', stagger: 0.14,
-    scrollTrigger: { trigger: '.count-grid', start: 'top 80%', once: true },
+  // ── progress rail (left edge): one dot per act, click to jump ──
+  const navDots = [];
+  const nav = document.createElement('nav');
+  nav.id = 'k-deck-nav';
+  nav.setAttribute('aria-label', 'Sections');
+  acts.forEach((act, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('aria-label', (act.getAttribute('data-hud') || `Act ${i}`).replace(/^\d+\s*[—-]\s*/, ''));
+    b.addEventListener('click', () => { if (entered) go(i); });
+    nav.appendChild(b);
+    navDots.push(b);
   });
+  document.body.appendChild(nav);
+  function updateNav() { navDots.forEach((d, i) => d.classList.toggle('is-current', i === idx)); }
+  updateNav();
+
+  // ── input: wheel / keys / vertical swipe (disabled until the gate opens) ──
+  // Content-fit safety (fullpage-style): if the current act is taller than the
+  // viewport, let it scroll INTERNALLY until its edge, then the next gesture
+  // advances the deck — so a tall act (e.g. events on a small phone) is never
+  // clipped unreachably.
+  const canScrollPast = (act, dir) => {
+    if (!act || act.scrollHeight <= act.clientHeight + 2) return false;
+    const atTop = act.scrollTop <= 0;
+    const atBottom = act.scrollTop + act.clientHeight >= act.scrollHeight - 2;
+    return dir > 0 ? !atBottom : !atTop;
+  };
+  let wheelAcc = 0, wheelLast = 0;
+  window.addEventListener('wheel', (e) => {
+    if (!entered) return;
+    if (canScrollPast(acts[idx], e.deltaY)) return; // let the act scroll natively
+    e.preventDefault();
+    if (busy) return;
+    const t = e.timeStamp || 0;
+    wheelAcc = (t - wheelLast < 140) ? wheelAcc + e.deltaY : e.deltaY;
+    wheelLast = t;
+    if (Math.abs(wheelAcc) > 40) { go(idx + (wheelAcc > 0 ? 1 : -1)); wheelAcc = 0; }
+  }, { passive: false });
+
+  window.addEventListener('keydown', (e) => {
+    if (!entered) return;
+    if (['ArrowDown', 'PageDown'].includes(e.key) || (e.key === ' ' && !e.shiftKey)) { e.preventDefault(); go(idx + 1); }
+    else if (['ArrowUp', 'PageUp'].includes(e.key) || (e.key === ' ' && e.shiftKey)) { e.preventDefault(); go(idx - 1); }
+    else if (e.key === 'Home') { e.preventDefault(); go(0); }
+    else if (e.key === 'End') { e.preventDefault(); go(acts.length - 1); }
+  });
+
+  let touchY = null;
+  window.addEventListener('touchstart', (e) => {
+    // let the rings act own its horizontal drag; only swipe elsewhere changes acts
+    if (!entered || (e.target.closest && e.target.closest('#k-rings-stage'))) { touchY = null; return; }
+    touchY = e.touches[0].clientY;
+  }, { passive: true });
+  window.addEventListener('touchmove', (e) => {
+    if (!entered || touchY == null || busy) return;
+    const dy = touchY - e.touches[0].clientY;
+    if (Math.abs(dy) < 48) return;
+    if (canScrollPast(acts[idx], dy)) { touchY = null; return; } // let the act scroll natively
+    go(idx + (dy > 0 ? 1 : -1));
+    touchY = null;
+  }, { passive: true });
 
   // ── Hero entrance (fired by the gate on open) ──
   const heroNames = $$('#hero [data-scramble-name]');
@@ -280,6 +373,7 @@ export function initKinetic() {
   if (hasGate) gsap.set(heroBits, { autoAlpha: 0, y: 18 });
 
   heroReveal = function heroReveal() {
+    entered = true;   // the gate is open → the deck accepts wheel / swipe / keys
     heroNames.forEach((el, i) => {
       const delay = i * 0.12;
       gsap.to(el, { autoAlpha: 1, y: 0, duration: 0.9, ease: 'expo.out', delay });
@@ -293,32 +387,8 @@ export function initKinetic() {
   };
   if (!hasGate) heroReveal();
 
-  // ── Section-heading scramble: every [data-scramble] OUTSIDE the hero
-  //    (script-head / display-head) scrambles as it scrolls into view ──
-  $$('[data-scramble]').filter(el => !el.closest('#hero')).forEach(el => {
-    ScrollTrigger.create({
-      trigger: el,
-      start: 'top 80%',
-      once: true,
-      onEnter: () => scramble(el, { duration: 1.1 }),
-    });
-  });
-
-  // ── HUD section marker: swap on the section in view (both directions) ──
-  const hudSec = $('#k-hud-sec');
-  if (hudSec) {
-    $$('[data-hud]').forEach(section => {
-      const label = section.getAttribute('data-hud');
-      if (!label) return;
-      ScrollTrigger.create({
-        trigger: section,
-        start: 'top center',
-        end: 'bottom center',
-        onEnter: () => { hudSec.textContent = label; },
-        onEnterBack: () => { hudSec.textContent = label; },
-      });
-    });
-  }
+  // (Section-heading scramble + HUD section marker are driven per-act by the
+  //  deck's enterReveals() above — no ScrollTriggers needed in deck mode.)
 
   const finePointer = matchMedia('(hover:hover) and (pointer:fine)').matches;
 
