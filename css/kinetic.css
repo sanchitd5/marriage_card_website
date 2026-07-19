@@ -400,14 +400,12 @@ html.k-deck .band,
 html.k-deck .footer {
   position: fixed; inset: 0;
   min-height: 0; height: 100svh; margin: 0;
-  overflow-x: hidden; overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+  /* a control panel does NOT scroll — every panel is a fixed viewport with no
+     internal scroll (was overflow-y:auto, which let the hero scroll). All panels
+     (incl. the content-heavy run-of-show) are sized to fit the viewport. */
+  overflow: hidden;
   pointer-events: none;
   z-index: 1;
-  /* keep vertical centring, but when an act is taller than the viewport let the
-     overflow spill DOWNWARD only (never clip the top) — the internal scroll then
-     reaches it before the deck advances */
   justify-content: safe center;
 }
 html.k-deck .hero::-webkit-scrollbar,
