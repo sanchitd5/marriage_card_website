@@ -76,10 +76,18 @@ env-flagged build. Goal: make it **state-of-the-art**. Original brief:
   removed, one obsidian palette), retired the cyan "second-word" heading tic.
 
 ## In progress / next (the design overhaul)
-- **Batch 2 (IN PROGRESS): desktop art-direction.** Biggest structural gap:
-  desktop is a ~720px centred column marooned in dead black. Break the centre,
-  bleed oversized type off edges, fill/kill the dead vertical bands, tighten
-  rhythm, asymmetric event cards. Per-section wide-screen composition.
+- **Batch 2 (DONE 2026-07-19): desktop art-direction.** Root cause was NOT
+  "centred" but a triple-nested width throttle (content pinned to 24-34rem in a
+  74rem wrap) + undersized type. Fixed with WIDTH + SCALE + RHYTHM, asymmetry
+  spent only on informational bands; sacred/emotional core stays centred. Two
+  review passes (`reviews/2026-07-19-batch2-*`): killed the orphan corner-tick,
+  countdown -> one left axis with a height-matched readout, events climax card
+  weighted, interlude -> dominant left-bleed portrait + anchored quote, gallery
+  veil -> a sealed object (crosshair + frame count), hero cyan trimmed to budget.
+  Deferred: footer romanised-transliteration diacritics render glitchy (a later
+  type pass). Also fixed a **Regency** gate-reveal stutter (commit `69c75c5`):
+  the reveal decoded BOTH day+night clips + hero at once; now only the active
+  clip plays. And the Regency build no longer ships the 34MB techno playlist.
 - **Batch 3: component redesign** — countdown (drop the outlined boxes, set
   numerals in the display face, roll animation), gate (less generic modal, stop
   the muddy hero blur behind it), event cards (depth/venue cue), scratch panel

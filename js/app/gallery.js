@@ -16,10 +16,21 @@ function photosHTML() {
 }
 
 // Techno reads the veil as a redacted "SEALED" label; Regency as a gold fleuron.
+// Techno also gets a crosshair-seal + a real locked frame count (00 / N) so the
+// wide desktop veil reads as a deliberately sealed object, not an empty table.
+// The seal + count are CSS-hidden below 1024px, so the mobile veil is unchanged.
 function veiledHTML() {
-  const motif = document.documentElement.dataset.skin === 'techno' ? 'Sealed' : '&#10022;';
+  if (document.documentElement.dataset.skin === 'techno') {
+    const total = String(GALLERY.length).padStart(2, '0');
+    return `<figure class="gframe gframe--veiled fade-up">
+       <svg class="veil-seal" aria-hidden="true" focusable="false"><use href="#nataraja-motif"/></svg>
+       <span class="veil-motif" aria-hidden="true">Sealed</span>
+       <p class="veil-note">Their story is kept close, to be unveiled after the celebration</p>
+       <span class="veil-count" aria-hidden="true">00 / ${total} frames</span>
+     </figure>`;
+  }
   return `<figure class="gframe gframe--veiled fade-up">
-     <span class="veil-motif" aria-hidden="true">${motif}</span>
+     <span class="veil-motif" aria-hidden="true">&#10022;</span>
      <p class="veil-note">Their story is kept close, to be unveiled after the celebration</p>
    </figure>`;
 }
