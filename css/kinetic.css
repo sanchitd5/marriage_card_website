@@ -969,21 +969,24 @@ html[data-variant="kinetic"] #hero { overflow: hidden; }
    `display:none` and the desktop right-side placement.
    ═══════════════════════════════════════════════════════════════════ */
 @media (max-width: 900px) {
+  /* Anchor the figure to the LOWER band of the screen (where panels have empty
+     space) instead of dead-centre where the centred headline masks it. It rises
+     from the bottom behind the content — clearly visible, more present. */
   html.k-deck #k-dancer-canvas {
     display: block;
-    left: 0; right: 0; top: 0;
-    width: 100%; height: 100svh;
+    left: 0; right: 0; top: auto; bottom: 0;
+    width: 100%; height: 62svh;
     transform: none;                 /* drop the desktop right-shift */
     z-index: 1;                      /* behind the panel content (z2) */
   }
   html.k-deck #k-dancer-canvas.is-live,
   html.k-deck[data-panel="interlude"] #k-dancer-canvas.is-live,
   html.k-deck[data-panel="archive"]   #k-dancer-canvas.is-live,
-  html.k-deck[data-panel="rsvp"]       #k-dancer-canvas.is-live { opacity: 0.3; }
+  html.k-deck[data-panel="rsvp"]       #k-dancer-canvas.is-live { opacity: 0.6; }
   html.k-deck[data-panel="interlude"] #k-dancer-canvas { transform: none; }
-  /* a soft centre-out scrim behind the content so text reads over the hologram */
+  /* scrim only the TOP (behind the headline) so the lower figure stays visible */
   html.k-deck #k-dancer-scrim {
     display: block; z-index: 1;
-    background: radial-gradient(130% 75% at 50% 46%, rgba(6,7,10,.35) 0%, rgba(6,7,10,.66) 70%, rgba(6,7,10,.8) 100%);
+    background: linear-gradient(180deg, rgba(6,7,10,.78) 0%, rgba(6,7,10,.5) 38%, rgba(6,7,10,0) 62%);
   }
 }
