@@ -351,3 +351,59 @@ html[data-variant="kinetic"] .gate-hint .k-click { display: none; }
      this section, so drop the redundant clipped index here. */
   html[data-variant="kinetic"] .interlude .k-index { display: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   INTERACTIVE RINGS (.krings / #k-rings-stage)
+   A saifullah-style interactive 3D object: two interlocked cyan wireframe
+   rings on their own canvas (js/app/kinetic-rings.js). The inline SVG
+   fallback (#k-rings-fallback) shows by default; JS adds .is-live to the
+   stage once the WebGL rings paint, revealing the canvas + hiding the SVG.
+   ═══════════════════════════════════════════════════════════════════ */
+html[data-variant="kinetic"] .krings { text-align: center; }
+
+.k-rings-stage {
+  position: relative;
+  width: min(560px, 84vw);
+  aspect-ratio: 7 / 5;
+  margin: clamp(1.5rem, 5vw, 3rem) auto clamp(1.8rem, 5vw, 2.8rem);
+  /* vertical page scroll still passes through; the horizontal drag spins the
+     rings (kinetic-rings.js only rotates, never blocks the vertical gesture). */
+  touch-action: pan-y;
+}
+.k-rings-stage.is-grabbing { cursor: grabbing; }
+
+#k-rings-canvas {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  opacity: 0;                       /* revealed when the rings go live */
+  transition: opacity .6s var(--k-ease);
+}
+.k-rings-stage.is-live #k-rings-canvas { opacity: 1; }
+
+/* Static SVG fallback — centred, glowing cyan rings. Hidden once live (either
+   via the [hidden] attribute the JS sets, or the .is-live stage class). */
+.k-rings-fallback {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  display: block;
+}
+.k-rings-fallback[hidden],
+.k-rings-stage.is-live .k-rings-fallback { display: none; }
+
+.k-rings-hint {
+  position: absolute; left: 50%; bottom: -.2rem; transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: .58rem; letter-spacing: .28em; text-transform: uppercase;
+  color: var(--label);
+  transition: opacity .5s var(--k-ease);
+}
+.k-rings-hint.is-hidden { opacity: 0; }   /* fades after first interaction */
+
+/* the section's closing quote reuses the interlude line's register */
+html[data-variant="kinetic"] .krings-line { max-width: 30rem; margin-inline: auto; }
+
+/* Reduced motion: no canvas is created, so the SVG fallback simply stays. Give
+   it a slow breathing glow so it isn't dead-static, but nothing that moves. */
+@media (prefers-reduced-motion: reduce) {
+  #k-rings-canvas { display: none; }
+}

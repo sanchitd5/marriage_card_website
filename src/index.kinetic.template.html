@@ -245,7 +245,7 @@
       <!-- ══════════ COUNTDOWN + SCRATCH ══════════ -->
       <section class="band band--tint countdown" id="countdown" data-hud="01 — COUNTDOWN">
         <div class="wrap">
-          <p class="k-index" aria-hidden="true">01 / 05</p>
+          <p class="k-index" aria-hidden="true">01 / 06</p>
           <p class="kicker fade-up">The most anticipated set of the season</p>
           <h2 class="script-head fade-up" data-scramble>Until the drop</h2>
           <div class="count-grid" role="timer" aria-live="off">
@@ -271,7 +271,7 @@
       <!-- ══════════ EVENTS ══════════ -->
       <section class="band events" id="events" data-hud="02 — RUN OF SHOW">
         <div class="wrap">
-          <p class="k-index" aria-hidden="true">02 / 05</p>
+          <p class="k-index" aria-hidden="true">02 / 06</p>
           <p class="kicker fade-up">The running order</p>
           <h2 class="display-head fade-up" data-scramble>Three sets,<br><em>two hearts</em></h2>
           <div class="event-grid">
@@ -316,10 +316,53 @@
         </div>
       </section>
 
-      <!-- ══════════ INTERLUDE ══════════ -->
-      <section class="band band--tint interlude" data-hud="03 — INTERLUDE">
+      <!-- ══════════ INTERACTIVE RINGS ══════════ -->
+      <!-- A saifullah.dev-style interactive 3D object, reimagined for a wedding:
+           two interlocked low-poly wireframe rings (wedding bands + a DJ/vinyl
+           motif). Cyan additive LineSegments on its OWN small low-DPR canvas
+           (kinetic-rings.js) — separate from the techno backdrop context, paused
+           when offscreen. Drag to spin (mouse + touch) with inertia; idle bob +
+           desktop parallax. The inline SVG is the static fallback shown under
+           reduced-motion / no-WebGL / no-JS, hidden once the canvas goes live. -->
+      <section class="band band--tint krings" id="rings" data-hud="03 — THE RINGS">
         <div class="wrap wrap--narrow">
-          <p class="k-index" aria-hidden="true">03 / 05</p>
+          <p class="k-index" aria-hidden="true">03 / 06</p>
+          <p class="kicker fade-up">The interlock</p>
+          <h2 class="display-head fade-up" data-scramble>Give it a <em>spin</em></h2>
+          <div class="k-rings-stage fade-up" id="k-rings-stage">
+            <canvas id="k-rings-canvas" aria-hidden="true"></canvas>
+            <svg class="k-rings-fallback" id="k-rings-fallback" viewBox="0 0 420 300" role="img" aria-label="Two interlocked wireframe rings">
+              <defs>
+                <filter id="k-rings-glow" x="-30%" y="-30%" width="160%" height="160%">
+                  <feGaussianBlur stdDeviation="3" result="b"/>
+                  <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+              </defs>
+              <g fill="none" stroke="#22d3ee" stroke-width="1.1" filter="url(#k-rings-glow)" opacity=".9">
+                <g transform="translate(168 150) rotate(-18)">
+                  <ellipse rx="86" ry="86" opacity=".95"/>
+                  <ellipse rx="86" ry="30"/>
+                  <ellipse rx="60" ry="86" opacity=".6"/>
+                  <path d="M-86 0 L86 0 M0 -86 L0 86" opacity=".35"/>
+                </g>
+                <g transform="translate(252 150) rotate(18)" opacity=".8">
+                  <ellipse rx="86" ry="86" opacity=".85"/>
+                  <ellipse rx="86" ry="30"/>
+                  <ellipse rx="60" ry="86" opacity=".55"/>
+                  <path d="M-86 0 L86 0 M0 -86 L0 86" opacity=".3"/>
+                </g>
+              </g>
+            </svg>
+            <p class="k-rings-hint" id="k-rings-hint" aria-hidden="true">Drag to spin</p>
+          </div>
+          <p class="interlude-line krings-line">“Two orbits that found the same groove, and never fell out of phase.”</p>
+        </div>
+      </section>
+
+      <!-- ══════════ INTERLUDE ══════════ -->
+      <section class="band band--tint interlude" data-hud="04 — INTERLUDE">
+        <div class="wrap wrap--narrow">
+          <p class="k-index" aria-hidden="true">04 / 06</p>
           <div class="interlude-art">
             <img src="assets/images/art-couple.jpg" alt="{{FIRST_A}} and {{FIRST_B}}" loading="lazy" decoding="async">
           </div>
@@ -328,9 +371,9 @@
       </section>
 
       <!-- ══════════ GALLERY ══════════ -->
-      <section class="band gallery" id="gallery" data-hud="04 — ARCHIVE">
+      <section class="band gallery" id="gallery" data-hud="05 — ARCHIVE">
         <div class="wrap">
-          <p class="k-index" aria-hidden="true">04 / 05</p>
+          <p class="k-index" aria-hidden="true">05 / 06</p>
           <p class="kicker fade-up">A courtship, in frames</p>
           <h2 class="display-head fade-up" data-scramble>The story <em>so far</em></h2>
           <div class="gallery-grid" id="gallery-grid"><!-- populated by js --></div>
@@ -338,9 +381,9 @@
       </section>
 
       <!-- ══════════ FOOTER ══════════ -->
-      <footer class="footer" data-hud="05 — RSVP">
+      <footer class="footer" data-hud="06 — RSVP">
         <div class="wrap wrap--narrow">
-          <p class="k-index" aria-hidden="true">05 / 05</p>
+          <p class="k-index" aria-hidden="true">06 / 06</p>
           <p class="invocation footer-invocation">
             <svg class="invocation-motif" aria-hidden="true" focusable="false"><use href="#nataraja-motif"/></svg>
             <span class="shloka" lang="sa">तं नुमः सात्त्विकं शिवम्&nbsp;॥</span>
