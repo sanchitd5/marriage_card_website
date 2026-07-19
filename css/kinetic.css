@@ -958,3 +958,6 @@ html.k-deck .gframe--veiled { border: 1px solid rgba(var(--accent-rgb), .22); }
     var(--bg) 0%, var(--bg) 30%, rgba(11,12,15,0) 44%, rgba(11,12,15,0) 50%,
     rgba(6,7,10,.6) 58%, rgba(6,7,10,.9) 70%, rgba(6,7,10,.92) 100%);
 }
+
+/* explicit belt-and-suspenders: the hero panel itself never scrolls/overflows */
+html[data-variant="kinetic"] #hero { overflow: hidden; }
