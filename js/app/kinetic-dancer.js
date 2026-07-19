@@ -600,10 +600,10 @@ export function initKineticDancer() {
     // WHOLE-FIGURE SWAY — the big readable move. The pelvis (base of the whole
     // skeleton) translates side-to-side + bobs, so the entire silhouette grooves,
     // not just the thin limbs.
-    set(b.pelvis.position, 'x', s * 0.24 * A);                       // sway L↔R (visible mass shift)
-    set(b.pelvis.position, 'y', 0.12 + Math.abs(s) * 0.10 * A);      // bob up on each side
-    tgt(b.pelvis.rotation, 'z', s * 0.18 * A);                       // hip drop into the sway
-    tgt(b.pelvis.rotation, 'y', s * 0.22 * A);
+    set(b.pelvis.position, 'x', s * 0.17 * A);                       // sway L↔R (graceful, still visible)
+    set(b.pelvis.position, 'y', 0.12 + Math.abs(s) * 0.08 * A);      // gentle bob
+    tgt(b.pelvis.rotation, 'z', s * 0.16 * A);                       // hip drop into the sway
+    tgt(b.pelvis.rotation, 'y', s * 0.20 * A);
 
     // torso COUNTER-sways over the hips (contrapposto S-curve) + a breathing curl
     tgt(b.spine.rotation, 'x', 0.08 + (0.5 - 0.5 * Math.cos(p)) * 0.14 * A);
@@ -611,13 +611,16 @@ export function initKineticDancer() {
     tgt(b.chest.rotation, 'z', s * 0.14 * A);
     tgt(b.chest.rotation, 'y', -s * 0.14 * A);
 
-    // ARMS — big alternating raises toward the head/chest, deep bent elbows
-    tgt(b.upperArmL.rotation, 'z', 0.20 + reachL * 1.00 * A);
-    tgt(b.upperArmL.rotation, 'x', 0.15 + reachL * 1.15 * A);
-    tgt(b.forearmL.rotation, 'x', -0.5 - reachL * 1.25 * A);
-    tgt(b.upperArmR.rotation, 'z', -(0.20 + reachR * 1.00 * A));
-    tgt(b.upperArmR.rotation, 'x', 0.15 + reachR * 1.15 * A);
-    tgt(b.forearmR.rotation, 'x', -0.5 - reachR * 1.25 * A);
+    // ARMS — Anyma "Syren" vocabulary: hands drawn UP toward the FACE/CHEST with
+    // deep bent elbows (contemplative / self-embrace), alternating, then released.
+    // Less sideways spread (hands stay IN FRONT, toward the face), more forward
+    // reach + deeper elbow so the hands actually arrive at the head/chest.
+    tgt(b.upperArmL.rotation, 'z', 0.12 + reachL * 0.50 * A);   // stays close to the body
+    tgt(b.upperArmL.rotation, 'x', 0.25 + reachL * 1.30 * A);   // swing forward + up
+    tgt(b.forearmL.rotation, 'x', -0.6 - reachL * 1.55 * A);    // deep elbow → hand to face
+    tgt(b.upperArmR.rotation, 'z', -(0.12 + reachR * 0.50 * A));
+    tgt(b.upperArmR.rotation, 'x', 0.25 + reachR * 1.30 * A);
+    tgt(b.forearmR.rotation, 'x', -0.6 - reachR * 1.55 * A);
 
     // legs WEIGHT-SHIFT with the sway — the un-weighted knee bends up (steps in
     // place). Knees only bend one way (max(0,…)).
@@ -626,11 +629,22 @@ export function initKineticDancer() {
     tgt(b.shinL.rotation, 'x', 0.05 + Math.max(0, s) * 0.40 * A);
     tgt(b.shinR.rotation, 'x', 0.05 + Math.max(0, -s) * 0.40 * A);
 
-    // head — bobs/tilts with the sway + bows into the arm gesture
+    // EXPRESSIVE HEAD/NECK — the figure is FACELESS, so it "expresses" through
+    // motion: it BOWS into the hands as the arms draw up (contemplative), LIFTS +
+    // gazes up as they release/open, slowly SEARCHES side to side, and tilts with
+    // the sway. Split across neck + head for a graceful, longer emote; the head
+    // TRAILS the chest (secondary motion) so it feels alive, not mechanical.
+    const reach = Math.max(reachL, reachR);
+    const look = Math.sin(p * 0.5 + 0.7);            // slow "looking around"
     headTrail += (b.chest.rotation.z - headTrail) * 0.08;
-    tgt(b.head.rotation, 'z', s * 0.14 * A - headTrail * 0.4);
-    tgt(b.head.rotation, 'x', 0.05 + Math.max(reachL, reachR) * 0.24 * A);
-    tgt(b.head.rotation, 'y', -s * 0.10 * A);
+    tgt(b.neck.rotation, 'x', 0.03 + reach * 0.20 * A);      // neck leads the bow
+    tgt(b.neck.rotation, 'z', s * 0.08 * A);
+    tgt(b.neck.rotation, 'y', look * 0.10 * A);
+    // head pitch: gazes UP when open (reach≈0 → −0.12), BOWS down into the hands
+    // when reaching (reach≈1 → +0.42) — the emotive core of the expression.
+    tgt(b.head.rotation, 'x', -0.12 + reach * 0.54 * A);
+    tgt(b.head.rotation, 'z', s * 0.16 * A - headTrail * 0.4);   // tilt with the sway
+    tgt(b.head.rotation, 'y', look * 0.22 * A);                  // search / look around
 
     // ON-BEAT accent — MUSIC-LOCKED dip (knees + body sink) so the TEMPO is felt.
     add(b.pelvis.position, 'y', -hit * 0.06);
