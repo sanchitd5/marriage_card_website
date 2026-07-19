@@ -353,66 +353,34 @@ html[data-variant="kinetic"] .gate-hint .k-click { display: none; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   INTERACTIVE RINGS (.krings / #k-rings-stage)
-   A saifullah-style interactive 3D object: two interlocked cyan wireframe
-   rings on their own canvas (js/app/kinetic-rings.js). The inline SVG
-   fallback (#k-rings-fallback) shows by default; JS adds .is-live to the
-   stage once the WebGL rings paint, revealing the canvas + hiding the SVG.
+   SIDE WIREFRAME DANCER (#k-dancer-canvas)
+   A persistent procedural wireframe humanoid (Iron-Man-suit read) that dances
+   to the music on the right side, across ALL panels. Own low-DPR WebGL canvas
+   (js/app/kinetic-dancer.js), fixed, BEHIND panel content (z1) — panels are
+   transparent where there's no text, so the figure reads as an ambient
+   companion. Hidden on narrow screens (no room beside content) and under
+   reduced-motion (no canvas is created there).
    ═══════════════════════════════════════════════════════════════════ */
-html[data-variant="kinetic"] .krings { text-align: center; }
-
-.k-rings-stage {
-  position: relative;
-  width: min(560px, 84vw);
-  aspect-ratio: 7 / 5;
-  margin: clamp(1.5rem, 5vw, 3rem) auto clamp(1.8rem, 5vw, 2.8rem);
-  /* vertical page scroll still passes through; the horizontal drag spins the
-     rings (kinetic-rings.js only rotates, never blocks the vertical gesture). */
-  touch-action: pan-y;
+#k-dancer-canvas {
+  position: fixed;
+  top: 0; right: 0;
+  width: min(38vw, 560px); height: 100svh;
+  z-index: 1;               /* above backdrop/vignette (0–1), below panels (2) */
+  pointer-events: none;
+  opacity: 0;               /* faded in by JS once the first frame renders */
+  transition: opacity 1.1s var(--k-ease);
 }
-.k-rings-stage.is-grabbing { cursor: grabbing; }
-
-#k-rings-canvas {
-  position: absolute; inset: 0;
-  width: 100%; height: 100%;
-  opacity: 0;                       /* revealed when the rings go live */
-  transition: opacity .6s var(--k-ease);
-}
-.k-rings-stage.is-live #k-rings-canvas { opacity: 1; }
-
-/* Static SVG fallback — centred, glowing cyan rings. Hidden once live (either
-   via the [hidden] attribute the JS sets, or the .is-live stage class). */
-.k-rings-fallback {
-  position: absolute; inset: 0;
-  width: 100%; height: 100%;
-  display: block;
-}
-.k-rings-fallback[hidden],
-.k-rings-stage.is-live .k-rings-fallback { display: none; }
-
-.k-rings-hint {
-  position: absolute; left: 50%; bottom: -.2rem; transform: translateX(-50%);
-  font-family: var(--font-mono);
-  font-size: .58rem; letter-spacing: .28em; text-transform: uppercase;
-  color: var(--label);
-  transition: opacity .5s var(--k-ease);
-}
-.k-rings-hint.is-hidden { opacity: 0; }   /* fades after first interaction */
-
-/* the section's closing quote reuses the interlude line's register */
-html[data-variant="kinetic"] .krings-line { max-width: 30rem; margin-inline: auto; }
-
-/* Reduced motion: no canvas is created, so the SVG fallback simply stays. Give
-   it a slow breathing glow so it isn't dead-static, but nothing that moves. */
-@media (prefers-reduced-motion: reduce) {
-  #k-rings-canvas { display: none; }
-}
+#k-dancer-canvas.is-live { opacity: 1; }
+/* no room for a side companion on a phone; the light show carries mobile */
+@media (max-width: 900px) { #k-dancer-canvas { display: none; } }
+@media (prefers-reduced-motion: reduce) { #k-dancer-canvas { display: none; } }
 
 /* ═══════════════════════════════════════════════════════════════════
-   NON-SCROLLING SCENE DECK (html.k-deck — added by kinetic.js in the
+   CONTROL PANEL / SETUP-WIZARD (html.k-deck — added by kinetic.js in the
    full-motion path only; reduced-motion / no-JS keep a normal scrolling
-   page). The page never scrolls: each act is a fixed full-viewport layer
-   and a wheel / swipe / arrow key swaps the current one in place.
+   page). The page never scrolls and has NO scroll effect: each act is a
+   fixed full-viewport panel; navigation is a labelled side menu + Back/Next
+   buttons + a step counter (no wheel / swipe / arrow keys). Panels crossfade.
    ═══════════════════════════════════════════════════════════════════ */
 html.k-deck, html.k-deck body {
   height: 100%;
@@ -447,30 +415,78 @@ html.k-deck .band::-webkit-scrollbar,
 html.k-deck .footer::-webkit-scrollbar { width: 0; height: 0; }
 html.k-deck .act-current { pointer-events: auto; z-index: 2; }
 
-/* the floating scroll-dock cue is meaningless without a scrolling page */
-html.k-deck #floating-cue { display: none; }
+/* scroll affordances are meaningless in a control panel */
+html.k-deck #floating-cue,
+html.k-deck .scroll-cue { display: none; }
+/* the per-section index (e.g. "02 / 06") is superseded by the wizard's menu +
+   step counter — hide it in panel mode so numbering isn't shown three ways */
+html.k-deck .k-index { display: none; }
+/* chrome only exists in panel mode */
+html:not(.k-deck) #k-panel-menu,
+html:not(.k-deck) #k-panel-controls { display: none; }
 
-/* progress rail — one dot per act on the left edge; click to jump. Sits below
-   the HUD (58) / cursor, above content. */
-#k-deck-nav {
-  position: fixed; left: clamp(.85rem, 2vw, 1.5rem); top: 50%;
+/* ── side menu: jump to any panel (left rail, mono labels) ── */
+#k-panel-menu {
+  position: fixed; left: clamp(1rem, 2.5vw, 2.2rem); top: 50%;
   transform: translateY(-50%);
   z-index: 57;
-  display: flex; flex-direction: column; gap: .75rem;
+  display: flex; flex-direction: column; gap: .5rem;
+  font-family: var(--font-mono);
 }
-html:not(.k-deck) #k-deck-nav { display: none; }   /* only in deck mode */
-#k-deck-nav button {
-  width: 9px; height: 9px; padding: 0; border-radius: 50%;
-  border: 1px solid var(--hairline); background: transparent;
-  cursor: pointer; transition: border-color .3s var(--k-ease), background .3s var(--k-ease), box-shadow .3s var(--k-ease);
+.k-menu-item {
+  display: flex; align-items: center; gap: .55rem;
+  background: none; border: 0; padding: .18rem 0; margin: 0;
+  cursor: pointer; text-align: left; color: var(--label);
+  font-family: var(--font-mono); font-size: .62rem;
+  letter-spacing: .2em; text-transform: uppercase; line-height: 1;
+  transition: color .3s var(--k-ease);
 }
-#k-deck-nav button:hover { border-color: var(--accent); }
-#k-deck-nav button.is-current {
-  border-color: var(--accent); background: var(--accent);
-  box-shadow: 0 0 8px rgba(var(--accent-rgb), .7);
+/* a leading tick that lights on the active panel (console list marker) */
+.k-menu-item::before {
+  content: ""; width: 0; height: 1px; background: var(--accent);
+  transition: width .3s var(--k-ease); flex: none;
 }
-@media (max-width: 640px) {
-  #k-deck-nav { left: .7rem; gap: .6rem; }
-  #k-deck-nav button { width: 7px; height: 7px; }
+.k-menu-idx { font-size: .5rem; opacity: .55; letter-spacing: .1em; }
+.k-menu-item:hover { color: var(--muted); }
+.k-menu-item.is-current { color: var(--accent); }
+.k-menu-item.is-current::before { width: 16px; }
+.k-menu-item.is-current .k-menu-idx { opacity: 1; color: var(--accent); }
+.k-menu-item.is-current .k-menu-label { text-shadow: 0 0 8px rgba(var(--accent-rgb), .45); }
+
+/* ── Back / Next + step counter (bottom-right console controls) ── */
+#k-panel-controls {
+  position: fixed; right: clamp(1rem, 3vw, 2.4rem); bottom: clamp(1rem, 3vw, 2rem);
+  z-index: 57;
+  display: flex; align-items: center; gap: 1rem;
+  font-family: var(--font-mono);
 }
-@media (prefers-reduced-motion: reduce) { #k-deck-nav button { transition: none; } }
+.k-wz-btn {
+  background: rgba(20, 22, 28, .6);
+  border: 1px solid var(--hairline); color: var(--text);
+  font-family: var(--font-mono); font-size: .62rem;
+  letter-spacing: .18em; text-transform: uppercase;
+  padding: .6rem 1.05rem; cursor: pointer;
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  transition: border-color .3s var(--k-ease), color .3s var(--k-ease), opacity .3s var(--k-ease);
+}
+.k-wz-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.k-wz-btn:disabled { opacity: .28; cursor: not-allowed; }
+.k-step {
+  font-size: .6rem; letter-spacing: .22em; color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* mobile: the labelled rail crowds a narrow frame — hide it and give a compact
+   bottom control bar (Back / Next + counter). The panel's own heading + HUD
+   still name the section. */
+@media (max-width: 720px) {
+  #k-panel-menu { display: none; }
+  #k-panel-controls {
+    left: 0; right: 0; bottom: 0; justify-content: center; gap: .9rem;
+    padding: .7rem 1rem calc(.7rem + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(0deg, rgba(6, 7, 10, .92), rgba(6, 7, 10, 0));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .k-menu-item, .k-menu-item::before, .k-wz-btn { transition: none; }
+}

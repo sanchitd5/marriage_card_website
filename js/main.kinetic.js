@@ -12,7 +12,7 @@ import { initScratch } from './app/scratch.js';
 import { initLightshow } from './app/lightshow.js';
 import { initMilkdrop } from './app/milkdrop.js';
 import { initKinetic, initKineticGate } from './app/kinetic.js';
-import { initKineticRings } from './app/kinetic-rings.js';
+import { initKineticDancer } from './app/kinetic-dancer.js';
 import {
   initCountdown,
   initCalendarButtons,
@@ -37,5 +37,5 @@ window.addEventListener('DOMContentLoaded', () => {
   initLightshow();   // techno light show (data-skin==='techno' → runs)
   initMilkdrop();    // no-ops if butterchurn CDN absent
   initTilt();        // vanilla-tilt on the event cards ([data-tilt])
-  initKineticRings(); // interactive wireframe rings (own canvas; SVG fallback if REDUCED/no-WebGL)
+  initKineticDancer(); // persistent side wireframe humanoid, dances to the music (own canvas)
 });

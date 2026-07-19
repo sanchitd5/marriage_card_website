@@ -44,21 +44,39 @@ per-theme difference is the template: `src/index.kinetic.template.html`.
 Kinetic is obsidian-only (no day/night toggle) and uses vanilla JS scramble
 (GSAP's ScrambleTextPlugin is a paid Club plugin and is not loaded).
 
-## Non-scrolling scene deck
+## Control panel / setup-wizard (no scrolling)
 
-In the full-motion path the page **does not scroll**: `kinetic.js` adds
-`html.k-deck`, stacks every act (`.hero` / `.band` / `.footer`) as a fixed
-full-viewport layer, and a **wheel / vertical swipe / arrow key / left-rail dot**
-swaps the current act in place (cross-fade + slide, `expo`/`power` eases). Each
-act reveals on enter (fade-up stagger, heading scramble, countdown settle,
-interlude timeline) and the rings act is driven by the deck via
-`appState.rings.setInView(true/false)` (its IntersectionObserver is disabled
-under `k-deck`). A `#k-deck-nav` rail marks progress; the HUD section marker
-updates per act. Content-fit safety: a tall act (e.g. events on a small phone)
-scrolls **internally** to its edge before the next gesture advances the deck, so
-nothing is clipped unreachably. **Reduced-motion / no-GSAP / no-JS keep a normal
-scrolling page** (no `k-deck`), so all content stays reachable — the deck is a
-progressive enhancement, not a hard requirement.
+In the full-motion path the page **does not scroll and has no scroll effect**:
+`kinetic.js` adds `html.k-deck`, stacks every act (`.hero` / `.band` /
+`.footer`) as a fixed full-viewport **panel**, and navigation is a control
+panel — a labelled left **side menu** (`#k-panel-menu`, jump to any panel) plus
+**Back / Next** buttons and a **step counter** (`#k-panel-controls`). There is
+NO wheel / swipe / arrow-key navigation; every panel change is an explicit click
+(buttons are real `<button>`s, so Tab+Enter still works). Panels crossfade and
+the incoming heading scramble-resolves; each panel reveals on enter (fade-up
+stagger, countdown settle, interlude timeline). The HUD marker updates per
+panel; the per-section index is hidden (the menu + counter own numbering). On
+mobile the menu collapses to a compact bottom Back/Next+counter bar. A panel
+taller than the viewport scrolls its own overflow natively (never changes
+panel). **Reduced-motion / no-GSAP / no-JS keep a plain scrolling page** (no
+`k-deck`, none of this chrome) so all content stays reachable.
+
+## Side wireframe dancer
+
+`js/app/kinetic-dancer.js` renders a **persistent procedural wireframe humanoid**
+(an "Iron-Man-suit" read — cube helmet, broad chest plate with an arc-reactor
+core, blocky plated limbs, slab hands/feet) on the right side, across all
+panels, that **dances to the background music**. It's ~15 nested `Group` bones
+(no glTF/skeleton), cyan additive `LineSegments` with a scaled halo copy for
+fake bloom, on its own low-DPR WebGL canvas (`#k-dancer-canvas`, fixed, behind
+panel content). The dance is a continuous groove (phase accumulator whose
+speed/amplitude scale with the music) + beat accents, all damped toward targets;
+it reads the repo's existing offline-envelope energy via `appState.lightshow.energy`
+(no new AnalyserNode) and idle-grooves when silent. Flash-safe (WCAG 2.3.1):
+brightness is driven only by slow-smoothed energy, never by beats. Hidden on
+mobile (≤900px) and under reduced-motion. Replaces the earlier interactive
+rings. `lightshow.js` suppresses its own solid mecha when `data-variant="kinetic"`
+so the two figures don't clash.
 
 ## Signature elements
 

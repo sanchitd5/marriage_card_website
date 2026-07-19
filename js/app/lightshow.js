@@ -254,6 +254,9 @@ export function initLightshow() {
   let mechaRawH = 1;            // model's un-scaled height (for the fit)
   let mechaCenter = null;       // model's raw bounding-box centre
   function ensureMecha() {
+    // The kinetic skin ships its OWN procedural wireframe dancer (kinetic-dancer.js)
+    // as the side figure, so suppress the Regency/techno solid mecha there.
+    if (document.documentElement.dataset.variant === 'kinetic') return;
     if (mechaLoading || mechaTemplate || !THREE.GLTFLoader || !renderer) return; // load on all tiers
     mechaLoading = true;
     setupMechaScene(); // lights + env on the current scene (idempotent)

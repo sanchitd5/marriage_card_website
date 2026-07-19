@@ -240,11 +240,13 @@ export function initKinetic() {
     return;
   }
 
-  // ── NON-SCROLLING SCENE DECK ────────────────────────────────────────
-  // The page never scrolls; a wheel / vertical swipe / arrow key swaps the
-  // current full-viewport "act" in place. (Reduced-motion + no-GSAP paths
-  // returned above and keep a normal scrolling page, so all content stays
-  // reachable — the deck is a full-motion enhancement.)
+  // ── CONTROL PANEL / SETUP-WIZARD (no scrolling) ─────────────────────
+  // The page never scrolls and has NO scroll effect: each act is a fixed
+  // full-viewport "panel", and navigation is a control panel — a labelled side
+  // menu (jump anywhere) plus Back / Next buttons and a step counter. Panels
+  // crossfade (heading scramble-resolves); there is no wheel / swipe / arrow
+  // navigation. (Reduced-motion + no-GSAP paths returned above and keep a plain
+  // scrolling page with none of this chrome, so all content stays reachable.)
   document.documentElement.classList.add('k-deck');
   const acts = [$('#hero'), ...$$('#smooth-content .band'), $('.footer')].filter(Boolean);
   const hudSecEl = $('#k-hud-sec');
@@ -286,82 +288,72 @@ export function initKinetic() {
   function go(n) {
     n = Math.max(0, Math.min(acts.length - 1, n));
     if (n === idx || busy) return;
-    const dir = n > idx ? 1 : -1;
     busy = true;
     const cur = acts[idx], nxt = acts[n];
     leaveAct(cur);
     nxt.classList.add('act-current');
-    gsap.set(nxt, { autoAlpha: 0, yPercent: 6 * dir });
-    gsap.timeline({ onComplete() { cur.classList.remove('act-current'); gsap.set(cur, { yPercent: 0 }); busy = false; } })
-      .to(cur, { autoAlpha: 0, yPercent: -6 * dir, duration: 0.45, ease: 'power2.in' })
-      .to(nxt, { autoAlpha: 1, yPercent: 0, duration: 0.6, ease: 'power2.out' }, '-=0.15')
+    // Quick console crossfade — no slide, no scroll. The incoming heading
+    // scramble-resolves in enterReveals(): a panel switching channels.
+    gsap.set(nxt, { autoAlpha: 0 });
+    gsap.timeline({ onComplete() { cur.classList.remove('act-current'); busy = false; } })
+      .to(cur, { autoAlpha: 0, duration: 0.28, ease: 'power1.inOut' })
+      .to(nxt, { autoAlpha: 1, duration: 0.4, ease: 'power1.inOut' }, '-=0.08')
       .add(() => enterReveals(nxt), '<');
     idx = n;
-    updateNav();
+    updateChrome();
   }
 
-  // ── progress rail (left edge): one dot per act, click to jump ──
-  const navDots = [];
-  const nav = document.createElement('nav');
-  nav.id = 'k-deck-nav';
-  nav.setAttribute('aria-label', 'Sections');
-  acts.forEach((act, i) => {
+  // ── CONTROL-PANEL / WIZARD CHROME ───────────────────────────────────
+  // A labelled side menu (jump to any panel), Back / Next buttons, and a step
+  // counter. This is a wizard/console, NOT a scrolling page: there is no wheel,
+  // swipe or keyboard-arrow navigation — every panel change is an explicit
+  // click. (Buttons are real <button>s, so Tab + Enter still works.) The
+  // reduced-motion / no-JS fallback returned above and keeps a scrolling page
+  // with none of this chrome.
+  const labelFor = (act, i) => (act.getAttribute('data-hud') || `Panel ${i}`).replace(/^\d+\s*[—-]\s*/, '');
+
+  const menu = document.createElement('nav');
+  menu.id = 'k-panel-menu';
+  menu.setAttribute('aria-label', 'Sections');
+  const menuBtns = acts.map((act, i) => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.setAttribute('aria-label', (act.getAttribute('data-hud') || `Act ${i}`).replace(/^\d+\s*[—-]\s*/, ''));
+    b.className = 'k-menu-item';
+    b.innerHTML = `<span class="k-menu-idx">${String(i).padStart(2, '0')}</span><span class="k-menu-label"></span>`;
+    b.querySelector('.k-menu-label').textContent = labelFor(act, i);
     b.addEventListener('click', () => { if (entered) go(i); });
-    nav.appendChild(b);
-    navDots.push(b);
+    menu.appendChild(b);
+    return b;
   });
-  document.body.appendChild(nav);
-  function updateNav() { navDots.forEach((d, i) => d.classList.toggle('is-current', i === idx)); }
-  updateNav();
+  document.body.appendChild(menu);
 
-  // ── input: wheel / keys / vertical swipe (disabled until the gate opens) ──
-  // Content-fit safety (fullpage-style): if the current act is taller than the
-  // viewport, let it scroll INTERNALLY until its edge, then the next gesture
-  // advances the deck — so a tall act (e.g. events on a small phone) is never
-  // clipped unreachably.
-  const canScrollPast = (act, dir) => {
-    if (!act || act.scrollHeight <= act.clientHeight + 2) return false;
-    const atTop = act.scrollTop <= 0;
-    const atBottom = act.scrollTop + act.clientHeight >= act.scrollHeight - 2;
-    return dir > 0 ? !atBottom : !atTop;
-  };
-  let wheelAcc = 0, wheelLast = 0;
-  window.addEventListener('wheel', (e) => {
-    if (!entered) return;
-    if (canScrollPast(acts[idx], e.deltaY)) return; // let the act scroll natively
-    e.preventDefault();
-    if (busy) return;
-    const t = e.timeStamp || 0;
-    wheelAcc = (t - wheelLast < 140) ? wheelAcc + e.deltaY : e.deltaY;
-    wheelLast = t;
-    if (Math.abs(wheelAcc) > 40) { go(idx + (wheelAcc > 0 ? 1 : -1)); wheelAcc = 0; }
-  }, { passive: false });
+  const controls = document.createElement('div');
+  controls.id = 'k-panel-controls';
+  const prevBtn = document.createElement('button');
+  prevBtn.type = 'button'; prevBtn.id = 'k-prev'; prevBtn.className = 'k-wz-btn';
+  prevBtn.textContent = '◀ Back';
+  prevBtn.addEventListener('click', () => { if (entered) go(idx - 1); });
+  const stepEl = document.createElement('span');
+  stepEl.id = 'k-step'; stepEl.className = 'k-step'; stepEl.setAttribute('aria-live', 'polite');
+  const nextBtn = document.createElement('button');
+  nextBtn.type = 'button'; nextBtn.id = 'k-next'; nextBtn.className = 'k-wz-btn';
+  nextBtn.textContent = 'Next ▶';
+  nextBtn.addEventListener('click', () => { if (entered) go(idx + 1); });
+  controls.append(prevBtn, stepEl, nextBtn);
+  document.body.appendChild(controls);
 
-  window.addEventListener('keydown', (e) => {
-    if (!entered) return;
-    if (['ArrowDown', 'PageDown'].includes(e.key) || (e.key === ' ' && !e.shiftKey)) { e.preventDefault(); go(idx + 1); }
-    else if (['ArrowUp', 'PageUp'].includes(e.key) || (e.key === ' ' && e.shiftKey)) { e.preventDefault(); go(idx - 1); }
-    else if (e.key === 'Home') { e.preventDefault(); go(0); }
-    else if (e.key === 'End') { e.preventDefault(); go(acts.length - 1); }
-  });
+  const pad2 = n => String(n).padStart(2, '0');
+  function updateChrome() {
+    menuBtns.forEach((b, i) => b.classList.toggle('is-current', i === idx));
+    stepEl.textContent = `${pad2(idx + 1)} / ${pad2(acts.length)}`;
+    prevBtn.disabled = idx === 0;
+    nextBtn.disabled = idx === acts.length - 1;
+  }
+  updateChrome();
 
-  let touchY = null;
-  window.addEventListener('touchstart', (e) => {
-    // let the rings act own its horizontal drag; only swipe elsewhere changes acts
-    if (!entered || (e.target.closest && e.target.closest('#k-rings-stage'))) { touchY = null; return; }
-    touchY = e.touches[0].clientY;
-  }, { passive: true });
-  window.addEventListener('touchmove', (e) => {
-    if (!entered || touchY == null || busy) return;
-    const dy = touchY - e.touches[0].clientY;
-    if (Math.abs(dy) < 48) return;
-    if (canScrollPast(acts[idx], dy)) { touchY = null; return; } // let the act scroll natively
-    go(idx + (dy > 0 ? 1 : -1));
-    touchY = null;
-  }, { passive: true });
+  // NOTE: no wheel / touch-swipe / arrow-key handlers by design — navigation is
+  // buttons/clicks only. A panel taller than the viewport still scrolls its own
+  // overflow natively (CSS overflow-y:auto), which never changes the panel.
 
   // ── Hero entrance (fired by the gate on open) ──
   const heroNames = $$('#hero [data-scramble-name]');
