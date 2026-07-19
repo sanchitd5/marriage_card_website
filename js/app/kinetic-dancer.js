@@ -559,7 +559,9 @@ export function initKineticDancer() {
       const beatPhase = beatPos - Math.floor(beatPos);   // 0 = on the beat
       return { rateHz: 1 / (N_BEATS * info.beatPeriod), accent: Math.pow(1 - beatPhase, 4) };
     }
-    return { rateHz: 0.12 + energy * 0.10, accent: 0 };   // idle free-run, no beat
+    // idle free-run (no music yet): keep it LIVELY so it visibly dances even
+    // before any track plays (~one gesture every ~2.4s), no beat accent.
+    return { rateHz: 0.42 + energy * 0.15, accent: 0 };
   }
 
   // ── the dance ────────────────────────────────────────────────────────
