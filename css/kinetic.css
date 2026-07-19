@@ -903,3 +903,41 @@ html.k-deck[data-panel="rsvp"]       #k-dancer-canvas.is-live { opacity: .62; }
 html.k-deck .gframe--veiled::before,
 html.k-deck .gframe--veiled::after { display: none; }
 html.k-deck .gframe--veiled { border: 1px solid rgba(var(--accent-rgb), .22); }
+
+/* ═══════ 9.5 PUNCH-LIST — round 6 (final) ═══════ */
+
+/* #1 — dancer crisp + UNIFORM everywhere: lift it above the film-grain (was
+   softening it) and give it a consistent dark backing on the right (behind the
+   figure) so the backdrop never bleeds blue/haze between the wireframe. The
+   backing is BELOW the figure, so it dims the backdrop, not the dancer. */
+#k-dancer-canvas { z-index: 2; }                 /* above .k-grain (2, earlier in DOM) → crisp */
+#k-dancer-canvas.is-live,
+html.k-deck[data-panel="interlude"] #k-dancer-canvas.is-live,
+html.k-deck[data-panel="archive"]   #k-dancer-canvas.is-live,
+html.k-deck[data-panel="rsvp"]       #k-dancer-canvas.is-live { opacity: .66; }
+#k-dancer-scrim {
+  background: linear-gradient(90deg,
+    var(--bg) 0%, var(--bg) 34%, rgba(11,12,15,0) 50%,
+    rgba(11,12,15,0) 60%, rgba(6,7,10,.5) 80%, rgba(6,7,10,.5) 100%);
+}
+/* #3 — interlude: uniform anchor so the wide hand clears the right hairline */
+html.k-deck[data-panel="interlude"] #k-dancer-canvas { transform: translateX(8%); }
+
+/* #4 — gallery mask/overflow applies ONLY to the revealed photo grid; the single
+   veil box must keep its full 4-side border (the mask was fading its top/bottom) */
+@media (min-width: 900px) {
+  html.k-deck .gallery-grid--veiled { max-height: none; overflow: visible;
+    -webkit-mask-image: none; mask-image: none; }
+}
+@media (max-width: 899px) {
+  html.k-deck .gallery-grid--veiled { max-height: none; overflow: visible;
+    -webkit-mask-image: none; mask-image: none; }
+}
+html.k-deck .gframe--veiled { border: 1px solid rgba(var(--accent-rgb), .22); }
+
+/* #2 — mobile archive: compact the sealed box + brighten the medallion so it
+   doesn't collapse to a smudge or leave a hollow void */
+@media (max-width: 899px) {
+  html.k-deck .gframe--veiled { padding: 2rem 1.5rem; gap: 1rem; }
+  html.k-deck .veil-seal { opacity: 1; color: var(--accent); }
+}

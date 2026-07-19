@@ -38,36 +38,71 @@ export function initKineticDancer() {
 
   const disposables = [];   // WireframeGeometry instances to dispose on teardown
 
-  // A bone is a THREE.Group whose ORIGIN is the proximal joint: its box
-  // geometry is translated DOWN by len/2 so it hangs from the joint, and child
-  // bones attach at the distal end (position.y = -parentLen). Rotating the group
-  // therefore pivots about the joint like a real limb.
-  function makeBone(len, w, d) {
+  // ── high-poly wireframe helpers ("Anyma alien" silhouette) ──────────────
+  // The figure is a tall, slender, smooth, featureless humanoid (à la Anyma's
+  // Genesys/Eva & Syren stage visuals): elongated tapered limbs, a long neck and
+  // an elongated ovoid head — rendered as a DENSE cyan holographic wireframe
+  // (many small facets on curved surfaces), not a low-poly box mannequin.
+  //
+  // Segment density on the curved surfaces (keeps the wireframe reading as a
+  // fine mesh while staying well within a sane vertex budget for a tiny canvas).
+  const RSEG = 16, HSEG = 6;
+
+  // Shared render path for every bone: a core LineSegments + an additive halo
+  // copy at 1.04× (identical to the old boxes, just on smooth geometry). The
+  // base geometry is disposed immediately; the WireframeGeometry is tracked for
+  // teardown. `len` is stored so attach()/attachUp() can seat children.
+  function boneFromGeo(geo, len) {
     const g = new THREE.Group();
-    const box = new THREE.BoxGeometry(w, len, d);
-    box.translate(0, -len / 2, 0);
-    const wire = new THREE.WireframeGeometry(box); box.dispose();
+    const wire = new THREE.WireframeGeometry(geo); geo.dispose();
     g.add(new THREE.LineSegments(wire, coreMat));
     const halo = new THREE.LineSegments(wire, haloMat); halo.scale.setScalar(1.04); g.add(halo);
     g.userData.len = len; disposables.push(wire); return g;
+  }
+
+  // A bone is a THREE.Group whose ORIGIN is the proximal joint. Its SMOOTH,
+  // tapered geometry (a high-poly open cone/cylinder, rProx at the joint tapering
+  // to rDist at the distal end) is translated DOWN by len/2 so it hangs from the
+  // joint, exactly like the old box; child bones attach at the distal end
+  // (position.y = -parentLen). Rotating the group pivots about the joint.
+  function makeBone(len, rProx, rDist) {
+    // CylinderGeometry(radiusTop, radiusBottom, height, radialSeg, heightSeg, openEnded)
+    // top (+Y) = proximal (joint) end → put rProx on top so the joint end is thicker.
+    const geo = new THREE.CylinderGeometry(rProx, rDist, len, RSEG, HSEG, true);
+    geo.translate(0, -len / 2, 0);
+    return boneFromGeo(geo, len);
   }
   function attach(parent, child) { child.position.set(0, -parent.userData.len, 0); parent.add(child); }
 
-  // Same as makeBone, but the segment RISES from the joint (box translated UP).
-  // The limbs (arms/legs) genuinely hang down, so they use makeBone; the torso
-  // (spine→chest→neck→head) genuinely rises from the waist, so it uses this —
-  // otherwise a down-hanging torso box would overlap the pelvis. Children of an
-  // up-bone are seated at +parentLen.
-  function makeBoneUp(len, w, d) {
-    const g = new THREE.Group();
-    const box = new THREE.BoxGeometry(w, len, d);
-    box.translate(0, len / 2, 0);
-    const wire = new THREE.WireframeGeometry(box); box.dispose();
-    g.add(new THREE.LineSegments(wire, coreMat));
-    const halo = new THREE.LineSegments(wire, haloMat); halo.scale.setScalar(1.04); g.add(halo);
-    g.userData.len = len; disposables.push(wire); return g;
+  // Same as makeBone, but the segment RISES from the joint (geometry translated
+  // UP). The limbs (arms/legs) hang down → makeBone; the torso (spine→chest→neck)
+  // rises from the waist → this. Children of an up-bone are seated at +parentLen.
+  function makeBoneUp(len, rProx, rDist) {
+    // translated up: bottom (−Y) = proximal (joint) end → rProx on the bottom.
+    const geo = new THREE.CylinderGeometry(rDist, rProx, len, RSEG, HSEG, true);
+    geo.translate(0, len / 2, 0);
+    return boneFromGeo(geo, len);
   }
   function attachUp(parent, child) { child.position.set(0, parent.userData.len, 0); parent.add(child); }
+
+  // Elongated, featureless ovoid head. A geodesic icosphere (even faceting →
+  // dense holographic mesh) scaled taller on Y for the alien skull, then
+  // translated up so it RISES from the neck-top joint like an up-bone.
+  function makeHead(r, yScale) {
+    const geo = new THREE.IcosahedronGeometry(r, 2);   // 320 faces — smooth, no face
+    geo.scale(0.92, yScale, 0.92);
+    geo.translate(0, r * yScale, 0);                   // bottom of the ovoid sits at the joint
+    return boneFromGeo(geo, r * yScale * 2);
+  }
+
+  // Small smooth rounded/tapered form for hands & feet — a scaled geodesic
+  // icosphere offset from the joint (oy down for hands, oz forward for feet).
+  function makeBlob(rx, ry, rz, oy, oz) {
+    const geo = new THREE.IcosahedronGeometry(1, 1);   // 80 faces
+    geo.scale(rx, ry, rz);
+    geo.translate(0, oy, oz);
+    return boneFromGeo(geo, ry * 2);
+  }
 
   // ── runtime state ────────────────────────────────────────────────────
   let renderer, scene, camera, root;
@@ -98,25 +133,27 @@ export function initKineticDancer() {
     // the camera. ~15 primary bones.
     root = new THREE.Group();
 
-    const pelvis = makeBone(0.35, 0.85, 0.5);     // waist(origin) → hips (hangs down)
-    const spine = makeBoneUp(0.45, 0.7, 0.45);    // torso rises …
-    const chest = makeBoneUp(0.55, 1.0, 0.55);    // broad plate → Iron-Man read
-    const neck = makeBoneUp(0.12, 0.25, 0.25);
-    const head = makeBoneUp(0.55, 0.55, 0.6);     // cube helmet
+    // Slim, elongated proportions → tall smooth alien silhouette. Limbs taper
+    // (rProx → rDist), each distal limb thinner than the one before it.
+    const pelvis = makeBone(0.30, 0.24, 0.30);    // waist(origin) → hips (slim, hangs down)
+    const spine = makeBoneUp(0.55, 0.26, 0.22);   // slender torso rises …
+    const chest = makeBoneUp(0.62, 0.24, 0.30);   // narrow ribcage widening toward the shoulders
+    const neck = makeBoneUp(0.30, 0.13, 0.115);   // long swan neck
+    const head = makeHead(0.27, 1.6);             // elongated featureless ovoid (alien skull)
 
-    const upperArmL = makeBone(0.55, 0.34, 0.34);
-    const forearmL = makeBone(0.5, 0.3, 0.3);
-    const handL = makeBone(0.22, 0.28, 0.18);     // slab hands
-    const upperArmR = makeBone(0.55, 0.34, 0.34);
-    const forearmR = makeBone(0.5, 0.3, 0.3);
-    const handR = makeBone(0.22, 0.28, 0.18);
+    const upperArmL = makeBone(0.70, 0.135, 0.105);
+    const forearmL = makeBone(0.64, 0.10, 0.075);       // thinner than the upper arm (taper)
+    const handL = makeBlob(0.085, 0.15, 0.06, -0.13, 0.02);  // small rounded hand
+    const upperArmR = makeBone(0.70, 0.135, 0.105);
+    const forearmR = makeBone(0.64, 0.10, 0.075);
+    const handR = makeBlob(0.085, 0.15, 0.06, -0.13, 0.02);
 
-    const thighL = makeBone(0.7, 0.42, 0.42);
-    const shinL = makeBone(0.68, 0.36, 0.36);
-    const footL = makeBone(0.28, 0.34, 0.6);      // slab feet
-    const thighR = makeBone(0.7, 0.42, 0.42);
-    const shinR = makeBone(0.68, 0.36, 0.36);
-    const footR = makeBone(0.28, 0.34, 0.6);
+    const thighL = makeBone(0.92, 0.185, 0.13);
+    const shinL = makeBone(0.88, 0.125, 0.09);          // thinner than the thigh (taper)
+    const footL = makeBlob(0.09, 0.075, 0.22, -0.04, 0.11);  // small tapered foot, points forward
+    const thighR = makeBone(0.92, 0.185, 0.13);
+    const shinR = makeBone(0.88, 0.125, 0.09);
+    const footR = makeBlob(0.09, 0.075, 0.22, -0.04, 0.11);
 
     // torso chain: spine origin sits AT the waist (pelvis origin), then rises
     root.add(pelvis);
@@ -126,8 +163,8 @@ export function initKineticDancer() {
     attachUp(neck, head);                              // head above neck
 
     // shoulders: tiny offset groups near the top of the chest; arms hang OUT/down
-    const shoulderL = new THREE.Group(); shoulderL.position.set(0.62, chest.userData.len * 0.9, 0);
-    const shoulderR = new THREE.Group(); shoulderR.position.set(-0.62, chest.userData.len * 0.9, 0);
+    const shoulderL = new THREE.Group(); shoulderL.position.set(0.34, chest.userData.len * 0.92, 0);
+    const shoulderR = new THREE.Group(); shoulderR.position.set(-0.34, chest.userData.len * 0.92, 0);
     chest.add(shoulderL); chest.add(shoulderR);
     attach(shoulderL, upperArmL); attach(upperArmL, forearmL); attach(forearmL, handL);
     attach(shoulderR, upperArmR); attach(upperArmR, forearmR); attach(forearmR, handR);
@@ -135,25 +172,26 @@ export function initKineticDancer() {
     upperArmL.position.set(0, 0, 0); upperArmR.position.set(0, 0, 0);
 
     // hips: tiny offset groups at the bottom of the pelvis; legs hang DOWN
-    const hipL = new THREE.Group(); hipL.position.set(0.28, -pelvis.userData.len, 0);
-    const hipR = new THREE.Group(); hipR.position.set(-0.28, -pelvis.userData.len, 0);
+    const hipL = new THREE.Group(); hipL.position.set(0.20, -pelvis.userData.len, 0);
+    const hipR = new THREE.Group(); hipR.position.set(-0.20, -pelvis.userData.len, 0);
     pelvis.add(hipL); pelvis.add(hipR);
     attach(hipL, thighL); attach(thighL, shinL); attach(shinL, footL);
     attach(hipR, thighR); attach(thighR, shinR); attach(shinR, footR);
     thighL.position.set(0, 0, 0); thighR.position.set(0, 0, 0);   // seat at hip-group origin
 
-    // CHEST CORE (arc reactor): the brightest element, mid-plate, toward camera.
-    const coreGeo = new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(0.14, 0));
+    // CHEST CORE (arc reactor): the brightest element, mid-chest, toward camera.
+    // A small high-poly icosphere so it reads as a glowing faceted node.
+    const coreGeo = new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(0.11, 1));
     disposables.push(coreGeo);
     const chestCore = new THREE.LineSegments(coreGeo, coreCoreMat);
-    chestCore.position.set(0, chest.userData.len * 0.5, 0.33);
+    chestCore.position.set(0, chest.userData.len * 0.5, 0.24);
     chest.add(chestCore);
 
     // Seat the rig so head↔feet centre on the origin. Waist is at root y; the
-    // head top rises ~1.67 above and the feet drop ~1.7 below the waist, so a
-    // tiny lift keeps the figure vertically centred for the tall canvas.
+    // ovoid head top now rises ~2.33 above and the feet drop ~2.2 below the
+    // waist (taller, slimmer figure), so a tiny lift keeps it vertically centred.
     root.position.y = 0.05;
-    root.scale.setScalar(0.82); // shrink so wide/T-pose arm-span stays clear of the frame edge
+    root.scale.setScalar(0.68); // smaller than before → the taller alien still frames head→feet with headroom
     scene.add(root);
 
     bones = {
@@ -163,9 +201,9 @@ export function initKineticDancer() {
     };
 
     // ── camera: the canvas is TALL and NARROW, so frame the FULL figure
-    // vertically. The rig spans ~3.1 units head→feet; pull the camera back on
-    // +Z (the root faces +Z toward us) and aim slightly below centre so the
-    // helmet and feet both sit inside the frame with a little headroom. ──
+    // vertically. The rig spans ~4.5 units head→feet (scaled by root.scale);
+    // pull the camera back on +Z (the root faces +Z toward us) and aim slightly
+    // below centre so the ovoid head and feet both sit inside the frame. ──
     camera = new THREE.PerspectiveCamera(38, 0.5, 0.1, 100);
     camera.position.set(0, 0.05, 8.4); // pulled back so even wide/T-pose hands stay clear of the frame edge
     camera.lookAt(0, -0.05, 0);
