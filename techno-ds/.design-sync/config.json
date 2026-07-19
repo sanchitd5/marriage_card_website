@@ -1,0 +1,11 @@
+{
+  "pkg": "techno-ds",
+  "globalName": "TechnoDS",
+  "projectId": "28ebc4a1-b72d-4643-989d-366beba7355b",
+  "shape": "package",
+  "buildCmd": "npm run build",
+  "srcDir": "src",
+  "tsconfig": "tsconfig.json",
+  "cssEntry": "dist/styles.css",
+  "readmeHeader": ".design-sync/conventions.md"
+}
