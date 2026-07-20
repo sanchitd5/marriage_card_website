@@ -257,6 +257,11 @@ export function initKineticDancer() {
     // `armZSign` comment at its use site in onModelLoaded for how this was
     // confirmed and what it fixes.
     armZSign: -1,
+    // The rebuilt rig (from the pristine, never-round-tripped source) faces
+    // the OPPOSITE way from the earlier Blender export — confirmed visually
+    // (hero screenshot showed the back of the head/hair, not the face).
+    // Flip this rig only; the Armadrillo's own facing is unaffected.
+    faceSpin: Math.PI,
     // fitH lower than the Armadrillo's: this rig's hair/headdress mesh
     // extends well above the Head bone itself, which frameModel() fits by
     // (bone positions only, not mesh extent) -- at 0.82 that overhang
@@ -383,7 +388,7 @@ export function initKineticDancer() {
       // GLTFLoader already imports these assets UPRIGHT (Y-up standing), so
       // no uprighting rotation is applied here — only a facing spin about Y.
       rigState.rigGroup = new THREE.Group();
-      rigState.rigGroup.rotation.y = FACE_SPIN;
+      rigState.rigGroup.rotation.y = (rigState.cfg.faceSpin != null) ? rigState.cfg.faceSpin : FACE_SPIN;
       scene.add(rigState.rigGroup);
 
       // whole-figure sway pivot (dance's b.root.rotation.y — the slow 3/4 turn)
