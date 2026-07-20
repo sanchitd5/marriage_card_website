@@ -269,7 +269,7 @@ export function initKineticDancer() {
     // original x:1.0/scale:1.
     // (post-merge fix) rig A's horns still crossed into "RIYA" at -1.05 on a
     // 1440x900/DPR1 desktop — pushed further right + slightly smaller.
-    display:    { a: { x: -0.05, scaleMul: 0.8,  z: -0.6 }, b: { x: 1.4,   scaleMul: 0.9,  z: 0    } },
+    display:    { a: { x: -0.15, scaleMul: 0.8,  z: -0.6 }, b: { x: 1.0,   scaleMul: 0.85, z: 0    } },
     // RSVP: role-swap (Armadrillo foreground/larger) reads fine here — the
     // closing copy sits in the LEFT column, well clear of the right-side duet.
     displayAlt: { a: { x: 0.85,  scaleMul: 1.15, z: 0.9  }, b: { x: -1.15, scaleMul: 0.8,  z: -0.9 } },
