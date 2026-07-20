@@ -11,8 +11,8 @@ export const TRACK = "techno/theme-8";
 //   full → the video is fully visible (everything else still hidden)
 //   end  → the video disappears, the overlay drops, the UI returns
 export const WINDOWS = [
-  [20, 22, 25, 40],
-  [135, 137, 140, 165],
+  [20, 22, 25, 30],
+  [135, 137, 140, 145],
 ];
 
 export const PREROLL = 3; // start (hidden) playback this many secs before `hide`
