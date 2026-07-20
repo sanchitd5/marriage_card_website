@@ -61,24 +61,69 @@ taller than the viewport scrolls its own overflow natively (never changes
 panel). **Reduced-motion / no-GSAP / no-JS keep a plain scrolling page** (no
 `k-deck`, none of this chrome) so all content stays reachable.
 
-## Side wireframe dancer
+## The dancer duet
 
-`js/app/kinetic-dancer.js` renders a **persistent procedural wireframe humanoid**
-(an "Iron-Man-suit" read — cube helmet, broad chest plate with an arc-reactor
-core, blocky plated limbs, slab hands/feet) on the right side, across all
-panels, that **dances to the background music**. It's ~15 nested `Group` bones
-(no glTF/skeleton), cyan additive `LineSegments` with a scaled halo copy for
-fake bloom, on its own low-DPR WebGL canvas (`#k-dancer-canvas`, fixed, behind
-panel content). The dance is a continuous groove (phase accumulator whose
-speed/amplitude scale with the music) + beat accents, all damped toward targets;
-it reads the repo's existing offline-envelope energy via `appState.lightshow.energy`
-(no new AnalyserNode) and idle-grooves when silent. Brightness pulses on the
-beat (bar-weighted, smooth decay curve — not a hard flash); checked against
-WCAG 2.3.1: this project's 125-150 BPM tracks are 2.08-2.5 beats/sec, under
-the 3-flashes/sec G19 ceiling regardless of amplitude. Hidden on mobile
-(≤900px) and under reduced-motion. Replaces the earlier interactive
-rings. `lightshow.js` suppresses its own solid mecha when `data-variant="kinetic"`
-so the two figures don't clash.
+`js/app/kinetic-dancer.js` renders **two loaded, rigged glTF humanoids** —
+the "Armadrillo" and a rigged-for-this-project "fairy punk" figure (see
+attribution below) — sharing one canvas/renderer/camera, side by side, across
+every panel: an ambient wedding-duet motif, not a literal depiction of either
+half of the couple. Own low-DPR WebGL canvas (`#k-dancer-canvas`, fixed,
+behind panel content). Hidden on mobile ≤900px in favour of a full-width
+"reserved stage"/watermark treatment (see the mobile-UI section above) and
+hidden entirely under reduced-motion. `lightshow.js` suppresses its own solid
+mecha when `data-variant="kinetic"` so the figures don't clash.
+
+**Render style — chrome + wireframe accent, not wireframe-only.** Each mesh
+gets a shaded chrome base pass (`MeshMatcapMaterial`, a matcap texture drawn
+procedurally to an offscreen canvas at load — no HDRI/network fetch, no scene
+lights needed) so sculpted form and facial features actually read, plus a thin
+additive cyan wireframe pass on a `.clone()` of the same mesh (rebinds to the
+same `Skeleton` for free) as a "circuitry" accent on top. Brightness (the
+wireframe accent's opacity + the chrome pass's colour multiplier) pulses on
+the beat via a bar-weighted, smooth decay curve, not a hard flash — WCAG
+2.3.1 is deprioritized project-wide per the owner's call, though for the
+record this project's 125-150 BPM tracks are 2.08-2.5 beats/sec, under the
+3-flashes/sec G19 ceiling regardless of amplitude.
+
+**Choreography.** A 12-move procedural library (`MOVE_TABLE` — grooveSway,
+handsFace, strike, breakdown, stepTouch, bodyWave, reachOpen, tribalStomp,
+invocation, groundedIsolation, crouchProwl, polyStep) replaces the original
+single continuous-groove loop. Each dancer independently re-picks a
+weighted-random move every 8 beats from a context-gated pool (idle / low-energy
+/ high-energy "drop"), biased toward moves whose `affinity` tag matches
+whichever instrument register (bass/kick, mid melodic/vocal, hi-hat/percussion)
+currently dominates the track — computed from a multi-band RMS envelope
+(`envLow`/`envMid`/`envHigh` in `assets/audio/techno/envelopes.json`,
+ffmpeg band-pass decodes via `gen-envelopes.mjs`). Per-beat accent magnitude
+tracks the track's REAL loudness at that instant (`beatStrength`, sampled from
+the offline envelope), not just a fixed phase/bar-position formula. A cheap
+per-beat/per-move-instance jitter (a sine-hash "coherent noise" stand-in) plus
+a slightly asymmetric master oscillator keep the motion from reading as
+perfectly repeating/mechanical. `strike` (a wind-up + punch accent) fires in
+unison for both dancers on a sustained-loud section's rising edge — the one
+choreographed moment they always hit together.
+
+**Authored arc (offline, hand-read — not a shipped model).** A proposal to use
+an LLM (Gemma 3n E2B) to pick moves live, in-browser, was reviewed and
+rejected (model size 1.5-5.6GB+, multi-second in-browser latency on real
+phones, and a 12-option weighted pick isn't an LLM-shaped problem anyway —
+see git history for the full review). Instead, `assets/audio/techno/choreo-arcs.json`
+is a per-track list of hand-authored sections (intro/groove/build/drop/
+breakdown/outro), read directly off each track's actual energy curve — a
+static, zero-runtime-cost build artifact. It overrides the live pool gate
+where it *knows* the structure (a 'drop' section commits to the high-energy
+pool, 'breakdown' commits to calm, ahead of the live signal catching up) and
+triggers the synchronized duet `strike` right as a known drop begins, instead
+of only reacting to the live threshold. A missing/failed fetch falls back to
+the live-only behaviour exactly as before.
+
+**Per-panel placement.** The duet doesn't sit in the same spot on every
+panel — `PANEL_LAYOUTS`/`PANEL_GROUP` in `kinetic-dancer.js` group panels into
+a few placement modes (`display`, `displayAlt`, `interludeAlt`, `dense`) that
+vary each rig's position/scale/depth (which figure is foreground/larger,
+how far apart they stand) so the composition changes panel to panel instead
+of reading as a static sticker pasted in one corner, while never crossing a
+button/heading/paragraph on any panel at any checked breakpoint.
 
 ## Signature elements
 
@@ -101,9 +146,19 @@ tappable. The HUD clock ticks in every path. Verified at 390px and 1440px.
 
 ## Dancer model attribution
 
-The kinetic side dancer loads a rigged glTF: **"Armadrillo"** by **kimni88**
-(https://sketchfab.com/3d-models/armadrillo-6dc598423875484fb9dc8d7cbff1f122),
-licensed **CC-BY-4.0** (http://creativecommons.org/licenses/by/4.0/). Shipped
-under `assets/scene/armadrillo/` (full licence in that folder's `license.txt`).
-It's driven procedurally by the beat-locked choreography (no baked animation
-clips) and rendered as a cyan wireframe to match the theme.
+The kinetic dancer duet loads two rigged glTFs, both driven procedurally by
+the same beat-locked choreography engine (no baked animation clips):
+
+- **"Armadrillo"** by **kimni88**
+  (https://sketchfab.com/3d-models/armadrillo-6dc598423875484fb9dc8d7cbff1f122),
+  licensed **CC-BY-4.0**. Shipped under `assets/scene/armadrillo/` (full
+  licence in that folder's `license.txt`). A 50-bone T-pose rig as sourced.
+- **"DP Techno Fairy Punk Set HD Textures"** by **BilloXD**
+  (https://sketchfab.com/3d-models/dp-techno-fairy-punk-set-hd-textures-6c2d6ff1ca3043ff9ffdf884ffbba1b8),
+  licensed **CC-BY-4.0**. Shipped as static, unrigged geometry from Sketchfab
+  and **rigged for this project** headlessly in Blender (a custom 13-bone
+  biped armature in a hanging-arms bind pose, matching the joint set the
+  choreography engine drives) — see `assets/scene/fairy-punk/license.txt` for
+  the full note and credit. Source PBR textures were not re-exported (the
+  runtime renders both dancers as chrome + wireframe with a shared material
+  stack, so the source textures are unused).
