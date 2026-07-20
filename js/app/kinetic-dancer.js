@@ -125,8 +125,9 @@ export function initKineticDancer() {
   const RIG_B = {
     url: 'assets/scene/fairy-punk/scene.gltf',
     // Bone names as authored by the Blender rig (see assets/scene/fairy-punk/
-    // license.txt) — dots sanitize to underscores on import, same as the
-    // Armadrillo's spaces, via the shared `norm()` below.
+    // license.txt) — GLTFLoader DROPS the dots on import ("UpperArm.L" →
+    // "UpperArmL"), it does not underscore them like the Armadrillo's spaces;
+    // the shared `norm()` below strips dots and underscores spaces to match.
     nameOf: {
       pelvis: 'Pelvis', spine: 'Spine', chest: 'Chest', neck: 'Neck', head: 'Head',
       upperArmL: 'UpperArm.L', forearmL: 'Forearm.L', upperArmR: 'UpperArm.R', forearmR: 'Forearm.R',
@@ -138,6 +139,54 @@ export function initKineticDancer() {
     armDown: 0, foreRest: 0.12,
     fitH: 0.82, fitW: 0.34, xOffset: 1.0,
   };
+
+  // ── per-panel duet placement ─────────────────────────────────────────
+  // The duet shouldn't sit in the exact same spot on every panel — that reads
+  // as a static sticker pasted in the corner. `updateDuetSlot()` (in the
+  // render loop) reads the active panel (published on <html data-panel> by
+  // kinetic.js) and damps each rig's position/scale toward a per-GROUP target
+  // on top of its calibrated base transform (frameModel's fit, untouched).
+  // Grouped (not one bespoke layout per panel) so the variety stays coherent:
+  // 'display' is the baseline split (fairy-punk front-right, Armadrillo
+  // back-left); 'displayAlt' swaps which figure is foreground/larger and
+  // pushes them further apart for a genuinely different silhouette;
+  // 'dense' (the content-heavy Run of Show/Archive panels, already a faint
+  // background watermark per kinetic.css) tucks both figures smaller and
+  // further to one side so they read as ambient corner presence, not a
+  // repeat of the display-panel composition.
+  const PANEL_LAYOUTS = {
+    // fairy-punk pushed further right + a touch smaller than the initial
+    // tuning — its corrected (post bone-fix) silhouette is taller/wider than
+    // before and its reaching arm crossed into the "RIYA" hero name at the
+    // original x:1.0/scale:1.
+    display:    { a: { x: -1.05, scaleMul: 1,    z: 0    }, b: { x: 1.4,   scaleMul: 0.9,  z: 0    } },
+    // RSVP: role-swap (Armadrillo foreground/larger) reads fine here — the
+    // closing copy sits in the LEFT column, well clear of the right-side duet.
+    displayAlt: { a: { x: 0.85,  scaleMul: 1.15, z: 0.9  }, b: { x: -1.15, scaleMul: 0.8,  z: -0.9 } },
+    // Interlude is a different case from RSVP: its quote sits centre-right,
+    // reaching further into the dancer's column than any other panel, so the
+    // generic displayAlt slot crossed the quote text. Push both figures
+    // further right and smaller, clear of the quote's line length.
+    interludeAlt: { a: { x: 1.9, scaleMul: 0.7, z: 0.4 }, b: { x: 1.55, scaleMul: 0.45, z: -0.5 } },
+    dense:      { a: { x: -1.5,  scaleMul: 0.68, z: -0.3 }, b: { x: -0.65, scaleMul: 0.6,  z: 0.3  } },
+  };
+  const PANEL_GROUP = {
+    invocation: 'display', countdown: 'display',
+    interlude: 'interludeAlt', rsvp: 'displayAlt',
+    'run-of-show': 'dense', archive: 'dense',
+  };
+  const DEFAULT_LAYOUT_GROUP = 'display';
+  function updateDuetSlot(rigState, key, dt) {
+    const groupName = PANEL_GROUP[document.documentElement.dataset.panel] || DEFAULT_LAYOUT_GROUP;
+    const target = PANEL_LAYOUTS[groupName][key];
+    const k = 1 - Math.pow(0.02, dt);   // graceful glide (~1s to settle), not a snap
+    rigState.slotX += (target.x - rigState.slotX) * k;
+    rigState.slotScaleMul += (target.scaleMul - rigState.slotScaleMul) * k;
+    rigState.slotZ += (target.z - rigState.slotZ) * k;
+    rigState.rigGroup.position.x = rigState.baseX + rigState.slotX;
+    rigState.rigGroup.position.z = rigState.baseZ + rigState.slotZ;
+    rigState.rigGroup.scale.setScalar(rigState.baseScale * rigState.slotScaleMul);
+  }
 
   function createRigState(cfg) {
     return {
@@ -151,6 +200,10 @@ export function initKineticDancer() {
       currentMoveName: 'grooveSway', currentMove: null,
       moveStartBeat: 0, moveMirror: 1, lastBar8: -1, prevDrop: false,
       headTrail: 0,   // secondary-motion memory for the head (grooveSway only), per-rig
+      // calibrated base transform (set once by frameModel) + the animated
+      // per-panel "duet slot" offset applied on top each frame (updateDuetSlot)
+      baseX: 0, baseY: 0, baseZ: 0, baseScale: 1,
+      slotX: cfg.xOffset, slotScaleMul: 1, slotZ: 0,
     };
   }
   const rigA = createRigState(RIG_A);
@@ -227,10 +280,16 @@ export function initKineticDancer() {
     });
 
     // find the mapped bones by exact name
-    // GLTFLoader SANITIZES node names (spaces + dots → underscores), so match
-    // on the normalized form — otherwise any bone with a space/dot fails to
-    // map and never animates. Normalize both sides.
-    const norm = (s) => s.replace(/[\s.]/g, '_');
+    // GLTFLoader SANITIZES node names: a space becomes an underscore, but a
+    // DOT is DROPPED entirely (not underscore-replaced) — confirmed empirically
+    // ("UpperArm.L" imports as "UpperArmL", not "UpperArm_L"). The fairy-punk
+    // rig's names all use dots (Blender's own naming convention), so the
+    // previous dot→underscore assumption silently matched only the 5 no-dot
+    // roles (Pelvis/Spine/Chest/Neck/Head) and left all 8 limb bones (every
+    // name with a dot) unmapped — frozen at bind pose, and corrupting this
+    // rig's frame-fit (only 5 of 13 points to fit/centre against). Normalize
+    // both sides the same way.
+    const norm = (s) => s.replace(/\s/g, '_').replace(/\./g, '');
     const boneByRole = {};
     model.traverse((o) => {
       if (!o.isBone) return;
@@ -238,8 +297,16 @@ export function initKineticDancer() {
     });
 
     // ── frame: fit this rig into its half of the canvas, then slot it ──
+    // Fit ONLY the driven-role bones (torso/head/limbs), not every bone in the
+    // model — the Armadrillo ships a 4-segment tail, wrist-mounted drills, and
+    // full finger chains that extend well past its actual body silhouette;
+    // fitting to ALL bones (the old behaviour) shrank the whole rig down to
+    // keep those far-flung extremities in frame, making the visible creature
+    // look tiny next to the fairy-punk rig (which has no such extras). Framing
+    // to the same 13 roles both rigs are actually driven by keeps scale
+    // comparisons between the two figures meaningful.
     rigState.turnGroup.add(model);
-    frameModel(rigState);
+    frameModel(rigState, boneByRole);
 
     // ── proxies + adapters (the retarget) ────────────────────────────────
     // A proxy per animated role: dance() writes to these (persist → damping).
@@ -295,9 +362,15 @@ export function initKineticDancer() {
   // fixed `xOffset` into its duet slot (applied once, after centering
   // converges, so it isn't undone by the centering math).
   const _corner = new THREE.Vector3(), _c = new THREE.Vector3();
-  function frameModel(rigState) {
+  function frameModel(rigState, boneByRole) {
     if (!rigState.model || !camera) return;
-    if (!rigState.frameBonesCache) { rigState.frameBonesCache = []; rigState.model.traverse(o => { if (o.isBone) rigState.frameBonesCache.push(o); }); }
+    if (!rigState.frameBonesCache) {
+      // Fit to the driven roles only (see call site comment) — fall back to
+      // every bone only if a role map wasn't supplied (shouldn't happen at
+      // runtime, but keeps this function safe to call standalone).
+      rigState.frameBonesCache = boneByRole ? Object.values(boneByRole) : [];
+      if (!rigState.frameBonesCache.length) rigState.model.traverse(o => { if (o.isBone) rigState.frameBonesCache.push(o); });
+    }
     const frameBones = rigState.frameBonesCache;
     if (!frameBones.length) return;
     camera.updateMatrixWorld(true);
@@ -333,8 +406,15 @@ export function initKineticDancer() {
       rigState.rigGroup.scale.setScalar(s);
       if (Math.abs(k - 1) < 0.01 && Math.abs(yc) < 0.01) break;
     }
-    // slot into the duet position (world-space shift, applied once post-fit)
-    rigState.rigGroup.position.x += rigState.cfg.xOffset;
+    // Capture the CALIBRATED base transform (centred, correctly scaled) once —
+    // per-panel duet placement (updateDuetSlot, in the render loop) then
+    // varies position/scale on TOP of this base every frame, so the fit
+    // quality here is never re-derived or disturbed by the panel-to-panel
+    // composition changes.
+    rigState.baseX = rigState.rigGroup.position.x;
+    rigState.baseY = rigState.rigGroup.position.y;
+    rigState.baseZ = rigState.rigGroup.position.z;
+    rigState.baseScale = rigState.rigGroup.scale.x;
   }
 
   // Size the renderer + camera aspect to the canvas's CSS box (client px).
@@ -1040,6 +1120,7 @@ export function initKineticDancer() {
       const rigState = rigs[i];
       if (!rigState.modelReady || !rigState.bones) continue;   // that rig's load hasn't landed yet
 
+      updateDuetSlot(rigState, i === 0 ? 'a' : 'b', dt);   // per-panel placement (see PANEL_LAYOUTS)
       dance(rigState, dt, now, clk);
       applyRig(rigState);   // proxy joints → real bones (retarget)
 
