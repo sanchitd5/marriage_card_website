@@ -92,12 +92,21 @@ export function initKineticDancer() {
   // dance/energy state (reused across frames; nothing allocated in the loop)
   // Idle-energy baseline lifted to ~0.28 so the groove amplitude reads even
   // without music (the figure still visibly dances when silent).
-  let energy = 0.28, prevFast = 0, energySlow = 0.28, beat = 0, phase = 0;
+  let energy = 0.28, phase = 0;
   let beatAccent = 0;                 // on-beat pulse (0..1), music-locked
   let ENV = null;                     // the offline envelope JSON (fetched once)
   const trackInfo = {};               // per-track { beatPeriod, bpm, t0 } (cached)
-  const N_BEATS = 2;                  // a full sway/gesture spans this many beats (groovier)
-  let headTrail = 0; // secondary-motion memory for the head
+  const N_BEATS = 2;                  // grooveSway's master sway spans this many beats
+  let headTrail = 0; // secondary-motion memory for the head (grooveSway only)
+
+  // ── move-selection clock state ────────────────────────────────────────
+  // A separate BAR-GRID clock (beats elapsed, not radians) drives WHICH move
+  // is active — independent of `phase` (grooveSway's own sine oscillator).
+  const BAR_WEIGHT = [1.0, 0.35, 0.6, 0.35];   // beat-in-bar accent weighting (downbeat strongest)
+  const IDLE_BEAT_PERIOD = 0.6;                // synthetic ~100bpm grid while no track is locked
+  let idleBeatAccum = 0;
+  let currentMoveName = 'grooveSway', currentMove = null, moveStartBeat = 0, moveMirror = 1;
+  let lastBar8 = -1, prevDrop = false;
 
   // ── glTF bone name → our rig role ────────────────────────────────────
   // Exact node names in scene.gltf. Only the joints dance() actually drives get
@@ -274,7 +283,7 @@ export function initKineticDancer() {
   // figure. Iterate: measure the bones' projected vertical span, scale to fill
   // ~FIT_H of the canvas, and shift the top-level rig so the span is centred.
   const FIT_H = 0.86;                    // fraction of canvas HEIGHT the figure may fill
-  const FIT_W = 0.82;                    // fraction of canvas WIDTH (this creature is wide → usually binds)
+  const FIT_W = 0.62;                    // fraction of canvas WIDTH (this creature is wide → usually binds)
   const _corner = new THREE.Vector3(), _c = new THREE.Vector3();
   let _frameBones = null;
   function frameModel() {
@@ -341,17 +350,6 @@ export function initKineticDancer() {
     return 0.28 + 0.06 * Math.sin(t * 0.5);   // idle breath (raised baseline) when the lightshow is absent
   }
 
-  // Adaptive energy-flux beat detector on the RAW signal (the lightshow's
-  // `energy` is already smoothed, so we derive our own onset here). Refractory
-  // via the `beat < 0.2` gate; brightness never reads from this.
-  function updateBeat(rawE) {
-    const flux = Math.max(0, rawE - prevFast);
-    prevFast = rawE;
-    energySlow += (rawE - energySlow) * 0.02;
-    if (rawE > energySlow * 0.9 + 0.06 && flux > 0.05 && beat < 0.2) beat = 1;
-    beat *= 0.86;
-  }
-
   // ── BPM sync (adapted from zhaojw1998/Real-Time-Music-Driven-Dancing-Robot) ──
   // That robot ran madmom's DBN beat-tracker live and time-scaled motion frames
   // onto the beat (spb/fpb) with a PID re-sync. We already have the OFFLINE
@@ -394,23 +392,301 @@ export function initKineticDancer() {
     }
   }).catch(() => {});
 
-  // Returns the gesture-phase RATE (Hz) + the on-beat accent for `now`. When the
-  // music is playing and its track is analysed, the rate is BPM-locked (a full
-  // gesture spans N_BEATS beats) and the accent spikes on each beat; otherwise a
-  // slow free-run idle with no phantom beat. Rate-based (not absolute) so play/
-  // pause never snaps the phase.
-  function musicClock() {
+  // Returns the gesture-phase RATE (Hz) + the on-beat accent for `now`, PLUS a
+  // bar-grid `beatPos` (beats elapsed, monotonic float) that drives WHICH move
+  // is active (see MOVE_TABLE/updateMoveSelection below). When the music is
+  // playing and its track is analysed: `phase`'s rate is BPM-locked (a full
+  // grooveSway sway spans N_BEATS beats, halved again at high BPM via
+  // `tempoScale` so fast tracks read as bigger/slower rather than flailing),
+  // `beatPos` derives directly + driftlessly from `audio.currentTime`, and the
+  // accent spikes on each beat, weighted so the downbeat (beat 0 of the bar)
+  // reads stronger than the off-beats. Otherwise a slow free-run idle clock
+  // with no phantom beat/accent. Rate-based (not absolute) so play/pause never
+  // snaps the phase.
+  function musicClock(dt) {
     const m = appState.music, a = m && m.audio;
     const playing = !!(a && !m.paused && !a.paused && a.currentTime > 0.05);
     const info = playing && a._trackName && trackInfo[a._trackName];
     if (info && Number.isFinite(info.beatPeriod) && info.beatPeriod > 0.05) {
+      const tempoScale = info.bpm >= 140 ? 2 : 1;   // half-time at high BPM (bigger, slower per beat)
       const beatPos = (a.currentTime - info.t0) / info.beatPeriod;
-      const beatPhase = beatPos - Math.floor(beatPos);   // 0 = on the beat
-      return { rateHz: 1 / (N_BEATS * info.beatPeriod), accent: Math.pow(1 - beatPhase, 4) };
+      const beatIndex = Math.floor(beatPos);
+      const beatPhase = beatPos - beatIndex;          // 0 = on the beat
+      const barWeight = BAR_WEIGHT[beatIndex & 3];
+      return {
+        rateHz: 1 / (N_BEATS * info.beatPeriod * tempoScale),
+        accent: Math.pow(1 - beatPhase, 4) * barWeight,
+        beatPos, tempoScale, bpm: info.bpm, locked: true,
+      };
     }
     // idle free-run (no music yet): keep it LIVELY so it visibly dances even
-    // before any track plays (~one gesture every ~2.4s), no beat accent.
-    return { rateHz: 0.42 + energy * 0.15, accent: 0 };
+    // before any track plays (~one gesture every ~2.4s), no beat accent. Still
+    // advance a synthetic beatPos so move-selection has a grid to work with.
+    idleBeatAccum += (Number.isFinite(dt) ? dt : 0.016) / IDLE_BEAT_PERIOD;
+    return { rateHz: 0.42 + energy * 0.15, accent: 0, beatPos: idleBeatAccum, tempoScale: 1, bpm: 0, locked: false };
+  }
+
+  // ── move library ─────────────────────────────────────────────────────
+  // Seven move phrases replace the old single always-on sine loop (which
+  // repeated the same ~1s gesture unchanged for the length of an entire
+  // track). Every move is a pure function of a shared context — `b` (proxy
+  // joints), the damping helpers, amplitude `A`/beat accent `hit`, the
+  // grooveSway oscillator `p`/`s`, this move's own `elapsedBeats` (beats since
+  // it was selected, tempo-scaled), and `mirror` (±1, for L/R-picking moves).
+  // EVERY move sets a target for EVERY proxy axis another move might drive —
+  // otherwise an axis a move doesn't touch just freezes at whatever the
+  // PREVIOUS move left it at instead of easing back to rest, breaking the
+  // "moves crossfade for free through the shared damping" property.
+  const REST_ARM_X = 0.20, REST_FORE_X = 0.12, REST_LEG_X = 0.06;
+
+  // A. Groove sway — the retuned workhorse (was the only move). Whole-figure
+  // sway + alternating hands-to-face reach, on grooveSway's own `p` oscillator.
+  function grooveSway(c) {
+    const { b, tgt, set, A, p, s } = c;
+    const reachL = 0.5 - 0.5 * Math.cos(p);
+    const reachR = 0.5 - 0.5 * Math.cos(p + 2.4);
+    const reach = Math.max(reachL, reachR);
+    const look = Math.sin(p * 0.5 + 0.7);
+
+    set(b.pelvis.position, 'x', s * 0.17 * A);
+    set(b.pelvis.position, 'y', 0.12 + Math.abs(s) * 0.08 * A);
+    tgt(b.pelvis.rotation, 'z', s * 0.16 * A);
+    tgt(b.pelvis.rotation, 'y', s * 0.20 * A);
+
+    tgt(b.spine.rotation, 'x', 0.08 + (0.5 - 0.5 * Math.cos(p)) * 0.14 * A);
+    tgt(b.spine.rotation, 'z', -s * 0.14 * A);
+    tgt(b.chest.rotation, 'z', s * 0.14 * A);
+    tgt(b.chest.rotation, 'y', -s * 0.14 * A);
+
+    tgt(b.upperArmL.rotation, 'z', 0.12 + reachL * 0.50 * A);
+    tgt(b.upperArmL.rotation, 'x', 0.25 + reachL * 1.30 * A);
+    tgt(b.forearmL.rotation, 'x', -0.6 - reachL * 1.55 * A);
+    tgt(b.upperArmR.rotation, 'z', -(0.12 + reachR * 0.50 * A));
+    tgt(b.upperArmR.rotation, 'x', 0.25 + reachR * 1.30 * A);
+    tgt(b.forearmR.rotation, 'x', -0.6 - reachR * 1.55 * A);
+
+    tgt(b.thighL.rotation, 'x', 0.05 + Math.max(0, s) * 0.22 * A);
+    tgt(b.thighR.rotation, 'x', 0.05 + Math.max(0, -s) * 0.22 * A);
+    tgt(b.shinL.rotation, 'x', 0.05 + Math.max(0, s) * 0.40 * A);
+    tgt(b.shinR.rotation, 'x', 0.05 + Math.max(0, -s) * 0.40 * A);
+
+    // head trails the chest (secondary motion) — kept local to this move only
+    headTrail += (b.chest.rotation.z - headTrail) * (1 - Math.pow(0.92, (c.dt || 0.016) * 60));
+    tgt(b.neck.rotation, 'x', 0.03 + reach * 0.20 * A);
+    tgt(b.neck.rotation, 'z', s * 0.08 * A);
+    tgt(b.neck.rotation, 'y', look * 0.10 * A);
+    tgt(b.head.rotation, 'x', -0.12 + reach * 0.54 * A);
+    tgt(b.head.rotation, 'z', s * 0.16 * A - headTrail * 0.4);
+    tgt(b.head.rotation, 'y', look * 0.22 * A);
+  }
+
+  // B. Hands-to-face hold — draw up over 3 beats, HOLD near the face for 3
+  // (only a soft breath moving), release over 2. Stillness itself is
+  // choreography (Anyma Syren's held, contemplative poses).
+  function handsFace(c) {
+    const { b, tgt, set, A, elapsedBeats } = c;
+    const eb = elapsedBeats % 8;
+    const drawAmt = eb < 3 ? eb / 3 : eb < 6 ? 1 : Math.max(0, 1 - (eb - 6) / 2);
+    const breathe = Math.sin(eb * 1.3) * 0.03;
+
+    set(b.pelvis.position, 'x', 0);
+    set(b.pelvis.position, 'y', 0.11 + breathe * A);
+    tgt(b.pelvis.rotation, 'z', 0); tgt(b.pelvis.rotation, 'y', 0);
+    tgt(b.spine.rotation, 'x', 0.08 + drawAmt * 0.12 * A); tgt(b.spine.rotation, 'z', 0);
+    tgt(b.chest.rotation, 'z', 0); tgt(b.chest.rotation, 'y', drawAmt * 0.08 * A);
+
+    tgt(b.upperArmL.rotation, 'z', 0.10 + drawAmt * 0.30 * A);
+    tgt(b.upperArmL.rotation, 'x', 0.25 + drawAmt * 1.35 * A);
+    tgt(b.forearmL.rotation, 'x', -0.6 - drawAmt * 1.6 * A);
+    tgt(b.upperArmR.rotation, 'z', -(0.10 + drawAmt * 0.30 * A));
+    tgt(b.upperArmR.rotation, 'x', 0.25 + drawAmt * 1.35 * A);
+    tgt(b.forearmR.rotation, 'x', -0.6 - drawAmt * 1.6 * A);
+
+    tgt(b.thighL.rotation, 'x', REST_LEG_X); tgt(b.thighR.rotation, 'x', REST_LEG_X);
+    tgt(b.shinL.rotation, 'x', REST_LEG_X); tgt(b.shinR.rotation, 'x', REST_LEG_X);
+
+    tgt(b.neck.rotation, 'x', 0.03 + drawAmt * 0.28 * A); tgt(b.neck.rotation, 'z', 0); tgt(b.neck.rotation, 'y', 0);
+    tgt(b.head.rotation, 'x', -0.12 + drawAmt * 0.66 * A); tgt(b.head.rotation, 'z', 0); tgt(b.head.rotation, 'y', 0);
+  }
+
+  // C. Barrier strike — the Anyma signature accent. Triggered on the RISING
+  // edge of a sustained-loud ("drop") section: 2-beat wind-up (coil back),
+  // then an eased 6-beat recoil out of the strike. Motion-only (no opacity).
+  function strike(c) {
+    const { b, tgt, set, add, A, elapsedBeats } = c;
+    const eb = elapsedBeats;
+    if (eb < 2) {
+      const w = eb / 2;
+      set(b.pelvis.position, 'x', 0); set(b.pelvis.position, 'y', 0.10 - w * 0.03 * A);
+      tgt(b.upperArmL.rotation, 'x', 0.25 - w * 0.6 * A); tgt(b.upperArmL.rotation, 'z', 0.10);
+      tgt(b.upperArmR.rotation, 'x', 0.25 - w * 0.6 * A); tgt(b.upperArmR.rotation, 'z', -0.10);
+      tgt(b.forearmL.rotation, 'x', REST_FORE_X); tgt(b.forearmR.rotation, 'x', REST_FORE_X);
+      tgt(b.chest.rotation, 'y', w * 0.3 * A); tgt(b.chest.rotation, 'z', 0);
+      tgt(b.spine.rotation, 'z', w * 0.2 * A); tgt(b.spine.rotation, 'x', 0.08);
+      tgt(b.head.rotation, 'x', -0.12); tgt(b.head.rotation, 'z', 0); tgt(b.head.rotation, 'y', 0);
+      tgt(b.neck.rotation, 'x', 0.03); tgt(b.neck.rotation, 'z', 0); tgt(b.neck.rotation, 'y', 0);
+    } else {
+      const punch = Math.max(0, 1 - (eb - 2) / 6);
+      set(b.pelvis.position, 'x', 0); set(b.pelvis.position, 'y', 0.11 + punch * 0.03 * A);
+      tgt(b.upperArmL.rotation, 'x', 0.25 + 1.5 * punch * A); tgt(b.upperArmL.rotation, 'z', 0.10 * (1 - punch));
+      tgt(b.upperArmR.rotation, 'x', 0.25 + 1.5 * punch * A); tgt(b.upperArmR.rotation, 'z', -0.10 * (1 - punch));
+      tgt(b.forearmL.rotation, 'x', REST_FORE_X - 0.2 * punch); tgt(b.forearmR.rotation, 'x', REST_FORE_X - 0.2 * punch);
+      tgt(b.chest.rotation, 'y', -punch * 0.3 * A); tgt(b.chest.rotation, 'z', 0);
+      tgt(b.spine.rotation, 'x', 0.08 + punch * 0.25 * A); tgt(b.spine.rotation, 'z', 0);
+      tgt(b.head.rotation, 'x', -0.12 - punch * 0.2 * A); tgt(b.head.rotation, 'z', 0); tgt(b.head.rotation, 'y', 0);
+      tgt(b.neck.rotation, 'x', 0.03 + punch * 0.1 * A); tgt(b.neck.rotation, 'z', 0); tgt(b.neck.rotation, 'y', 0);
+      add(b.pelvis.position, 'y', -punch * 0.08);
+    }
+    tgt(b.thighL.rotation, 'x', REST_LEG_X + 0.04); tgt(b.thighR.rotation, 'x', REST_LEG_X + 0.04);
+    tgt(b.shinL.rotation, 'x', REST_LEG_X); tgt(b.shinR.rotation, 'x', REST_LEG_X);
+  }
+
+  // D. Breakdown gaze — long near-stillness for quiet sections/idle: one slow
+  // 16-beat weight shift, a full head turn toward the viewer, breath only.
+  // Giving the figure permission to STOP is the cheapest anti-monotony move.
+  function breakdown(c) {
+    const { b, tgt, set, A, elapsedBeats } = c;
+    const eb = elapsedBeats % 16;
+    const breathe = Math.sin(eb * 0.4) * 0.03 * A;
+    const shift = (eb < 8 ? eb / 8 : 1 - (eb - 8) / 8) - 0.5;
+    const gaze = Math.sin((eb / 16) * Math.PI * 2 + 0.3) * 0.26 * A;
+
+    set(b.pelvis.position, 'x', shift * 0.10 * A);
+    set(b.pelvis.position, 'y', 0.10 + breathe);
+    tgt(b.pelvis.rotation, 'z', 0); tgt(b.pelvis.rotation, 'y', shift * 0.10 * A);
+    tgt(b.spine.rotation, 'x', 0.06 + breathe * 0.5); tgt(b.spine.rotation, 'z', 0);
+    tgt(b.chest.rotation, 'z', 0); tgt(b.chest.rotation, 'y', gaze * 0.3);
+
+    tgt(b.upperArmL.rotation, 'z', 0.10); tgt(b.upperArmL.rotation, 'x', REST_ARM_X);
+    tgt(b.upperArmR.rotation, 'z', -0.10); tgt(b.upperArmR.rotation, 'x', REST_ARM_X);
+    tgt(b.forearmL.rotation, 'x', REST_FORE_X); tgt(b.forearmR.rotation, 'x', REST_FORE_X);
+
+    tgt(b.thighL.rotation, 'x', REST_LEG_X); tgt(b.thighR.rotation, 'x', REST_LEG_X);
+    tgt(b.shinL.rotation, 'x', REST_LEG_X); tgt(b.shinR.rotation, 'x', REST_LEG_X);
+
+    tgt(b.neck.rotation, 'x', 0.03); tgt(b.neck.rotation, 'z', 0); tgt(b.neck.rotation, 'y', gaze * 0.4);
+    tgt(b.head.rotation, 'x', -0.10); tgt(b.head.rotation, 'z', 0); tgt(b.head.rotation, 'y', gaze);
+  }
+
+  // E. Step-touch — a 4-beat weight-shifting step with elbow pumps ON the
+  // beat. High-energy pool only; the one move where the accent reads in the
+  // arms as much as the knees.
+  function stepTouch(c) {
+    const { b, tgt, set, A, elapsedBeats } = c;
+    const eb = elapsedBeats % 4;
+    const swing = Math.sin(eb * Math.PI);       // 0..1..0 across each beat pair
+    const dir = Math.floor(eb) % 2 === 0 ? 1 : -1;
+
+    set(b.pelvis.position, 'x', dir * 0.13 * A * Math.abs(swing));
+    set(b.pelvis.position, 'y', 0.12 + Math.abs(swing) * 0.06 * A);
+    tgt(b.pelvis.rotation, 'z', dir * 0.10 * A); tgt(b.pelvis.rotation, 'y', 0);
+    tgt(b.spine.rotation, 'x', 0.08); tgt(b.spine.rotation, 'z', -dir * 0.08 * A);
+    tgt(b.chest.rotation, 'z', dir * 0.08 * A); tgt(b.chest.rotation, 'y', 0);
+
+    tgt(b.upperArmL.rotation, 'z', 0.10); tgt(b.upperArmL.rotation, 'x', 0.3 + Math.max(0, Math.sin(eb * Math.PI + Math.PI)) * 0.4 * A);
+    tgt(b.upperArmR.rotation, 'z', -0.10); tgt(b.upperArmR.rotation, 'x', 0.3 + Math.max(0, -Math.sin(eb * Math.PI + Math.PI)) * 0.4 * A);
+    tgt(b.forearmL.rotation, 'x', REST_FORE_X); tgt(b.forearmR.rotation, 'x', REST_FORE_X);
+
+    tgt(b.thighL.rotation, 'x', 0.08 + Math.max(0, Math.sin(eb * Math.PI)) * 0.30 * A);
+    tgt(b.thighR.rotation, 'x', 0.08 + Math.max(0, -Math.sin(eb * Math.PI)) * 0.30 * A);
+    tgt(b.shinL.rotation, 'x', 0.05 + Math.max(0, Math.sin(eb * Math.PI)) * 0.35 * A);
+    tgt(b.shinR.rotation, 'x', 0.05 + Math.max(0, -Math.sin(eb * Math.PI)) * 0.35 * A);
+
+    tgt(b.neck.rotation, 'x', 0.03); tgt(b.neck.rotation, 'z', dir * 0.05); tgt(b.neck.rotation, 'y', 0);
+    tgt(b.head.rotation, 'x', -0.08); tgt(b.head.rotation, 'z', dir * 0.06); tgt(b.head.rotation, 'y', 0);
+  }
+
+  // F. Body wave — a traveling wave up the pelvis→spine→chest→neck→head
+  // chain (each link phase-delayed). Cheap, reads as skilled/fluid.
+  function bodyWave(c) {
+    const { b, tgt, set, A, elapsedBeats } = c;
+    const w = (delay) => Math.sin(((elapsedBeats - delay) / 4) * Math.PI * 2);
+    const w0 = w(0), w1 = w(0.4), w2 = w(0.8), w3 = w(1.2), w4 = w(1.6);
+
+    set(b.pelvis.position, 'x', 0); set(b.pelvis.position, 'y', 0.12 + Math.abs(w0) * 0.05 * A);
+    tgt(b.pelvis.rotation, 'z', w0 * 0.12 * A); tgt(b.pelvis.rotation, 'y', 0);
+    tgt(b.spine.rotation, 'x', 0.08); tgt(b.spine.rotation, 'z', w1 * 0.14 * A);
+    tgt(b.chest.rotation, 'z', w2 * 0.16 * A); tgt(b.chest.rotation, 'y', 0);
+
+    tgt(b.upperArmL.rotation, 'z', 0.10 + w2 * 0.15 * A); tgt(b.upperArmL.rotation, 'x', REST_ARM_X + Math.max(0, w1) * 0.3 * A);
+    tgt(b.upperArmR.rotation, 'z', -(0.10 + w2 * 0.15 * A)); tgt(b.upperArmR.rotation, 'x', REST_ARM_X + Math.max(0, -w1) * 0.3 * A);
+    tgt(b.forearmL.rotation, 'x', REST_FORE_X); tgt(b.forearmR.rotation, 'x', REST_FORE_X);
+
+    tgt(b.thighL.rotation, 'x', REST_LEG_X); tgt(b.thighR.rotation, 'x', REST_LEG_X);
+    tgt(b.shinL.rotation, 'x', REST_LEG_X); tgt(b.shinR.rotation, 'x', REST_LEG_X);
+
+    tgt(b.neck.rotation, 'x', 0.03); tgt(b.neck.rotation, 'z', w3 * 0.12 * A); tgt(b.neck.rotation, 'y', 0);
+    tgt(b.head.rotation, 'x', -0.10); tgt(b.head.rotation, 'z', w4 * 0.10 * A); tgt(b.head.rotation, 'y', 0);
+  }
+
+  // G. Reach and open — one-armed reach, mirrored L/R at selection time
+  // (doubles perceived variety for free). The featured arm opens/extends
+  // rather than bending to the face, so it reads distinct from handsFace.
+  function reachOpen(c) {
+    const { b, tgt, set, A, elapsedBeats, mirror } = c;
+    const eb = elapsedBeats % 8;
+    const amt = eb < 4 ? eb / 4 : Math.max(0, 1 - (eb - 4) / 4);
+    const L = mirror > 0, featUp = L ? b.upperArmR : b.upperArmL, featFore = L ? b.forearmR : b.forearmL;
+    const restUp = L ? b.upperArmL : b.upperArmR, restFore = L ? b.forearmL : b.forearmR;
+
+    set(b.pelvis.position, 'x', 0); set(b.pelvis.position, 'y', 0.11 + amt * 0.03 * A);
+    tgt(b.pelvis.rotation, 'z', 0); tgt(b.pelvis.rotation, 'y', mirror * amt * 0.12 * A);
+    tgt(b.spine.rotation, 'x', 0.08); tgt(b.spine.rotation, 'z', 0);
+    tgt(b.chest.rotation, 'z', 0); tgt(b.chest.rotation, 'y', mirror * amt * 0.22 * A);
+
+    tgt(featUp.rotation, 'x', 0.25 + amt * 1.4 * A); tgt(featUp.rotation, 'z', mirror * (0.12 + amt * 0.55 * A));
+    tgt(featFore.rotation, 'x', REST_FORE_X - 0.2 * amt);
+    tgt(restUp.rotation, 'x', REST_ARM_X); tgt(restUp.rotation, 'z', 0.10 * -mirror);
+    tgt(restFore.rotation, 'x', REST_FORE_X);
+
+    tgt(b.thighL.rotation, 'x', REST_LEG_X); tgt(b.thighR.rotation, 'x', REST_LEG_X);
+    tgt(b.shinL.rotation, 'x', REST_LEG_X); tgt(b.shinR.rotation, 'x', REST_LEG_X);
+
+    tgt(b.neck.rotation, 'x', 0.03); tgt(b.neck.rotation, 'z', 0); tgt(b.neck.rotation, 'y', -mirror * amt * 0.14 * A);
+    tgt(b.head.rotation, 'x', -0.14 - amt * 0.10 * A); tgt(b.head.rotation, 'z', 0); tgt(b.head.rotation, 'y', -mirror * amt * 0.20 * A);
+  }
+
+  const MOVE_TABLE = {
+    grooveSway: { beats: 8, pool: ['idle', 'low', 'high'], run: grooveSway },
+    handsFace: { beats: 8, pool: ['idle', 'low'], run: handsFace },
+    strike: { beats: 8, pool: ['high'], run: strike },
+    breakdown: { beats: 16, pool: ['idle', 'low'], run: breakdown },
+    stepTouch: { beats: 4, pool: ['high'], run: stepTouch },
+    bodyWave: { beats: 4, pool: ['idle', 'low', 'high'], run: bodyWave },
+    reachOpen: { beats: 8, pool: ['low', 'high'], mirrored: true, run: reachOpen },
+  };
+  currentMove = MOVE_TABLE.grooveSway;
+
+  // Re-selects the active move every 8 beats, AND immediately on a drop's
+  // rising edge (so the strike accent lands right when the section changes,
+  // not up to 8 beats late — it may then run short if the next 8-beat
+  // boundary falls soon after; that's fine, every move crossfades out
+  // cleanly via the shared damping). Context gates the eligible pool: idle
+  // (no track locked yet) / low (playing, not in a sustained-loud section) /
+  // high (`appState.lightshow.drop` — the repo's existing Schmitt-triggered,
+  // slow-eased sustained-loud-section flag).
+  function updateMoveSelection(clk) {
+    const drop = !!(appState.lightshow && appState.lightshow.drop);
+    const ctx = !clk.locked ? 'idle' : (drop ? 'high' : 'low');
+
+    if (drop && !prevDrop) {
+      currentMoveName = 'strike'; currentMove = MOVE_TABLE.strike;
+      moveStartBeat = clk.beatPos; moveMirror = 1;
+      lastBar8 = Math.floor(clk.beatPos / 8);   // don't immediately re-roll this same window
+      prevDrop = drop;
+      return;
+    }
+    prevDrop = drop;
+
+    const bar8 = Math.floor(clk.beatPos / 8);
+    if (bar8 !== lastBar8) {
+      lastBar8 = bar8;
+      const pool = Object.keys(MOVE_TABLE).filter((n) => n !== 'strike' && MOVE_TABLE[n].pool.includes(ctx));
+      const name = pool.length ? pool[Math.floor(Math.random() * pool.length)] : 'grooveSway';
+      currentMoveName = name; currentMove = MOVE_TABLE[name];
+      moveStartBeat = clk.beatPos;
+      moveMirror = (currentMove.mirrored && Math.random() < 0.5) ? -1 : 1;
+    }
   }
 
   // ── the dance ────────────────────────────────────────────────────────
@@ -418,87 +694,35 @@ export function initKineticDancer() {
   // so the figure grooves smoothly and never snaps or seizures. Ranges are kept
   // inside safe limits so no bone clips through another. dance() writes to the
   // PROXY joints (persistent Euler/Vector3 — same `.rotation.x/y/z` /
-  // `.position` API as a THREE.Bone) so the gesture math + damping are
-  // UNCHANGED; the adapter (applyRig) converts proxy → real bone each frame.
-  function dance(dt, t) {
+  // `.position` API as a THREE.Bone) so the gesture math + damping stay
+  // consistent; the adapter (applyRig) converts proxy → real bone each frame.
+  // WHICH move runs is decided by updateMoveSelection (an 8/16-beat grid,
+  // weighted-random within a context-gated pool); switching moves needs no
+  // special-case crossfade because every move writes every proxy and the
+  // shared `tgt`/`set` damping eases between whatever two targets differ.
+  function dance(dt, t, clk) {
     const b = bones;
     const k = 1 - Math.pow(0.001, dt);         // framerate-independent damping
-    // SLOW, weighty tempo — the Anyma "Genesys" figure moves like an awakening
-    // statue (contemporary dance), NOT a club bounce. Motion is a cycle of
-    // emotive GESTURES: arms drawing up toward the face/chest with deep elbows
-    // (hands-to-face / self-embrace), a slow torso curl-and-uncurl, weight
-    // shifts — all large, flowing, damped. (Ref: Anyma – Syren, lIdrRRofKm0.)
-    // `phase` is advanced in frame() at the BPM-locked rate (musicClock) so the
-    // gesture TEMPO matches the music; a full gesture spans N_BEATS beats.
-    const A = 0.9 + energy * 0.4;              // gesture reach (floored → lively even at 0 energy)
+    const A = 0.55 + energy * 0.9;             // wide gain: breakdowns visibly shrink, drops visibly grow
     const hit = beatAccent * (0.5 + energy * 0.5);   // music-locked on-beat accent
     const p = phase;
-    const s = Math.sin(p);                     // the master sway (left↔right)
+    const s = Math.sin(p);
 
     const tgt = (euler, axis, target) => { euler[axis] += (target - euler[axis]) * k; };
     const set = (vec, axis, target) => { vec[axis] += (target - vec[axis]) * k; };
     const add = (obj, axis, extra) => { obj[axis] += extra * k * 3; };
 
-    // arms rise/fall out of phase so they ALTERNATE (one up as the other drops)
-    const reachL = 0.5 - 0.5 * Math.cos(p);
-    const reachR = 0.5 - 0.5 * Math.cos(p + 2.4);
+    updateMoveSelection(clk);
+    const elapsedBeats = Math.max(0, (clk.beatPos - moveStartBeat) / (clk.tempoScale || 1));
+    currentMove.run({ b, tgt, set, add, A, hit, p, s, dt, elapsedBeats, mirror: moveMirror });
 
-    // WHOLE-FIGURE SWAY — the big readable move. The pelvis (base of the whole
-    // skeleton) translates side-to-side + bobs, so the entire silhouette grooves,
-    // not just the thin limbs.
-    set(b.pelvis.position, 'x', s * 0.17 * A);                       // sway L↔R (graceful, still visible)
-    set(b.pelvis.position, 'y', 0.12 + Math.abs(s) * 0.08 * A);      // gentle bob
-    tgt(b.pelvis.rotation, 'z', s * 0.16 * A);                       // hip drop into the sway
-    tgt(b.pelvis.rotation, 'y', s * 0.20 * A);
-
-    // torso COUNTER-sways over the hips (contrapposto S-curve) + a breathing curl
-    tgt(b.spine.rotation, 'x', 0.08 + (0.5 - 0.5 * Math.cos(p)) * 0.14 * A);
-    tgt(b.spine.rotation, 'z', -s * 0.14 * A);
-    tgt(b.chest.rotation, 'z', s * 0.14 * A);
-    tgt(b.chest.rotation, 'y', -s * 0.14 * A);
-
-    // ARMS — Anyma "Syren" vocabulary: hands drawn UP toward the FACE/CHEST with
-    // deep bent elbows (contemplative / self-embrace), alternating, then released.
-    // Less sideways spread (hands stay IN FRONT, toward the face), more forward
-    // reach + deeper elbow so the hands actually arrive at the head/chest.
-    tgt(b.upperArmL.rotation, 'z', 0.12 + reachL * 0.50 * A);   // stays close to the body
-    tgt(b.upperArmL.rotation, 'x', 0.25 + reachL * 1.30 * A);   // swing forward + up
-    tgt(b.forearmL.rotation, 'x', -0.6 - reachL * 1.55 * A);    // deep elbow → hand to face
-    tgt(b.upperArmR.rotation, 'z', -(0.12 + reachR * 0.50 * A));
-    tgt(b.upperArmR.rotation, 'x', 0.25 + reachR * 1.30 * A);
-    tgt(b.forearmR.rotation, 'x', -0.6 - reachR * 1.55 * A);
-
-    // legs WEIGHT-SHIFT with the sway — the un-weighted knee bends up (steps in
-    // place). Knees only bend one way (max(0,…)).
-    tgt(b.thighL.rotation, 'x', 0.05 + Math.max(0, s) * 0.22 * A);
-    tgt(b.thighR.rotation, 'x', 0.05 + Math.max(0, -s) * 0.22 * A);
-    tgt(b.shinL.rotation, 'x', 0.05 + Math.max(0, s) * 0.40 * A);
-    tgt(b.shinR.rotation, 'x', 0.05 + Math.max(0, -s) * 0.40 * A);
-
-    // EXPRESSIVE HEAD/NECK — the figure is FACELESS, so it "expresses" through
-    // motion: it BOWS into the hands as the arms draw up (contemplative), LIFTS +
-    // gazes up as they release/open, slowly SEARCHES side to side, and tilts with
-    // the sway. Split across neck + head for a graceful, longer emote; the head
-    // TRAILS the chest (secondary motion) so it feels alive, not mechanical.
-    const reach = Math.max(reachL, reachR);
-    const look = Math.sin(p * 0.5 + 0.7);            // slow "looking around"
-    headTrail += (b.chest.rotation.z - headTrail) * 0.08;
-    tgt(b.neck.rotation, 'x', 0.03 + reach * 0.20 * A);      // neck leads the bow
-    tgt(b.neck.rotation, 'z', s * 0.08 * A);
-    tgt(b.neck.rotation, 'y', look * 0.10 * A);
-    // head pitch: gazes UP when open (reach≈0 → −0.12), BOWS down into the hands
-    // when reaching (reach≈1 → +0.42) — the emotive core of the expression.
-    tgt(b.head.rotation, 'x', -0.12 + reach * 0.54 * A);
-    tgt(b.head.rotation, 'z', s * 0.16 * A - headTrail * 0.4);   // tilt with the sway
-    tgt(b.head.rotation, 'y', look * 0.22 * A);                  // search / look around
-
-    // ON-BEAT accent — MUSIC-LOCKED dip (knees + body sink) so the TEMPO is felt.
+    // shared, always-on accents regardless of the active move: the on-beat
+    // knee/body dip so the tempo is always physically felt, and the slow 3/4
+    // turn so the figure never sits flat-on for long.
     add(b.pelvis.position, 'y', -hit * 0.06);
     add(b.thighL.rotation, 'x', hit * 0.12);
     add(b.thighR.rotation, 'x', hit * 0.12);
     add(b.spine.rotation, 'x', hit * 0.06);
-
-    // slow 3/4 turn of the whole figure (never flat-on)
     tgt(b.root.rotation, 'y', Math.sin(p * 0.5) * 0.16);
   }
 
@@ -540,20 +764,25 @@ export function initKineticDancer() {
     last = now;
 
     if (modelReady && bones) {
-      // energy: read raw (music envelope or idle), smooth, derive beat
+      // energy: read raw (music envelope or idle), smooth (dt-scaled so the
+      // decay rate doesn't depend on display refresh rate), derive beat
       const rawE = readRawEnergy(now);
-      energy += (rawE - energy) * 0.12;
+      const kEnergy = 1 - Math.pow(0.88, dt * 60);   // ≈ the old flat 0.12-per-frame-at-60fps factor
+      energy += (rawE - energy) * kEnergy;
       if (!Number.isFinite(energy)) energy = 0.28;          // never let NaN corrupt the figure
 
-      // Advance the gesture phase at the BPM-locked rate (a full gesture spans
-      // N_BEATS beats), and capture the on-beat accent — so movement matches BPM.
-      const clk = musicClock();
+      // Advance the gesture phase at the BPM-locked rate (grooveSway's own
+      // oscillator spans N_BEATS beats), and capture the bar-weighted on-beat
+      // accent + the bar-grid beatPos that drives WHICH move is active.
+      const clk = musicClock(dt);
       const rate = Number.isFinite(clk.rateHz) ? clk.rateHz : 0.42;
       phase += rate * dt * 2 * Math.PI;
       if (!Number.isFinite(phase)) phase = 0;               // guard against any NaN creep
       beatAccent = Number.isFinite(clk.accent) ? clk.accent : 0;
+      if (!Number.isFinite(clk.beatPos)) clk.beatPos = 0;   // guard: never let move-selection see NaN
+      if (!Number.isFinite(clk.tempoScale) || clk.tempoScale <= 0) clk.tempoScale = 1;
 
-      dance(dt, now);
+      dance(dt, now, clk);
       applyRig();   // proxy joints → real bones (retarget)
 
       // Refresh bone world matrices → skeleton bone matrices BEFORE render. GPU
@@ -617,6 +846,8 @@ export function initKineticDancer() {
     get ready() { return modelReady; },
     get phase() { return +phase.toFixed(2); },
     get energy() { return +energy.toFixed(2); },
+    // current choreography move (for tuning/iteration)
+    get move() { return currentMoveName; },
   };
 
   raf = requestAnimationFrame(frame);
