@@ -267,7 +267,7 @@ export function initLightshow() {
     flashPolys = RADII.map((r, i) => {
       const geo = new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(r, 1)); // detail 1: more edges read as a "cluster", not a single diamond
       const mat = new THREE.LineBasicMaterial({
-        color: 0x8fe9ff, transparent: true, opacity: 0.16,
+        color: 0x8fe9ff, transparent: true, opacity: 0.16, fog: false,
         blending: THREE.AdditiveBlending, depthWrite: false,
       });
       const mesh = new THREE.LineSegments(geo, mat);
@@ -285,7 +285,7 @@ export function initLightshow() {
     }
     const sgeo = new THREE.BufferGeometry().setFromPoints(spts);
     flashSpiralMat = new THREE.LineBasicMaterial({
-      color: 0x8fe9ff, transparent: true, opacity: 0.85,
+      color: 0x8fe9ff, transparent: true, opacity: 0.85, fog: false,
       blending: THREE.AdditiveBlending, depthWrite: false,
     });
     flashSpiral = new THREE.Line(sgeo, flashSpiralMat);
