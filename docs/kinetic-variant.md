@@ -187,9 +187,11 @@ the same beat-locked choreography engine (no baked animation clips):
 - **"DP Techno Fairy Punk Set HD Textures"** by **BilloXD**
   (https://sketchfab.com/3d-models/dp-techno-fairy-punk-set-hd-textures-6c2d6ff1ca3043ff9ffdf884ffbba1b8),
   licensed **CC-BY-4.0**. Shipped as static, unrigged geometry from Sketchfab
-  and **rigged for this project** headlessly in Blender (a custom 13-bone
-  biped armature in a hanging-arms bind pose, matching the joint set the
-  choreography engine drives) — see `assets/scene/fairy-punk/license.txt` for
+  and **rigged for this project** with an expanded **21-bone** biped skeleton
+  (subdivided spine, clavicles, wrists and finger-curls; arms A-pose-matched so
+  they genuinely deform, unlike the prior 13-bone rig whose arms were dead-bound
+  to the chest), built deterministically in pure Python by
+  `gen-fairy-punk-rig.py` (no Blender round-trip) — see `assets/scene/fairy-punk/license.txt` for
   the full note and credit. Source PBR textures were not re-exported (the
   runtime renders both dancers as chrome + wireframe with a shared material
   stack, so the source textures are unused).
