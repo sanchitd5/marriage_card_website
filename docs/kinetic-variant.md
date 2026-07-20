@@ -103,6 +103,37 @@ perfectly repeating/mechanical. `strike` (a wind-up + punch accent) fires in
 unison for both dancers on a sustained-loud section's rising edge — the one
 choreographed moment they always hit together.
 
+**Portable retargeting engine (`js/app/dance-retarget.js`).** The choreography
+is authored once against a rig-agnostic PROXY layer (named joint ROLES, in the
+lineage of Unity's Humanoid Avatar and the VRM humanoid bone spec: a required
+core of 13 roles plus optional roles for spine subdivisions, shoulders, hands,
+individual fingers, toes and accessory chains like a tail). A small engine maps
+those proxy rotations onto whatever bones a model actually provides, so porting
+a NEW rig needs only a role→bone-name map — the engine derives the
+canonical→local axis mapping ANALYTICALLY from the captured bind pose (a
+per-bone child-direction change of basis, `qCorr = setFromUnitVectors`), which
+replaces the old per-bone, per-rig trial-and-error axis-sign hunting. A move
+authored on core roles runs identically on any rig with the core; a richer rig
+can add flourishes on optional roles it provides, and a simpler rig degrades
+gracefully (the proxy exists but has no adapter, so the write is a free no-op).
+The spring-damper secondary motion, beat/BPM sync, instrument-band selection and
+authored arc all operate on the proxy/clock layer, so they generalize across
+rigs for free. **The two shipping rigs are driven in EXPLICIT mode** — each
+supplies the exact hand-tuned `{ rest, axis-map }` it was verified with, so the
+engine's explicit path is bit-identical to the original inline retarget (proven
+`maxCompDiff = 0` across all 12 move poses on both rigs) and both dancers look
+and move exactly as before. **Honest scope:** the analytic path removes the
+axis-sign guessing (at load it auto-recovers the torso, forearms and shins to
+<2° of the hand-tuned result on both rigs), but rest-pose normalization
+(bringing a T-pose arm down to a hanging rest), bone roll about the limb axis,
+and leaf bones with no child to point down remain a small declared hint — the
+residual every mature retargeter (Unity, VRM, Mixamo) also leaves to a human
+"put the model in a clean T-pose" step. The engine measures and logs, per rig,
+how close the hint-free analytic derivation gets to each hand-tuned bone
+(`appState.dancer.retargetReport`) — the honest evidence for what is now
+automatic vs. what still needs a person. Pure retarget math is unit-tested
+(`test/dance-retarget.test.mjs`).
+
 **Authored arc (offline, hand-read — not a shipped model).** A proposal to use
 an LLM (Gemma 3n E2B) to pick moves live, in-browser, was reviewed and
 rejected (model size 1.5-5.6GB+, multi-second in-browser latency on real

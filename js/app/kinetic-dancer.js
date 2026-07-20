@@ -1,5 +1,8 @@
 import { REDUCED, $ } from './dom.js';
 import { appState } from './state.js';
+import {
+  CORE_ROLES, createProxyRig, buildRig, applyAdapters, applyPelvisSway, measureAutoVsManual,
+} from './dance-retarget.js';
 
 // ── Kinetic dancers (a persistent chrome DUET, cyan wireframe accent) ────
 // TWO loaded, rigged glTF humanoids share one canvas/renderer/camera, side
@@ -32,16 +35,30 @@ import { appState } from './state.js';
 // independently trigger the `strike` accent on the same drop edge — the
 // one moment they always hit together, like a rehearsed duet accent.
 //
-// ── Retargeting: per-rig bind pose differs, so per-rig REST OFFSETS differ ──
-// The Armadrillo's arms rest in a T-pose along ±X, so its adapter folds a
-// static ARM_DOWN offset (arms brought toward hanging) + a small FORE_REST
-// elbow bend before the dance's delta is applied. The fairy-punk rig was
-// deliberately built in a HANGING-ARMS bind pose (not T-pose) specifically so
-// its rest offsets are near-zero — see each rig's `cfg` below. Both rigs'
-// torso/head/legs are ~identity-aligned in the render frame (proxy axes map
-// 1:1, no remap needed); only the arm rest offset differs per rig. As with
-// the Armadrillo, GLTFLoader SANITIZES node names (spaces + dots →
-// underscores), so bone lookup normalizes both sides — see `norm()` below.
+// ── Retargeting: a PORTABLE, joint-count-agnostic engine (dance-retarget.js) ──
+// The choreography is authored once against a rig-agnostic PROXY layer (named
+// joint ROLES, Unity-Humanoid / VRM-style), and a small retargeting engine maps
+// those proxy rotations onto whatever bones a given model actually provides.
+// Porting a NEW model needs only a role -> bone-name map: the engine derives the
+// canonical->local axis mapping analytically from the captured bind pose (a
+// quaternion change-of-basis), which is what replaces the old per-bone, per-rig
+// trial-and-error axis-sign hunting. See dance-retarget.js for the full design
+// and its honest limits (rest-pose normalization, bone roll, and leaf bones
+// still take a small declared hint - the residual every retargeter carries).
+//
+// The two SHIPPING rigs are driven through that engine in EXPLICIT mode: each
+// supplies the exact hand-tuned { rest, axis-map } it was verified with (built
+// by makeExplicitHints from each rig's cfg), so the engine's explicit path is
+// bit-identical to the original inline applyRig and both dancers look and move
+// exactly as before - zero regression. The Armadrillo's arms rest in a T-pose
+// along ±X so its hint folds an ARM_DOWN offset + a small FORE_REST elbow bend;
+// the fairy-punk rig was built in a HANGING-ARMS bind pose so its offsets are
+// near-zero (only an upper-arm Z-sign flip). At load the engine ALSO measures,
+// for the record, how close a purely-analytic derivation (no hints) gets to
+// each hand-tuned bone (appState.dancer.retargetReport / console) - the honest
+// evidence for how much of the manual tuning the auto path now recovers.
+// GLTFLoader SANITIZES node names (spaces -> underscores, dots dropped); the
+// engine's normalizeBoneName handles both source conventions.
 //
 // Safety & performance:
 //  • reduced-motion → never runs (no WebGL init at all); CSS hides the canvas.
@@ -341,7 +358,7 @@ export function initKineticDancer() {
       cfg,
       rigGroup: null, turnGroup: null, model: null,
       skinnedMeshes: [], bones: null,
-      proxies: {}, adapters: [],
+      proxies: {}, adapters: [], retargetReport: null,
       pelvisBone: null, pelvisBind: null,
       modelReady: false, triCount: 0, vertCount: 0,
       frameBonesCache: null,
@@ -458,110 +475,82 @@ export function initKineticDancer() {
       }
     }
 
-    // find the mapped bones by exact name
-    // GLTFLoader SANITIZES node names: a space becomes an underscore, but a
-    // DOT is DROPPED entirely (not underscore-replaced) — confirmed empirically
-    // ("UpperArm.L" imports as "UpperArmL", not "UpperArm_L"). The fairy-punk
-    // rig's names all use dots (Blender's own naming convention), so the
-    // previous dot→underscore assumption silently matched only the 5 no-dot
-    // roles (Pelvis/Spine/Chest/Neck/Head) and left all 8 limb bones (every
-    // name with a dot) unmapped — frozen at bind pose, and corrupting this
-    // rig's frame-fit (only 5 of 13 points to fit/centre against). Normalize
-    // both sides the same way.
-    const norm = (s) => s.replace(/\s/g, '_').replace(/\./g, '');
-    const boneByRole = {};
-    model.traverse((o) => {
-      if (!o.isBone) return;
-      for (const role in rigState.cfg.nameOf) if (norm(rigState.cfg.nameOf[role]) === o.name) boneByRole[role] = o;
+    // ── retarget via the portable engine (dance-retarget.js) ──────────────
+    // A proxy per SCHEMA role (present in this model or not) so a move can write
+    // to any role unconditionally; only DRIVEN roles that the rig actually
+    // provides get an adapter. `nameOf` may map MORE bones than are driven (the
+    // Armadrillo maps shoulders/hands/feet purely so framing measures the real
+    // silhouette, see frameModel) - driveRoles limits animation to the core set.
+    // Each rig passes the exact hand-tuned EXPLICIT hints it was verified with,
+    // so the engine's explicit path is bit-identical to the original inline
+    // applyRig (proxy euler -> bindQ · Δ) and both dancers look/move exactly as
+    // before. The heavy-joint spring tags (head/neck/chest/spine carry the
+    // skinned hair + wings, so they get momentum/overshoot) are set by the
+    // engine from the role schema.
+    rigState.proxies = createProxyRig(THREE);
+    const hints = makeExplicitHints(rigState.cfg);
+    const rig = buildRig(THREE, {
+      model, nameOf: rigState.cfg.nameOf, driveRoles: CORE_ROLES,
+      hints, proxies: rigState.proxies,
     });
+    rigState.adapters = rig.adapters;
+    rigState.pelvisBone = rig.pelvisBone;
+    rigState.pelvisBind = rig.pelvisBind;
+    rigState.retargetReport = rig.report;
 
-    // ── frame: fit this rig into its half of the canvas, then slot it ──
-    // Fit ONLY the driven-role bones (torso/head/limbs), not every bone in the
-    // model — the Armadrillo ships a 4-segment tail, wrist-mounted drills, and
-    // full finger chains that extend well past its actual body silhouette;
-    // fitting to ALL bones (the old behaviour) shrank the whole rig down to
-    // keep those far-flung extremities in frame, making the visible creature
-    // look tiny next to the fairy-punk rig (which has no such extras). Framing
-    // to the same 13 roles both rigs are actually driven by keeps scale
-    // comparisons between the two figures meaningful.
+    // ── frame: fit this rig using its mapped bones, then slot it ──────────
     rigState.turnGroup.add(model);
-    frameModel(rigState, boneByRole);
+    frameModel(rigState, rig.boneByRole);
 
-    // ── proxies + adapters (the retarget) ────────────────────────────────
-    // A proxy per animated role: dance() writes to these (persist → damping).
-    const ROLES = ['pelvis', 'spine', 'chest', 'neck', 'head',
-      'upperArmL', 'forearmL', 'upperArmR', 'forearmR',
-      'thighL', 'shinL', 'thighR', 'shinR'];
-    for (const role of ROLES) {
-      const rotation = new THREE.Euler(0, 0, 0, 'XYZ');
-      const position = new THREE.Vector3();
-      // Tag the "weighted" joints for the spring integrator (see SPRING_HEAVY
-      // at dance()) — head/neck/chest/spine carry the hair (skinned to Head)
-      // and wings/chest ornament (skinned to Chest) for FREE through skinning,
-      // so giving THESE joints real momentum/overshoot is what makes hair and
-      // wings visibly follow through a turn instead of moving rigidly with
-      // the bone. Limbs/pelvis stay on the snappier default profile.
-      if (role === 'head' || role === 'neck' || role === 'chest' || role === 'spine') {
-        rotation.__heavy = true; position.__heavy = true;
-      }
-      rigState.proxies[role] = { rotation, position };
-    }
+    // Honest measurement (once, at load, diagnostics only - drives no motion):
+    // how close does a purely-ANALYTIC derivation (NO hints, just the captured
+    // bind pose) get to the hand-tuned result, per bone? Small angle = the auto
+    // path recovered the human's axis choice; large = a residual the human still
+    // supplies (rest-pose normalization / bone roll). See dance-retarget.js.
+    try {
+      const cmp = measureAutoVsManual(THREE, rig.adapters, rig.bodyFrameQ, AUTO_PROBES);
+      rigState.retargetReport.autoVsManual = cmp;
+      const tag = rigState.cfg.url.split('/').slice(-2, -1)[0];
+      console.info('[kinetic-dancer] retarget', tag, '| driven', rig.report.driven.length,
+        '| bodyFrame', rig.report.bodyFrame, '| auto-vs-manual worst',
+        cmp.worstErrDeg + 'deg at', cmp.worstRole, cmp.rows);
+    } catch (_) { /* diagnostics only, never block the dancer */ }
 
-    // adapter helper: how a proxy's (x,y,z) rotations map onto a bone's LOCAL
-    // axes. Both rigs' torso/head/legs are ~identity-aligned in the render
-    // frame, so mx/my/mz stay identity for everything; only the arm REST
-    // offset differs per rig (T-pose vs. hanging-arms bind — see RIG_A/RIG_B),
-    // EXCEPT the fairy-punk upper arms' Z axis (see `armZSign` below).
-    const A = (role, opts) => {
-      const bone = boneByRole[role]; if (!bone) return;
-      rigState.adapters.push({
-        role, bone, proxy: rigState.proxies[role],
-        bindQ: bone.quaternion.clone(),
-        rest: (opts && opts.rest) || { x: 0, y: 0, z: 0 },
-        mx: (opts && opts.mx) || ['x', 1],
-        my: (opts && opts.my) || ['y', 1],
-        mz: (opts && opts.mz) || ['z', 1],
-      });
-    };
-
-    A('pelvis'); A('spine'); A('chest'); A('neck'); A('head');
-
-    const armDown = rigState.cfg.armDown || 0, foreRest = rigState.cfg.foreRest || 0;
-    // The shared choreography's convention (grooveSway/handsFace etc.) is
-    // upperArm proxy.z POSITIVE = swing the arm IN, toward the body/face (the
-    // "reach" gestures increase z as the hand approaches the face). Confirmed
-    // empirically (single-axis, then composite-pose, screenshot tests with the
-    // proxy frozen at fixed values): on the Armadrillo's T-pose bind this
-    // already matches, but on the fairy-punk hanging-arms bind local +Z
-    // instead swings the arm OUT, away from the body — the opposite sign.
-    // Uncompensated, a
-    // "hand to face" gesture (handsFace's hold: upperArm x~1.7, z~0.4) reads
-    // as the forearm jutting out sideways like a spike instead of folding
-    // toward the face, which is the "arms misplaced" bug reported against
-    // this rig specifically. `armZSign` (default 1, RIG_B sets -1) negates
-    // proxy.z before it reaches this rig's upper-arm bones so the shared
-    // choreography's convention holds for BOTH rigs; the elbow/forearm
-    // bones' own axes tested consistent with the assumed convention on both
-    // rigs and are left as identity.
-    const armZSign = rigState.cfg.armZSign || 1;
-    A('upperArmL', { rest: { x: armDown, y: 0, z: 0 }, mz: ['z', armZSign] });
-    A('upperArmR', { rest: { x: armDown, y: 0, z: 0 }, mz: ['z', armZSign] });
-    A('forearmL', { rest: { x: foreRest, y: 0, z: 0 } });
-    A('forearmR', { rest: { x: foreRest, y: 0, z: 0 } });
-
-    A('thighL'); A('shinL'); A('thighR'); A('shinR');
-
-    // pelvis translation sway: parent frame is Z-up → side = local X, up = local Z.
-    rigState.pelvisBone = boneByRole.pelvis || null;
-    if (rigState.pelvisBone) rigState.pelvisBind = rigState.pelvisBone.position.clone();
-
-    // dance-facing rig: proxies for joints, the real turnGroup for `root`.
+    // dance-facing rig: proxies for every role, the real turnGroup for `root`.
     rigState.bones = { root: rigState.turnGroup };
-    for (const role of ROLES) rigState.bones[role] = rigState.proxies[role];
+    for (const role in rigState.proxies) rigState.bones[role] = rigState.proxies[role];
 
     rigState.currentMove = MOVE_TABLE.grooveSway;
     rigState.modelReady = true;
   }
+
+  // Build the EXPLICIT (hand-tuned) retarget hints for a rig from its cfg,
+  // reproducing exactly the original per-rig adapter setup so the engine's
+  // explicit path is bit-identical to the old inline applyRig. Torso/head/legs
+  // map identity; the arms fold this rig's T-pose-vs-hanging REST offset
+  // (armDown/foreRest) and, for fairy-punk, the empirically-found upper-arm
+  // Z-sign flip (armZSign). These are the residuals the analytic path does NOT
+  // auto-derive (rest-pose normalization) - see RIG_A/RIG_B and dance-retarget.
+  function makeExplicitHints(cfg) {
+    const armDown = cfg.armDown || 0, foreRest = cfg.foreRest || 0, armZSign = cfg.armZSign || 1;
+    const id = () => ({ mx: ['x', 1], my: ['y', 1], mz: ['z', 1] });
+    return {
+      pelvis: id(), spine: id(), chest: id(), neck: id(), head: id(),
+      upperArmL: { rest: { x: armDown, y: 0, z: 0 }, mx: ['x', 1], my: ['y', 1], mz: ['z', armZSign] },
+      upperArmR: { rest: { x: armDown, y: 0, z: 0 }, mx: ['x', 1], my: ['y', 1], mz: ['z', armZSign] },
+      forearmL: { rest: { x: foreRest, y: 0, z: 0 }, ...id() },
+      forearmR: { rest: { x: foreRest, y: 0, z: 0 }, ...id() },
+      thighL: id(), shinL: id(), thighR: id(), shinR: id(),
+    };
+  }
+
+  // Probe proxy rotations for the auto-vs-manual measurement: a spread across
+  // the axes and magnitudes the real moves use, so the reported error reflects
+  // the choreography's actual range rather than only near-rest angles.
+  const AUTO_PROBES = [
+    { x: 0.5, y: 0, z: 0 }, { x: 0, y: 0.5, z: 0 }, { x: 0, y: 0, z: 0.5 },
+    { x: 1.3, y: 0, z: 0.4 }, { x: -0.6, y: 0.3, z: -0.3 }, { x: 1.5, y: 0.2, z: 0.9 },
+  ];
 
   // ── fit + centre + slot a rig into its duet position (projected, perspective-aware) ──
   // Both source creatures are wide relative to a single narrow canvas, so
@@ -1418,33 +1407,17 @@ export function initKineticDancer() {
   }
 
   // ── adapter: proxy joints → real bone transforms (per rig) ────────────────
-  // For every mapped bone: build a small LOCAL delta Euler from its proxy's
-  // rotations (remapped axis/sign + static rest offset), then
-  //   bone.quaternion = bindQ · Δ
-  // so the captured bind pose is preserved and the dance eases away from it.
-  // The pelvis also takes the translation sway (side = local X, up = local Z in
-  // its Z-up parent frame), scaled by THIS rig's own posScale.
+  // Delegates to the portable engine (dance-retarget.js applyAdapters): for
+  // every driven bone it builds a LOCAL delta from its proxy rotations - via
+  // the EXPLICIT axis map for the two shipping rigs (bit-identical to the old
+  // inline math: bone.quaternion = bindQ · Δ) or the analytic change-of-basis
+  // for an un-hinted rig - so the captured bind pose is preserved and the dance
+  // eases away from it. The pelvis also takes the translation sway (side = local
+  // X, up = local Z in its Z-up parent frame), scaled by THIS rig's posScale.
+  const _retargetScratch = { e: _e, q: _q, q2: new THREE.Quaternion() };
   function applyRig(rigState) {
-    const adapters = rigState.adapters;
-    for (let i = 0; i < adapters.length; i++) {
-      const a = adapters[i];
-      const r = a.proxy.rotation;
-      const lx = a.rest.x + a.mx[1] * r[a.mx[0]];
-      const ly = a.rest.y + a.my[1] * r[a.my[0]];
-      const lz = a.rest.z + a.mz[1] * r[a.mz[0]];
-      _e.set(lx, ly, lz, 'XYZ');
-      _q.setFromEuler(_e);
-      a.bone.quaternion.copy(a.bindQ).multiply(_q);
-    }
-    if (rigState.pelvisBone) {
-      const p = rigState.proxies.pelvis.position;
-      const posScale = rigState.cfg.posScale;
-      rigState.pelvisBone.position.set(
-        rigState.pelvisBind.x + p.x * posScale,   // side sway
-        rigState.pelvisBind.y,                    // depth unchanged
-        rigState.pelvisBind.z + p.y * posScale,   // vertical bob (up = local Z)
-      );
-    }
+    applyAdapters(rigState.adapters, _retargetScratch);
+    applyPelvisSway(rigState.pelvisBone, rigState.pelvisBind, rigState.proxies.pelvis.position, rigState.cfg.posScale);
   }
 
   // ── main loop ──────────────────────────────────────────────────────────
@@ -1562,6 +1535,9 @@ export function initKineticDancer() {
     get moveB() { return rigB.currentMoveName; },
     get readyA() { return rigA.modelReady; },
     get readyB() { return rigB.modelReady; },
+    // retarget diagnostics: driven roles + the honest auto-vs-manual measure
+    // (how close a hint-free analytic derivation gets to each hand-tuned bone).
+    get retargetReport() { return { a: rigA.retargetReport, b: rigB.retargetReport }; },
   };
 
   raf = requestAnimationFrame(frame);
