@@ -36,6 +36,13 @@ function nextName(m) {
   return m.queue[m.qi];
 }
 
+// Step BACK one slot in the current shuffle order (manual "previous"). Wraps to
+// the end of the queue; keeps the same shuffle so prev↔next are symmetric.
+function prevName(m) {
+  m.qi = (m.qi - 1 + m.queue.length) % m.queue.length;
+  return m.queue[m.qi];
+}
+
 function makeAudio(name) {
   const audio = new Audio(`assets/audio/${name}.mp3`);
   audio.volume = MUSIC_VOL;
@@ -63,15 +70,17 @@ function wireTrack(m, audio, dock) {
   }, { once: true });
 }
 
-// Start the next track. fade=true ramps it up while the previous ramps down.
-function advance(m, dock, fade) {
-  const name = nextName(m);
+// Start a track. fade=true ramps it up while the previous ramps down.
+// forcedName overrides the shuffle pick (used by the manual prev/next skipper).
+function advance(m, dock, fade, forcedName) {
+  const name = forcedName || nextName(m);
   const audio = makeAudio(name);
   audio._trackName = name; // read by the techno light show to index its envelope
   m.currentName = name;
   wireTrack(m, audio, dock);
   if (fade) audio.volume = 0;
   m.audio = audio;
+  updateTrackLabel();
   audio.play().then(() => {
     m.fails = 0;
     setPlaying(true);
@@ -82,13 +91,15 @@ function advance(m, dock, fade) {
   return audio;
 }
 
-function beginCrossfade(m, cur, dock) {
+// dur = crossfade seconds (defaults to the long automix overlap; the manual
+// skipper passes a shorter value so a click feels responsive, not sluggish).
+function beginCrossfade(m, cur, dock, forcedName, dur = CROSSFADE) {
   m.fading = true;
-  const next = advance(m, dock, true); // becomes m.audio, starts at volume 0
+  const next = advance(m, dock, true, forcedName); // becomes m.audio, starts at volume 0
   m.outgoing = cur;
   const t0 = performance.now();
   (function ramp(now) {
-    const p = Math.min(1, (now - t0) / (CROSSFADE * 1000));
+    const p = Math.min(1, (now - t0) / (dur * 1000));
     m.crossP = p; // exposed so the light show blends the two tracks' envelopes
     try {
       cur.volume = MUSIC_VOL * (1 - p);
@@ -100,6 +111,36 @@ function beginCrossfade(m, cur, dock) {
     m.crossP = null;
     m.fading = false;
   })(t0);
+}
+
+// Manual prev/next uses a MICRO-crossfade (~220ms): long enough to kill the
+// click between ambient beds, short enough that a tap feels instant. The long
+// CROSSFADE constant stays reserved for the automatic end-of-track mix.
+const MANUAL_FADE = 0.22;
+
+// Jump one track back/forward in the running mix (dir -1 / +1). No-op until the
+// mix has started; ignored mid-crossfade so taps can't stack fades. If paused,
+// resumes playback on the new track.
+function skipTrack(dir) {
+  const m = appState.music;
+  const dock = $('#music-dock');
+  if (!m.queue || !m.audio || !dock || m.fading) return;
+  const name = dir < 0 ? prevName(m) : nextName(m);
+  m.paused = false;
+  beginCrossfade(m, m.audio, dock, name, MANUAL_FADE);
+}
+
+// Minimal "now playing" readout: stable track number from the SONGS order
+// (theme-1 → 01), NOT the shuffled queue position, so the label is consistent.
+function updateTrackLabel() {
+  const el = $('#music-track');
+  if (!el) return;
+  const i = SONGS.indexOf(appState.music.currentName);
+  if (i < 0) return;
+  const pad = (n) => String(n).padStart(2, '0');
+  el.textContent = `${pad(i + 1)} / ${pad(SONGS.length)}`;
+  // Screen-reader reads the counter oddly — spell it out on aria-live.
+  el.setAttribute('aria-label', `Track ${i + 1} of ${SONGS.length}`);
 }
 
 export function startMusic() {
@@ -150,6 +191,24 @@ export function initMusicToggle() {
       if (m.outgoing) m.outgoing.play().catch(() => {});
     }
     setPlaying(!m.playing);
+  });
+}
+
+// Prev/next track buttons + keyboard shortcuts (kinetic music player). Safe on
+// pages without the buttons (main site ships play/pause only).
+export function initMusicSwitcher() {
+  const prev = $('#music-prev');
+  const next = $('#music-next');
+  if (!prev && !next) return;
+  if (prev) prev.addEventListener('click', () => skipTrack(-1));
+  if (next) next.addEventListener('click', () => skipTrack(1));
+  // Media-key style shortcuts once the mix is live; ignore while typing.
+  document.addEventListener('keydown', (e) => {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    if (e.key === '[') { e.preventDefault(); skipTrack(-1); }
+    else if (e.key === ']') { e.preventDefault(); skipTrack(1); }
   });
 }
 

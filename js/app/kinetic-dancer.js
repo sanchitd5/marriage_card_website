@@ -5,23 +5,34 @@ import {
 } from './dance-retarget.js';
 
 // ── Kinetic dancers (a persistent chrome DUET, cyan wireframe accent) ────
-// TWO loaded, rigged glTF humanoids share one canvas/renderer/camera, side
-// by side: the Sketchfab "Armadrillo" (CC-BY-4.0, kimni88, 50-bone, T-pose)
-// and "DP Techno Fairy Punk Set" (CC-BY-4.0, BilloXD) — the latter shipped
-// as a static unrigged character set and rigged for this project with an
-// EXPANDED 21-bone biped skeleton (subdivided spine + clavicles + wrists +
-// finger-curls, arms A-pose-matched so they actually deform; built by a
-// deterministic pure-Python re-rig, see assets/scene/fairy-punk/license.txt).
-// Both dance to the background music
-// across every panel: ambient decoration, no user interaction, no audio
-// node of its own — a wedding-invitation duet motif, not a literal
-// depiction of either half of the couple.
+// TWO loaded, rigged glTF humanoids: the Sketchfab "Armadrillo" (CC-BY-4.0,
+// kimni88, 50-bone, T-pose) and "DP Techno Fairy Punk Set" (CC-BY-4.0,
+// BilloXD) — the latter shipped as a static unrigged character set and rigged
+// for this project with an EXPANDED 21-bone biped skeleton (subdivided spine +
+// clavicles + wrists + finger-curls, arms A-pose-matched so they actually
+// deform; built by a deterministic pure-Python re-rig, see assets/scene/
+// fairy-punk/license.txt). Both dance to the background music across every
+// panel: ambient decoration, no user interaction, no audio node of its own —
+// a wedding-invitation duet motif, not a literal depiction of either half of
+// the couple.
 //
-// This is a sibling to lightshow.js (same renderer posture, same
-// context-loss / resize / visibility handling) but a completely separate,
-// tiny context. It reads the OFFLINE music energy the lightshow already
-// computes (appState.lightshow.energy) rather than opening a new AnalyserNode,
-// so the two stay in lockstep and there is no extra audio cost.
+// ── ONE full-viewport context, shared with the ambient crowd ─────────────
+// The two featured "hero" dancers are the LARGEST figures in a full-viewport
+// scene they SHARE with the ambient armadrillo crowd (see below): a single
+// WebGL renderer/scene/camera on #k-ambient-dancers. They are placed at two
+// spread full-screen NDC anchors (armadrillo left-of-centre, fairy-punk
+// right-of-centre; see placeDuet/duetAnchor) so they read as two prominent
+// performers standing among the scattered crowd — not confined to a strip.
+// (History: they used to render on their own narrow right-strip canvas
+// #k-dancer-canvas via a SECOND renderer/scene/camera + per-panel
+// PANEL_LAYOUTS; that whole path is retired — one context now, one coordinate
+// system, and the crowd's placeAtNDC screen→world placement works for the
+// duet too. #k-dancer-canvas is left in the DOM but hidden by CSS.)
+//
+// This is a sibling to lightshow.js (same renderer posture, same context-loss
+// / resize / visibility handling). It reads the OFFLINE music energy the
+// lightshow already computes (appState.lightshow.energy) rather than opening a
+// new AnalyserNode, so the two stay in lockstep and there is no extra audio cost.
 //
 // ── Two independent RIGS, one shared choreography engine ─────────────────
 // Each rig gets its own Group (`rigGroup` → `turnGroup` → model), its own
@@ -113,8 +124,10 @@ import {
 export function initKineticDancer() {
   if (REDUCED) return;                 // static path — CSS keeps the canvas hidden
   if (!window.THREE) return;           // no three.js → nothing to draw
-  const canvas = $('#k-dancer-canvas');
-  if (!canvas) return;
+  // The shared full-viewport canvas (#k-ambient-dancers) is the ONLY render
+  // target now — the old narrow-strip #k-dancer-canvas is retired (left in the
+  // DOM but hidden by CSS). Bail if the render canvas is absent.
+  if (!$('#k-ambient-dancers')) return;
 
   const THREE = window.THREE;
   if (!THREE.GLTFLoader) return;       // loader not present → nothing to draw (fail safe)
@@ -188,12 +201,21 @@ export function initKineticDancer() {
   // no map — the Armadrillo's plain-grey material). Built lazily as meshes
   // load (see getChromeMat below); `chromeMats` is what the per-frame beat-
   // illumination loop iterates instead of one shared material's `.color`.
+  // Body tint for the map-less armadrillo (its material carries NO diffuse
+  // texture — plain grey). Instead of neutral grey chrome, colour the body in
+  // the site's CYAN theme: the matcap grey ramp still shades the sculpted form,
+  // and this multiplies a cyan hue over it so the whole figure reads cyan-metal
+  // on the obsidian bg (same family as the wireframe accent + flash cyan).
+  // Mapped materials (e.g. a textured rig) keep white so their real texture
+  // shows. Stored as `mat.__base` so the per-frame beat-illumination modulates
+  // this hue's BRIGHTNESS instead of overwriting it to grey (see frame()).
+  const ARMADRILLO_TINT = 0x22d3ee;   // site accent cyan
   const chromeMats = [];
   function getChromeMat(srcMat) {
     const map = srcMat && srcMat.map ? srcMat.map : null;
     const key = map ? map.uuid : 'none';
     for (const m of chromeMats) if (m.__key === key) return m;
-    const opts = { matcap: chromeMatcapTex, color: 0xffffff, skinning: true };
+    const opts = { matcap: chromeMatcapTex, color: map ? 0xffffff : ARMADRILLO_TINT, skinning: true };
     if (map) opts.map = map;
     // carry over transparency/alpha-cutout from the SOURCE material (e.g. a
     // hair card rendered with an alpha-masked texture) so restoring the real
@@ -203,6 +225,7 @@ export function initKineticDancer() {
     if (srcMat && srcMat.side !== undefined) opts.side = srcMat.side;
     const mat = new THREE.MeshMatcapMaterial(opts);
     mat.__key = key;
+    mat.__base = new THREE.Color(opts.color);   // pristine hue; beat-illum modulates brightness off this
     chromeMats.push(mat);
     disposables.push(mat);
     return mat;
@@ -210,19 +233,17 @@ export function initKineticDancer() {
   const wireMat = new THREE.MeshBasicMaterial({ color: 0x66f0ff, wireframe: true, transparent: true, opacity: 0.14, blending: THREE.AdditiveBlending, depthWrite: false, skinning: true });
   const disposables = [wireMat, chromeMatcapTex];   // chromeMats are pushed in as they're created (see below)
 
-  // ── shared renderer/scene/camera + lifecycle ─────────────────────────
-  let renderer, scene, camera;
-  let running = true, raf = 0, live = false, dead = false;
+  // ── lifecycle ────────────────────────────────────────────────────────
+  let running = true, raf = 0, dead = false;
 
-  // ── AMBIENT armadrillo crowd (tablet + desktop only) ─────────────────────
+  // ── AMBIENT armadrillo crowd + the featured duet (tablet + desktop only) ──
   // A time-based (NOT tap-driven) effect: at random intervals lone armadrillo
   // dancers fade in at random spots across the WHOLE viewport, groove to the
-  // same music clock as the duet, then fade out. Deliberately on its OWN
-  // full-viewport canvas / renderer / scene / camera (#k-ambient-dancers) so
-  // the duet's narrow-strip canvas (#k-dancer-canvas) and ALL its delicately
-  // tuned per-panel CSS (transform/opacity/mix-blend) + frameModel/updateDuetSlot
-  // aspect framing stay byte-identical — zero regression to the 2-dancer duet,
-  // which is the hard constraint here. Spawns REUSE the duet's dance() engine,
+  // same music clock as the duet, then fade out. This is the SHARED full-
+  // viewport canvas / renderer / scene / camera (#k-ambient-dancers) — the two
+  // featured hero dancers (rigA/rigB) render into it TOO (see setupDuet/
+  // placeDuet), so there is ONE WebGL context total, one camera, one
+  // coordinate system. Spawns REUSE the duet's dance() engine,
   // MOVE_TABLE, retarget adapters and the shared music clock, so they read as
   // the same performers; each gets its OWN rigState (move pick, phase, lean,
   // amp) so they never move in lockstep. Instances are POOLED (skinned-mesh
@@ -248,6 +269,50 @@ export function initKineticDancer() {
   const AMBIENT_MAX = (_cores >= 8 && _mem >= 8) ? 20 : (_cores <= 4 || _mem <= 4) ? 12 : 16;
   const AMBIENT_SCALE_BASE = 0.34;     // fraction of the armadrillo's duet fit scale → scattered-crowd size
   const _ndc = new THREE.Vector3();    // scratch for screen→world unprojection (spawn-time only)
+
+  // ── GIANT "presenter" armadrillo (welcome + drop takeover) ───────────────
+  // ONE reserved, humongous armadrillo — NOT part of the spawn pool — that
+  // takes the stage as a presenter in two moments: a WELCOME right after the
+  // gate opens (dances a few seconds, then leaves), and a DROP TAKEOVER
+  // whenever the live drop level crosses its threshold. While it is on screen
+  // the console HUD is hidden together (html.hud-hidden — see css/kinetic.css)
+  // so nothing competes with it; the HUD fades back in as the giant leaves. It
+  // is built lazily from the SAME loaded armadrillo (SkeletonUtils.clone of
+  // rigA.model) via buildAmbientInstance, then removed from ambientPool so the
+  // crowd scheduler never reuses it, and driven by the SAME dance()/applyRig
+  // engine into this SAME shared scene (no third WebGL context). Reduced-motion
+  // never reaches here (initKineticDancer bails under REDUCED at the very top),
+  // so the HUD can never vanish for those users.
+  let giant = null;                    // the reserved presenter instance (lazy)
+  let giantOpacity = 0;                // eased 0..1 fade (independent of the crowd)
+  let giantDropHi = false;             // hysteretic threshold state of the live drop level
+  let dropBurstTimer = 0;              // seconds left in a drop-triggered takeover BURST (capped, edge-armed)
+  // The small crowd holds off until CROWD_START_DELAY after the HUD first appears
+  // (= after the welcome giant leaves), so nothing spawns during the gate screen
+  // or the welcome — then the crowd trickles in.
+  let crowdReady = false, crowdArmed = false, crowdArmTimer = 0;
+  const CROWD_START_DELAY = 2;         // seconds after the HUD appears before the first small armadrillo
+  let presenterShown = false;          // is the giant currently claiming the stage (drives html.hud-hidden)
+  let welcomeArmed = false;            // gate-open fired; welcome not yet started (may defer until the model loads)
+  let welcomeStarted = false;          // one-shot latch: the welcome has already run
+  let welcomeTimer = 0;                // seconds left in the welcome window
+  const WELCOME_SECONDS = 5;           // how long the welcome dance holds before the HUD arrives
+  const GIANT_FADE_SECONDS = 0.55;     // giant fade in/out duration (opacity ramp)
+  const GIANT_SCALE_MULT = 1.6;        // × the duet fit → humongous (VISUAL-VERIFY / tune)
+  // Centre stage, and low enough that the HEAD lands at screen centre (not the
+  // body). frameModel anchors the model's BODY-centre at this NDC, and the giant
+  // is ≈0.93 viewport tall (fit 0.58 × GIANT_SCALE_MULT 1.6), so its head sits
+  // ≈+0.9 NDC above centre — drop the anchor ≈that much so the head reads centred
+  // and the humongous body fills the lower + side stage. VISUAL-VERIFY: this is
+  // the head-centring knob; nudge if the head sits high/low or clips the top.
+  const GIANT_NDC_X = 0, GIANT_NDC_Y = -0.85;
+  const DROP_ON = 0.55, DROP_OFF = 0.42;        // hysteresis band on appState.lightshow.drop (0..1)
+  const DROP_BURST_SECONDS = 4.5;               // capped takeover per drop EDGE — HUD returns after this even on a sustained high upbeat
+
+  // Arm the welcome on the gate-open signal kinetic.js dispatches once the gate
+  // is fully removed + scroll unlocked. If the model has not loaded yet this
+  // just stays armed and the welcome starts the frame the model becomes ready.
+  window.addEventListener('kinetic-gate-open', () => { welcomeArmed = true; }, { once: true });
 
   // ── shared music-driven state (both rigs read the same beat/energy) ──
   // Idle-energy baseline lifted to ~0.28 so the groove amplitude reads even
@@ -287,9 +352,13 @@ export function initKineticDancer() {
     // T-pose rest offsets: bring the arms DOWN out of the T toward "hanging",
     // slight resting elbow bend so forearms aren't ramrod-straight.
     armDown: -1.15, foreRest: 0.15,
-    // duet framing: half-width slot, shifted LEFT (this creature is wide, so
-    // it gets a touch more width budget than the slimmer fairy-punk rig)
-    fitH: 0.82, fitW: 0.40, xOffset: -1.05,
+    // FULL-SCREEN featured framing: the two hero dancers now share the ambient
+    // full-viewport scene/camera (not the retired narrow strip), so fitH is a
+    // fraction of the WHOLE viewport height — sized clearly above the crowd's
+    // typical bodies so the pair reads as the featured performers; they're
+    // spread apart horizontally by duetAnchor (see placeDuet). This creature is
+    // wide, so it keeps a touch more width budget than the slimmer fairy-punk.
+    fitH: 0.58, fitW: 0.52,
   };
   const RIG_B = {
     url: 'assets/scene/fairy-punk/scene.gltf',
@@ -335,78 +404,52 @@ export function initKineticDancer() {
     // data, only the skeleton + weights were rebuilt), so the rig still faces
     // the opposite way from the camera at import and needs the same flip.
     faceSpin: Math.PI,
-    // fitH lower than the Armadrillo's: this rig's hair/headdress mesh
-    // extends well above the Head bone itself, which frameModel() fits by
-    // (bone positions only, not mesh extent) -- at 0.82 that overhang
-    // clipped the top of the canvas. Leave more headroom.
-    fitH: 0.62, fitW: 0.34, xOffset: 1.0,
+    // fitH lower than the Armadrillo's: this rig's hair/headdress mesh extends
+    // well above the Head bone itself, which frameModel() fits by (bone
+    // positions only, not mesh extent), so it needs more headroom. Full-viewport
+    // fraction now (see RIG_A note); still a featured figure, above crowd size.
+    fitH: 0.5, fitW: 0.44,
   };
 
-  // ── per-panel duet placement ─────────────────────────────────────────
-  // The duet shouldn't sit in the exact same spot on every panel — that reads
-  // as a static sticker pasted in the corner. `updateDuetSlot()` (in the
-  // render loop) reads the active panel (published on <html data-panel> by
-  // kinetic.js) and damps each rig's position/scale toward a per-GROUP target
-  // on top of its calibrated base transform (frameModel's fit, untouched).
-  // Grouped (not one bespoke layout per panel) so the variety stays coherent:
-  // 'display' is the baseline split (fairy-punk front-right, Armadrillo
-  // back-left); 'displayAlt' swaps which figure is foreground/larger and
-  // pushes them further apart for a genuinely different silhouette;
-  // 'dense' (the content-heavy Run of Show/Archive panels, already a faint
-  // background watermark per kinetic.css) tucks both figures smaller and
-  // further to one side so they read as ambient corner presence, not a
-  // repeat of the display-panel composition.
-  const PANEL_LAYOUTS = {
-    // fairy-punk pushed further right + a touch smaller than the initial
-    // tuning — its corrected (post bone-fix) silhouette is taller/wider than
-    // before and its reaching arm crossed into the "RIYA" hero name at the
-    // original x:1.0/scale:1.
-    // (post-merge fix) rig A's horns still crossed into "RIYA" at -1.05 on a
-    // 1440x900/DPR1 desktop — pushed further right + slightly smaller.
-    display:    { a: { x: -0.15, scaleMul: 0.8,  z: -0.6 }, b: { x: 1.0,   scaleMul: 0.85, z: 0    } },
-    // RSVP: role-swap (Armadrillo foreground/larger) reads fine here — the
-    // closing copy sits in the LEFT column, well clear of the right-side duet.
-    displayAlt: { a: { x: 0.85,  scaleMul: 1.15, z: 0.9  }, b: { x: -1.15, scaleMul: 0.8,  z: -0.9 } },
-    // Interlude is a different case from RSVP: its quote sits centre-right,
-    // reaching further into the dancer's column than any other panel, so the
-    // generic displayAlt slot crossed the quote text. Push both figures
-    // further right and smaller, clear of the quote's line length.
-    interludeAlt: { a: { x: 1.9, scaleMul: 0.7, z: 0.4 }, b: { x: 1.55, scaleMul: 0.45, z: -0.5 } },
-    dense:      { a: { x: -1.5,  scaleMul: 0.68, z: -0.3 }, b: { x: -0.65, scaleMul: 0.6,  z: 0.3  } },
-  };
-  const PANEL_GROUP = {
-    invocation: 'display', countdown: 'display',
-    interlude: 'interludeAlt', rsvp: 'displayAlt',
-    'run-of-show': 'dense', archive: 'dense',
-  };
-  const DEFAULT_LAYOUT_GROUP = 'display';
-  // The canvas is `width: min(38vw, 560px); height: 100svh` (kinetic.css) —
-  // width is capped/bounded but height tracks the full viewport, so on a
-  // TALLER browser window (1920x1080, 2560x1329, or just a maximized window
-  // on a tall monitor) camera.aspect (canvas w/h) drops well below the
-  // ~0.608 this layout was tuned against at 1440x900. A PERSPECTIVE camera's
-  // horizontal FOV scales with aspect at a FIXED vertical FOV, so a fixed
-  // WORLD-UNIT x offset maps to a LARGER fraction of the (narrower) canvas
-  // as aspect drops — both dancers drift toward, then past, the right edge
-  // and can vanish off-canvas entirely (confirmed: fairy-punk fully
-  // off-screen at 1920x1080, both dancers off-screen at 2000x1050). Scale
-  // the authored x offset by (currentAspect / CALIBRATED_ASPECT) so it holds
-  // its ON-SCREEN position — not its raw world distance — across window
-  // shapes. z (depth) is a separate perspective cue, not an aspect artifact,
-  // left unscaled.
-  const CALIBRATED_ASPECT = 0.608;   // canvas aspect at the 1440x900 window PANEL_LAYOUTS was tuned against
-  function updateDuetSlot(rigState, key, dt) {
-    const groupName = PANEL_GROUP[document.documentElement.dataset.panel] || DEFAULT_LAYOUT_GROUP;
-    const target = PANEL_LAYOUTS[groupName][key];
-    const aspectScale = camera && camera.aspect > 0 ? camera.aspect / CALIBRATED_ASPECT : 1;
-    const targetX = target.x * aspectScale;
-    const k = 1 - Math.pow(0.02, dt);   // graceful glide (~1s to settle), not a snap
-    rigState.slotX += (targetX - rigState.slotX) * k;
-    rigState.slotScaleMul += (target.scaleMul - rigState.slotScaleMul) * k;
-    rigState.slotZ += (target.z - rigState.slotZ) * k;
-    rigState.rigGroup.position.x = rigState.baseX + rigState.slotX;
-    rigState.rigGroup.position.z = rigState.baseZ + rigState.slotZ;
-    rigState.rigGroup.scale.setScalar(rigState.baseScale * rigState.slotScaleMul);
+  // ── full-screen featured-duet placement ──────────────────────────────────
+  // The featured pair render into the SAME full-viewport scene/renderer/camera
+  // as the ambient crowd (ONE WebGL context — the old narrow-strip
+  // #k-dancer-canvas renderer + per-panel PANEL_LAYOUTS/updateDuetSlot +
+  // CALIBRATED_ASPECT scheme are all retired). placeDuet positions each hero at
+  // its full-screen NDC anchor (see duetAnchor) with a slow drift, ON TOP of the
+  // calibrated fit captured by frameModel (fitX/fitY/fitZ/baseScale). It maps
+  // NDC→world against the LIVE camera aspect every frame, so the horizontal
+  // spread stays correct at any window shape without the old aspect correction.
+  // Deliberately panel-AGNOSTIC: the dancers are a full-screen backdrop behind
+  // every panel now, so there is NO data-panel lookup that could go stale or
+  // throw for an unknown panel value — it degrades to the same fixed anchors
+  // regardless of what <html data-panel> says. Ownership split (unchanged from
+  // the crowd's convention): placeDuet owns .x/.z/scale + baseY; dance() owns
+  // .y (the weight bounce, written from baseY). Safe no-op until the fit runs.
+  const FEATURED_SCALE_MULT = 0.32;   // featured dancer displayed small (tiny-in-back); giant sizes off the FULL baseScale, not this
+  function placeDuet(rigState, t) {
+    const cam = ambientCamera;
+    if (!cam || !rigState.rigGroup) return;
+    const anc = rigState.duetAnchor || { x: 0, y: 0, driftX: 0, driftY: 0, speed: 0, phase: 0 };
+    const ndcX = anc.x + Math.sin(t * anc.speed + anc.phase) * anc.driftX;
+    const ndcY = anc.y + Math.cos(t * anc.speed * 0.8 + anc.phase) * anc.driftY;
+    const fovR = THREE.MathUtils.degToRad(cam.fov);
+    const dist = Math.abs(cam.position.z - rigState.fitZ) || Math.abs(cam.position.z) || 8.4;
+    const worldPerNDC = Math.tan(fovR / 2) * dist;      // world units per NDC half-height at the fit depth
+    const aspect = cam.aspect > 0 ? cam.aspect : 1;
+    rigState.baseX = rigState.fitX + ndcX * worldPerNDC * aspect;
+    rigState.baseY = rigState.fitY + ndcY * worldPerNDC;
+    rigState.baseZ = rigState.fitZ;
+    rigState.rigGroup.position.x = rigState.baseX;
+    rigState.rigGroup.position.z = rigState.baseZ;
+    // Displayed SMALL (FEATURED_SCALE_MULT) so the ONLY humongous armadrillo is
+    // the presenter giant — the featured dancer is just another tiny figure in
+    // the field. baseScale itself stays the FULL fit (the giant sizes off it:
+    // rigA.baseScale × GIANT_SCALE_MULT), so shrinking the display here does NOT
+    // shrink the giant. dance()'s figRatio = scale.y/baseScale = the mult, so the
+    // weight bounce scales down proportionally too (no hop).
+    rigState.rigGroup.scale.setScalar(rigState.baseScale * FEATURED_SCALE_MULT);
+    // dance() writes rigGroup.position.y each frame from baseY (weight bounce).
   }
 
   function createRigState(cfg) {
@@ -426,10 +469,13 @@ export function initKineticDancer() {
       // mirrored (the research "kill L/R symmetry" fix): a dominant-side lean and
       // a de-phased idle sway, applied whole-figure on rigGroup each frame (§ dance).
       idlePhase: 0, leanSign: 1,
-      // calibrated base transform (set once by frameModel) + the animated
-      // per-panel "duet slot" offset applied on top each frame (updateDuetSlot)
+      // frameModel captures the calibrated FIT (centred, correctly scaled) into
+      // fitX/fitY/fitZ + baseScale; placeDuet re-derives baseX/baseY/baseZ each
+      // frame from that fit + this rig's full-screen NDC anchor (duetAnchor).
+      // dance() reads baseY (bounce origin) + baseScale (figRatio) each frame.
       baseX: 0, baseY: 0, baseZ: 0, baseScale: 1,
-      slotX: cfg.xOffset, slotScaleMul: 1, slotZ: 0,
+      fitX: 0, fitY: 0, fitZ: 0,
+      duetAnchor: null,
     };
   }
   const rigA = createRigState(RIG_A);
@@ -438,39 +484,63 @@ export function initKineticDancer() {
   // breathes independently instead of moving as one mirrored unit.
   rigA.leanSign = 1;  rigA.idlePhase = 0;
   rigB.leanSign = -1; rigB.idlePhase = 1.7;
-  const rigs = [rigA, rigB];
 
-  // ── build (synchronous scaffold + async model loads) ──────────────────────
-  // Create renderer/scene/camera NOW and start the RAF (it renders an empty
-  // transparent scene until the models arrive). Then kick off both glTF
-  // loads; on each success, add that model, populate its proxies/adapters,
-  // frame it into its duet slot, and flip its modelReady so its dance/
-  // adapter/skeleton.update run (independently of the other rig's load state).
+  // TEMPORARY (coordinator, "for now"): show ONLY the armadrillo (rigA) as the
+  // featured full-screen dancer; suppress the fairy-punk (rigB) ENTIRELY. rigB
+  // is never added to the scene, loaded, framed, danced, danglered, or rendered
+  // because the `rigs` array below — the SINGLE iteration point for both setup
+  // (setupDuet) and the per-frame update (frame()) — omits it. rigA stays the
+  // crowd clone source (buildAmbientInstance → rigA.model), unaffected. Flip
+  // this one flag back to true to restore the full duet with NO other changes.
+  const SHOW_FAIRY_PUNK = false;
+
+  // Full-screen anchors (NDC). Duet ON → spread the pair ACROSS the viewport
+  // (armadrillo left-of-centre, fairy-punk right-of-centre) so they read as two
+  // prominent dancers standing apart among the scattered crowd. Duet OFF (now)
+  // → the lone armadrillo sits near centre so the single featured dancer reads
+  // balanced, not stranded on one side. A slow independent drift keeps each
+  // from reading as a static sticker; placeDuet maps these NDC anchors → world
+  // against the live camera aspect every frame, so the spread holds across
+  // window shapes.
+  rigA.duetAnchor = SHOW_FAIRY_PUNK
+    ? { x: -0.46, y: -0.03, driftX: 0.05, driftY: 0.03,  speed: 0.05, phase: 0.0 }
+    : { x: -0.06, y: -0.02, driftX: 0.06, driftY: 0.035, speed: 0.05, phase: 0.0 };
+  rigB.duetAnchor = { x: 0.47, y: 0.04, driftX: 0.05, driftY: 0.03, speed: 0.045, phase: 1.9 };
+  const rigs = SHOW_FAIRY_PUNK ? [rigA, rigB] : [rigA];
+
+  // ── build (evaluate the width gate; start the RAF elsewhere) ──────────────
+  // The featured duet and the ambient crowd share ONE renderer/scene/camera
+  // (the full-viewport ambient context). evalAmbientGate inits that context if
+  // the viewport is wide enough, which ALSO sets up the duet (setupDuet, called
+  // from within the gate). Below the width gate nothing is allocated — phones
+  // stay a clean dancer-free page (the CSS reserves no stage there). The RAF is
+  // started at the bottom of initKineticDancer; frame() no-ops rendering until
+  // the context + models exist, and pauses for free when the tab hides.
   function build() {
-    renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'high-performance' });
-    // A lost GL context (iOS backgrounding etc.) must not freeze a dead frame:
-    // stop cleanly and leave the canvas transparent.
-    canvas.addEventListener('webglcontextlost', (ev) => { ev.preventDefault(); stop(); dead = true; try { disposeAmbient(); } catch (_) {} }, false);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));   // DPR capped
+    evalAmbientGate();
+    window.addEventListener('resize', () => { sizeAmbient(); evalAmbientGate(); }, { passive: true });
+  }
 
-    scene = new THREE.Scene();
-
-    // camera: TALL/NARROW canvas → frame the full duet vertically. Reuse the
-    // previously-tuned framing (fov 38, z 8.4); each rig is scaled to fit its
-    // own half-width slot (see frameModel).
-    camera = new THREE.PerspectiveCamera(38, 0.5, 0.1, 100);
-    camera.position.set(0, 0.05, 8.4);
-    camera.lookAt(0, -0.05, 0);
-
-    sizeToCanvas();
-
+  // Create the featured duet's rig groups + kick off both glTF loads, adding
+  // them to the SHARED ambient scene. Idempotent (guarded by duetSetup) and
+  // only ever runs once the ambient renderer/scene/camera exist (≥768px), so
+  // frameModel can fit against the real camera. On each load success: add the
+  // model, populate proxies/adapters, frame it, flip modelReady (each rig
+  // independent — one loading slower never blocks the other). A failed load on
+  // either rig fails safe (that rig stays absent, no throw). rigA is ALSO the
+  // clone source for the crowd (buildAmbientInstance → SkeletonUtils.clone(
+  // rigA.model)); its model stays intact in the graph, so cloning still works.
+  let duetSetup = false;
+  function setupDuet() {
+    if (duetSetup || !ambientScene || !ambientCamera || dead || !THREE.GLTFLoader) return;
+    duetSetup = true;
     for (const rigState of rigs) {
-      // static placement group (scale/position/facing tuned after load).
-      // GLTFLoader already imports these assets UPRIGHT (Y-up standing), so
-      // no uprighting rotation is applied here — only a facing spin about Y.
+      // static placement group (position/scale/facing set after load, per frame
+      // by placeDuet). GLTFLoader imports these assets UPRIGHT (Y-up standing),
+      // so no uprighting rotation here — only a facing spin about Y.
       rigState.rigGroup = new THREE.Group();
       rigState.rigGroup.rotation.y = (rigState.cfg.faceSpin != null) ? rigState.cfg.faceSpin : FACE_SPIN;
-      scene.add(rigState.rigGroup);
+      ambientScene.add(rigState.rigGroup);
 
       // whole-figure sway pivot (dance's b.root.rotation.y — the slow 3/4 turn)
       rigState.turnGroup = new THREE.Group();
@@ -485,16 +555,8 @@ export function initKineticDancer() {
         }
       } catch (_) { /* DRACO optional — neither asset is draco-compressed */ }
 
-      loader.load(rigState.cfg.url, (gltf) => onModelLoaded(rigState, gltf), undefined, () => { /* load error → that rig stays empty, fail safe */ });
+      loader.load(rigState.cfg.url, (gltf) => onModelLoaded(rigState, gltf), undefined, () => { /* load error → that rig stays absent, fail safe */ });
     }
-
-    // Ambient crowd: create its own full-viewport renderer lazily on the first
-    // frame the viewport is wide enough (tablet/desktop). Re-evaluate the gate
-    // on window resize (a narrow window despawns everything + stops spawning;
-    // a wide one resumes). Its RAF is the duet's frame() — no second loop — so
-    // the scheduler pauses for free whenever the tab hides (frame() stops).
-    evalAmbientGate();
-    window.addEventListener('resize', () => { sizeAmbient(); evalAmbientGate(); }, { passive: true });
   }
 
   // ── on model load: wire the rig, retarget the dance ──────────────────────
@@ -658,13 +720,13 @@ export function initKineticDancer() {
   // x/z dominate). Fit instead on the projected positions of the actual
   // BONES — they trace the real figure. Iterate: measure the bones'
   // projected vertical/horizontal span, scale to fill this rig's own
-  // fraction of the canvas (fitH/fitW — each rig gets roughly HALF the
-  // width, per RIG_A/RIG_B), centre it, THEN shift it left/right by its
-  // fixed `xOffset` into its duet slot (applied once, after centering
-  // converges, so it isn't undone by the centering math).
+  // fraction of the FULL VIEWPORT (fitH/fitW), and centre it. placeDuet then
+  // shifts the centred, correctly-scaled figure to its full-screen NDC anchor
+  // each frame — so this fit stays a pure pixel-fit and is never disturbed by
+  // placement. Fits against the SHARED ambientCamera (the one context now).
   const _corner = new THREE.Vector3(), _c = new THREE.Vector3();
   function frameModel(rigState, boneByRole) {
-    if (!rigState.model || !camera) return;
+    if (!rigState.model || !ambientCamera) return;
     if (!rigState.frameBonesCache) {
       // Fit to the driven roles only (see call site comment) — fall back to
       // every bone only if a role map wasn't supplied (shouldn't happen at
@@ -674,9 +736,9 @@ export function initKineticDancer() {
     }
     const frameBones = rigState.frameBonesCache;
     if (!frameBones.length) return;
-    camera.updateMatrixWorld(true);
-    const fovR = THREE.MathUtils.degToRad(camera.fov);
-    const worldPerNDC = Math.tan(fovR / 2) * Math.abs(camera.position.z);   // ≈ world units per NDC half-height
+    ambientCamera.updateMatrixWorld(true);
+    const fovR = THREE.MathUtils.degToRad(ambientCamera.fov);
+    const worldPerNDC = Math.tan(fovR / 2) * Math.abs(ambientCamera.position.z);   // ≈ world units per NDC half-height
     let s = rigState.rigGroup.scale.x || 1;
     const FIT_H = rigState.cfg.fitH, FIT_W = rigState.cfg.fitW;
     for (let iter = 0; iter < 8; iter++) {
@@ -689,14 +751,14 @@ export function initKineticDancer() {
       rigState.rigGroup.updateMatrixWorld(true);
       let xmin = Infinity, xmax = -Infinity;
       for (const bn of frameBones) {
-        bn.getWorldPosition(_corner).project(camera);
+        bn.getWorldPosition(_corner).project(ambientCamera);
         if (_corner.y < ymin) ymin = _corner.y;
         if (_corner.y > ymax) ymax = _corner.y;
         if (_corner.x < xmin) xmin = _corner.x;
         if (_corner.x > xmax) xmax = _corner.x;
       }
-      const fracY = (ymax - ymin) / 2;                 // NDC vertical span → fraction of canvas height
-      const fracX = (xmax - xmin) / 2;                 // NDC horizontal span → fraction of canvas width
+      const fracY = (ymax - ymin) / 2;                 // NDC vertical span → fraction of viewport height
+      const fracX = (xmax - xmin) / 2;                 // NDC horizontal span → fraction of viewport width
       const yc = (ymax + ymin) / 2;                    // projected vertical centre (NDC)
       if (fracY < 1e-3) break;
       rigState.rigGroup.position.y -= yc * worldPerNDC;              // bring the on-screen centre to the middle
@@ -707,25 +769,18 @@ export function initKineticDancer() {
       rigState.rigGroup.scale.setScalar(s);
       if (Math.abs(k - 1) < 0.01 && Math.abs(yc) < 0.01) break;
     }
-    // Capture the CALIBRATED base transform (centred, correctly scaled) once —
-    // per-panel duet placement (updateDuetSlot, in the render loop) then
-    // varies position/scale on TOP of this base every frame, so the fit
-    // quality here is never re-derived or disturbed by the panel-to-panel
-    // composition changes.
-    rigState.baseX = rigState.rigGroup.position.x;
-    rigState.baseY = rigState.rigGroup.position.y;
-    rigState.baseZ = rigState.rigGroup.position.z;
+    // Capture the CALIBRATED fit (centred, correctly scaled) once — placeDuet
+    // (in the render loop) then derives baseX/baseY/baseZ = this fit + the
+    // full-screen anchor every frame, so the fit quality here is never
+    // re-derived or disturbed by placement. baseScale is FIXED (the fit) so
+    // dance()'s figRatio (= scale.y / baseScale) stays 1 for the featured pair.
+    // fitZ is the depth placeDuet uses for its NDC→world mapping, so the
+    // anchor sits at the same depth the fit was measured at (size preserved).
+    rigState.fitX = rigState.rigGroup.position.x;
+    rigState.fitY = rigState.rigGroup.position.y;
+    rigState.fitZ = rigState.rigGroup.position.z;
     rigState.baseScale = rigState.rigGroup.scale.x;
-  }
-
-  // Size the renderer + camera aspect to the canvas's CSS box (client px).
-  function sizeToCanvas() {
-    if (!renderer || !camera) return;
-    const w = canvas.clientWidth || 180;
-    const h = canvas.clientHeight || 520;
-    renderer.setSize(w, h, false);
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
+    rigState.baseX = rigState.fitX; rigState.baseY = rigState.fitY; rigState.baseZ = rigState.fitZ;
   }
 
   // ── energy + beat, from the repo's existing offline envelope engine ──────
@@ -1799,7 +1854,7 @@ export function initKineticDancer() {
     // weight on the beat, knees absorbing it, or no amount of arm motion reads
     // as dancing. Two coupled layers:
     //  (1) a whole-figure vertical bounce on the outer rigGroup — an ABSOLUTE
-    //      write each frame (updateDuetSlot owns only x/z/scale, so .y is ours;
+    //      write each frame (placeDuet/placeAtNDC own .x/.z/scale, so .y is ours;
     //      no spring, no drift), lowest exactly ON the beat and deeper when the
     //      beat hits harder (per-beat `strength`) or the section is hotter
     //      (`energy`). beatFrac comes from the driftless beatPos so the bounce
@@ -1816,7 +1871,8 @@ export function initKineticDancer() {
     // ambient crowd is scaled down (~0.34×), so scale the bounce by the figure's
     // size relative to its own fit (scale.y / baseScale) — otherwise a small
     // spawn's fixed-world drop reads proportionally 3× bigger and it HOPS. For
-    // the duet this ratio is just the panel slotScaleMul (≈1), so it's unchanged.
+    // the featured duet this ratio is 1 (placeDuet sets scale == baseScale), so
+    // the bounce is the full BOUNCE_MAX tuned to their size — unchanged.
     const figRatio = (rigState.rigGroup.scale.y || 1) / (rigState.baseScale || 1);
     rigState.rigGroup.position.y = rigState.baseY - BOUNCE_MAX * figRatio * onBeat * grv;
 
@@ -1852,26 +1908,34 @@ export function initKineticDancer() {
     applyPelvisSway(rigState.pelvisBone, rigState.pelvisBind, rigState.proxies.pelvis.position, rigState.cfg.posScale);
   }
 
-  // ── ambient armadrillo crowd (own renderer/scene/camera) ─────────────────
-  // Everything below is additive and self-contained: it clones the ALREADY
-  // loaded armadrillo (rigA.model) into a pool, drives each pooled clone with
-  // the SAME dance()/applyRig/MOVE_TABLE + shared music clock the duet uses,
-  // and renders it on the full-viewport #k-ambient-dancers canvas. The duet's
-  // renderer/scene/camera/canvas and its CSS are never touched.
+  // ── ambient armadrillo crowd (the SHARED renderer/scene/camera) ──────────
+  // Everything below clones the ALREADY loaded armadrillo (rigA.model) into a
+  // pool, drives each pooled clone with the SAME dance()/applyRig/MOVE_TABLE +
+  // shared music clock the featured duet uses, and renders it on the full-
+  // viewport #k-ambient-dancers canvas. The featured duet (rigA/rigB) renders
+  // into this SAME scene/renderer/camera (see setupDuet/placeDuet) — one WebGL
+  // context total. Crowd instances are the ephemeral backdrop; the two duet
+  // rigs are the always-present, larger foreground pair.
 
-  // Lazily create the ambient renderer the first time the viewport is wide
-  // enough (so phones never even allocate a second GL context).
+  // Lazily create the shared renderer the first time the viewport is wide
+  // enough (so phones never even allocate a GL context — clean dancer-free page).
   function initAmbient() {
     if (ambientInited || !ambientCanvas || !window.THREE || !THREE.SkeletonUtils || dead) return;
     ambientInited = true;
     try {
       ambientRenderer = new THREE.WebGLRenderer({ canvas: ambientCanvas, alpha: true, antialias: true, powerPreference: 'high-performance' });
       ambientRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      // A lost ambient context tears down only the crowd — the duet keeps running.
-      ambientCanvas.addEventListener('webglcontextlost', (ev) => { ev.preventDefault(); disposeAmbient(); }, false);
+      // ONE shared context now: its loss is FATAL to the whole scene (duet +
+      // crowd). Stop the loop, dispose the duet's shared materials, tear the
+      // crowd down, and stay down (transparent canvas) rather than dead-framing.
+      ambientCanvas.addEventListener('webglcontextlost', (ev) => {
+        ev.preventDefault(); stop(); dead = true;
+        try { for (const g of disposables) g.dispose(); } catch (_) {}
+        try { disposeAmbient(); } catch (_) {}
+      }, false);
       ambientScene = new THREE.Scene();
-      // Same lens as the duet camera (fov 38, z 8.4) but full-viewport aspect,
-      // so a given world scale reads at the same on-screen HEIGHT as the duet.
+      // fov 38, z 8.4, full-viewport aspect. frameModel fits the featured pair
+      // against THIS camera; placeAtNDC/placeDuet unproject through it.
       ambientCamera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
       ambientCamera.position.set(0, 0.05, 8.4);
       ambientCamera.lookAt(0, -0.05, 0);
@@ -1880,8 +1944,8 @@ export function initKineticDancer() {
     } catch (_) { ambientRenderer = null; }
   }
 
-  // Size the ambient renderer/camera to the FULL viewport (its canvas is fixed
-  // inset:0). Separate from the duet's sizeToCanvas (which tracks the strip).
+  // Size the shared renderer/camera to the FULL viewport (its canvas is fixed
+  // inset:0).
   function sizeAmbient() {
     if (!ambientRenderer || !ambientCamera) return;
     const w = window.innerWidth || 1280, h = window.innerHeight || 720;
@@ -1891,16 +1955,25 @@ export function initKineticDancer() {
   }
 
   // Device gate: enable on tablet + desktop (≥768px) only; re-evaluated on
-  // resize. Dropping below the threshold despawns everyone and stops spawning.
+  // resize. Dropping below the threshold despawns the crowd, stops spawning,
+  // and stops rendering the shared scene (so the featured duet pauses/hides too
+  // — the CSS also hides #k-ambient-dancers < 768px). Above the threshold it
+  // inits the shared context AND sets up the featured duet (both idempotent).
   function evalAmbientGate() {
     if (dead) return;
     const allow = (window.innerWidth || 0) >= AMBIENT_MIN_WIDTH;
     if (allow) {
       initAmbient();
-      if (ambientRenderer && !ambientEnabled) { ambientEnabled = true; ambientSpawnTimer = 0.6; }
+      if (ambientRenderer) {
+        setupDuet();   // add the featured pair to the shared scene + kick their loads (once)
+        if (!ambientEnabled) { ambientEnabled = true; ambientSpawnTimer = 0.6; }
+        if (welcomeStarted) crowdReady = true;   // re-enable after a resize once the welcome already ran → crowd resumes at once
+
+      }
     } else if (ambientEnabled) {
       ambientEnabled = false;
       despawnAllAmbient();
+      resetPresenter();           // never leave the HUD hidden behind a frozen giant
       ambientNeedsClear = true;   // one final render to clear the canvas to transparent
     }
   }
@@ -1936,6 +2009,7 @@ export function initKineticDancer() {
         o.material = w; wireMats.push(w); ambientDisposables.push(w);
       } else if (o.material) {
         const c = o.material.clone(); c.transparent = true; c.opacity = 0;
+        c.__base = o.material.__base ? o.material.__base.clone() : (c.color ? c.color.clone() : null);   // carry the cyan body tint onto the clone (Material.clone drops custom props)
         o.material = c; chromeMats.push(c); ambientDisposables.push(c);
       }
       // base + wireframe-overlay skinned meshes get SEPARATE cloned skeletons
@@ -1985,24 +2059,44 @@ export function initKineticDancer() {
     inst.baseX = px; inst.baseY = py; inst.baseZ = pz;   // dance() writes .y each frame from baseY
   }
 
-  // (Re)activate a pooled instance at a fresh random spot / facing / scale with
+  // Pick a screen-space (NDC) spot that gives other dancers SOME SPACE: try a
+  // handful of random candidates and take the first that clears every active
+  // crowd member AND the featured pair by MIN_NDC_SEP; if none clear (crowded),
+  // keep the roomiest candidate. Screen-space separation (not world) is what
+  // stops on-screen overlap regardless of depth.
+  const MIN_NDC_SEP = 0.36;
+  function pickSpacedNDC(self) {
+    const others = [];
+    for (let i = 0; i < ambientPool.length; i++) { const p = ambientPool[i]; if (p.active && p !== self && p.ndcX != null) others.push(p); }
+    for (let i = 0; i < rigs.length; i++) { const r = rigs[i]; if (r.modelReady && r.duetAnchor) others.push({ ndcX: r.duetAnchor.x, ndcY: r.duetAnchor.y }); }
+    let best = null, bestD = -1;
+    for (let k = 0; k < 8; k++) {
+      const x = (Math.random() * 2 - 1) * 0.85, y = (Math.random() * 2 - 1) * 0.85;
+      let dmin = Infinity;
+      for (let i = 0; i < others.length; i++) { const dx = x - others[i].ndcX, dy = y - others[i].ndcY; const d = Math.sqrt(dx * dx + dy * dy); if (d < dmin) dmin = d; }
+      if (dmin >= MIN_NDC_SEP) return [x, y];
+      if (dmin > bestD) { bestD = dmin; best = [x, y]; }
+    }
+    return best || [(Math.random() * 2 - 1) * 0.85, (Math.random() * 2 - 1) * 0.85];
+  }
+
+  // (Re)activate a pooled instance at a fresh spaced spot / facing / scale with
   // its own move-selection state, so the crowd never moves in lockstep.
   function activateInstance(inst) {
-    const ndcX = (Math.random() * 2 - 1) * 0.85;
-    const ndcY = (Math.random() * 2 - 1) * 0.85;
-    const dist = 6.6 + Math.random() * 3.0;                 // slight depth variance → parallax
+    const [ndcX, ndcY] = pickSpacedNDC(inst);
+    inst.ndcX = ndcX; inst.ndcY = ndcY;                    // remembered so later spawns space off it
+    const dist = 9.5 + Math.random() * 6.0;                // DEEP (9.5–15.5) — behind the giant (~8.4) so the crowd reads as tiny figures in the BACK
     placeAtNDC(inst, ndcX, ndcY, dist);
     inst.rigGroup.rotation.x = 0; inst.rigGroup.rotation.z = 0;
     inst.rigGroup.rotation.y = (Math.random() * 2 - 1) * 1.2;   // scattered facing (mostly toward camera)
-    // scattered-crowd size: a fraction of the armadrillo's duet fit, with WIDE
-    // per-spawn variation (~0.55×–1.75×) so the crowd reads as a mix of near/far
-    // bodies of clearly different sizes, not uniform clones. Paired with the
-    // varied spawn depth, this sells scattered depth across the whole scene.
-    const scl = (rigA.baseScale || 1) * AMBIENT_SCALE_BASE * (0.55 + Math.random() * 1.2);
+    // TINY scattered-crowd size with per-spawn variation. Combined with the deep
+    // placement above, the crowd reads as small figures in the BACK — the single
+    // humongous armadrillo (the presenter giant) is the only large one on stage.
+    const scl = (rigA.baseScale || 1) * AMBIENT_SCALE_BASE * (0.4 + Math.random() * 0.5);
     inst.rigGroup.scale.setScalar(scl);
     // baseScale = the armadrillo's OWN duet fit (not 1), so dance()'s weight
-    // bounce (figRatio = scale.y / baseScale) scales with the shrunk crowd
-    // figure instead of applying the full-size world drop and making it hop.
+    // bounce (figRatio = scale.y / baseScale) scales with THIS spawn's size and
+    // never hops. scale.y carries the size.
     inst.baseScale = rigA.baseScale || 1;
     // fresh, independent dance state
     inst.currentMove = MOVE_TABLE.grooveSway; inst.currentMoveName = 'grooveSway';
@@ -2044,6 +2138,13 @@ export function initKineticDancer() {
   // instance's fade + dance + retarget + skeleton. Each instance is wrapped in
   // try/catch so a single bad spawn can never kill the duet's RAF.
   function updateAmbient(dt, now, clk) {
+    // Gate: no small armadrillo spawns until CROWD_START_DELAY after the HUD
+    // first appears (crowdArmed at welcome-end, see updateGiant). Until then bail
+    // — there are no active instances to animate yet, so nothing else is skipped.
+    if (!crowdReady) {
+      if (crowdArmed) { crowdArmTimer -= dt; if (crowdArmTimer <= 0) crowdReady = true; }
+      if (!crowdReady) return;
+    }
     // Crowd size TRACKS energy: hold the MIN floor when calm, climb toward MAX as
     // the section builds into a high upbeat. Only energy above ~0.3 pushes past
     // the floor, so quiet stretches stay at 5 and the drop fills the room to 20.
@@ -2091,7 +2192,7 @@ export function initKineticDancer() {
         if (inst.age >= inst.fadeOut) { deactivate(inst); continue; }
       }
       try {
-        for (let j = 0; j < inst.chromeMats.length; j++) { inst.chromeMats[j].opacity = inst.opacity; inst.chromeMats[j].color.setScalar(chromeCol); }
+        for (let j = 0; j < inst.chromeMats.length; j++) { const m = inst.chromeMats[j]; m.opacity = inst.opacity; if (m.__base) m.color.copy(m.__base).multiplyScalar(chromeCol); else m.color.setScalar(chromeCol); }
         for (let j = 0; j < inst.wireMats.length; j++) inst.wireMats[j].opacity = wireOp * inst.opacity;
         dance(inst, dt, now, clk);   // same engine, own rigState → own move/phase
         applyRig(inst);              // proxy joints → real bones (retarget)
@@ -2110,12 +2211,120 @@ export function initKineticDancer() {
       const inst = ambientPool[i];
       if (inst.rigGroup && ambientScene) { try { ambientScene.remove(inst.rigGroup); } catch (_) {} }
     }
+    // the reserved giant is NOT in ambientPool (removed in buildGiant) — remove
+    // it explicitly + restore the HUD (its cloned materials are in
+    // ambientDisposables already, disposed by the loop below).
+    if (giant && giant.rigGroup && ambientScene) { try { ambientScene.remove(giant.rigGroup); } catch (_) {} }
+    giant = null;
+    try { resetPresenter(); } catch (_) {}
     for (let i = 0; i < ambientDisposables.length; i++) { try { ambientDisposables[i].dispose(); } catch (_) {} }
     ambientDisposables.length = 0;
     ambientPool.length = 0;
     ambientEnabled = false;
     try { ambientRenderer && ambientRenderer.dispose(); } catch (_) {}
     ambientRenderer = null;
+  }
+
+  // ── GIANT presenter build + per-frame state machine ─────────────────────
+  // Build the reserved giant once the clone-source armadrillo has loaded: reuse
+  // buildAmbientInstance for IDENTICAL construction (own cloned materials in
+  // ambientDisposables, own proxies/adapters, added to ambientScene), then
+  // REMOVE it from ambientPool so the crowd scheduler never grabs it.
+  function buildGiant() {
+    if (giant || !rigA.modelReady) return giant;
+    const inst = buildAmbientInstance();
+    if (!inst) return null;
+    const i = ambientPool.indexOf(inst);
+    if (i >= 0) ambientPool.splice(i, 1);   // reserve it — the crowd must never reuse it
+    inst.rigGroup.visible = false;
+    giant = inst;
+    return giant;
+  }
+
+  // Centre + size the giant against the LIVE camera each frame it shows (so a
+  // resize keeps it centred). baseScale = rigA's duet fit so dance()'s figRatio
+  // (= scale.y / baseScale = GIANT_SCALE_MULT) keeps the weight bounce
+  // proportional at the giant's size instead of making it hop.
+  function placeGiant() {
+    if (!giant || !ambientCamera) return;
+    const dist = Math.abs(ambientCamera.position.z - (rigA.fitZ || 0)) || 8.4;
+    placeAtNDC(giant, GIANT_NDC_X, GIANT_NDC_Y, dist);   // sets position + baseX/Y/Z
+    giant.baseScale = rigA.baseScale || 1;
+    giant.rigGroup.scale.setScalar((rigA.baseScale || 1) * GIANT_SCALE_MULT);
+    giant.rigGroup.rotation.y = 0;   // face camera (dance() owns the .z/.x lean each frame)
+  }
+
+  // Force the presenter off the stage + restore the HUD — called when the
+  // shared context is disabled/torn down mid-show so the HUD can never get
+  // stuck hidden behind a frozen giant.
+  function resetPresenter() {
+    giantOpacity = 0; giantDropHi = false; welcomeTimer = 0; dropBurstTimer = 0;
+    if (giant && giant.rigGroup) giant.rigGroup.visible = false;
+    if (presenterShown) { document.documentElement.classList.remove('hud-hidden'); presenterShown = false; }
+  }
+
+  // Presenter state machine (per frame, only while the shared context is live).
+  // Shows the giant during (a) the welcome window and (b) a thresholded drop,
+  // and toggles html.hud-hidden on the show/hide EDGE. `welcome || drop` keeps
+  // `show` continuously true if a drop lands during / right after the welcome,
+  // so the HUD never flickers in then straight back out between the two.
+  function updateGiant(dt, now, clk) {
+    if (dead || !ambientRenderer) return;
+    if (!giant) buildGiant();
+
+    // start the (one-shot) welcome once armed AND the model is ready — deferred
+    // gracefully if the gate opened before the glTF finished loading.
+    if (welcomeArmed && !welcomeStarted && giant) {
+      welcomeStarted = true; welcomeArmed = false; welcomeTimer = WELCOME_SECONDS;
+    }
+    let welcomeActive = false;
+    if (welcomeTimer > 0) { welcomeActive = true; welcomeTimer -= dt; }
+    // Welcome finished (HUD is about to / has appeared) → arm the one-shot delay
+    // after which the small crowd may begin (updateAmbient counts it down).
+    if (welcomeStarted && welcomeTimer <= 0 && !crowdArmed) { crowdArmed = true; crowdArmTimer = CROWD_START_DELAY; }
+
+    // thresholded live drop level (appState.lightshow.drop is 0..1, NOT boolean),
+    // with hysteresis so a value hovering at the edge can't strobe the HUD.
+    const lvl = (appState.lightshow && Number.isFinite(appState.lightshow.drop)) ? appState.lightshow.drop : 0;
+    // Rising EDGE of the drop arms a CAPPED burst — the giant takes the stage
+    // once, then leaves and the HUD returns EVEN IF energy stays high. On a
+    // continuous high upbeat the level never dips below DROP_OFF, so no new edge
+    // fires and the HUD stays put after the one burst; a fresh burst needs the
+    // level to fall below DROP_OFF and spike above DROP_ON again.
+    if (giantDropHi) { if (lvl < DROP_OFF) giantDropHi = false; }
+    else if (lvl > DROP_ON) { giantDropHi = true; dropBurstTimer = DROP_BURST_SECONDS; }
+    if (dropBurstTimer > 0) dropBurstTimer -= dt;
+
+    const show = !!giant && (welcomeActive || dropBurstTimer > 0);
+    if (show !== presenterShown) {
+      document.documentElement.classList.toggle('hud-hidden', show);
+      presenterShown = show;
+    }
+    if (!giant) return;
+
+    // eased fade toward shown/hidden
+    const stepAmt = dt / GIANT_FADE_SECONDS;
+    const target = show ? 1 : 0;
+    if (giantOpacity < target) giantOpacity = Math.min(target, giantOpacity + stepAmt);
+    else if (giantOpacity > target) giantOpacity = Math.max(target, giantOpacity - stepAmt);
+
+    const vis = giantOpacity > 0.001;
+    giant.rigGroup.visible = vis;
+    if (!vis) return;   // fully faded → skip the heavy skinning work
+
+    placeGiant();
+    // beat illumination (same formula as the duet/crowd), scaled by the fade
+    const glow = Math.min(1, 0.15 + energy * 0.3 + beatAccent * 0.4);
+    const wireOp = Math.min(0.5, 0.06 + glow * 0.28);
+    const chromeCol = Math.min(1, 0.62 + glow * 0.38);
+    try {
+      for (let j = 0; j < giant.chromeMats.length; j++) { const m = giant.chromeMats[j]; m.opacity = giantOpacity; if (m.__base) m.color.copy(m.__base).multiplyScalar(chromeCol); else m.color.setScalar(chromeCol); }
+      for (let j = 0; j < giant.wireMats.length; j++) giant.wireMats[j].opacity = wireOp * giantOpacity;
+      dance(giant, dt, now, clk);       // same engine, own rigState → own move/phase
+      applyRig(giant);                  // proxy joints → real bones (retarget)
+      giant.rigGroup.updateMatrixWorld(true);
+      for (let j = 0; j < giant.skinnedMeshes.length; j++) { const sk = giant.skinnedMeshes[j].skeleton; if (sk) sk.update(); }
+    } catch (_) { /* a giant failure must never take down the RAF */ }
   }
 
   // ── main loop ──────────────────────────────────────────────────────────
@@ -2143,58 +2352,57 @@ export function initKineticDancer() {
     if (!Number.isFinite(clk.tempoScale) || clk.tempoScale <= 0) clk.tempoScale = 1;
     if (!Number.isFinite(clk.strength)) clk.strength = 0.6;
 
-    for (let i = 0; i < rigs.length; i++) {
-      const rigState = rigs[i];
-      if (!rigState.modelReady || !rigState.bones) continue;   // that rig's load hasn't landed yet
+    // ── featured duet + ambient crowd: ONE shared renderer/scene/camera ──────
+    // The two hero rigs (rigA/rigB) and the crowd render into the same context.
+    // Only runs on tablet/desktop (ambientRenderer exists) and once a rig has
+    // loaded. The RAF pauses for free when the tab hides (frame() stops).
+    if (ambientRenderer && (rigA.modelReady || rigB.modelReady)) {
+      if (ambientEnabled) {
+        for (let i = 0; i < rigs.length; i++) {
+          const rigState = rigs[i];
+          if (!rigState.modelReady || !rigState.bones) continue;   // that rig's load hasn't landed yet
 
-      updateDuetSlot(rigState, i === 0 ? 'a' : 'b', dt);   // per-panel placement (see PANEL_LAYOUTS)
-      dance(rigState, dt, now, clk);
-      applyRig(rigState);   // proxy joints → real bones (retarget)
-      updateDanglers(rigState, dt);   // hair/cloth secondary motion (fairy-punk only)
+          placeDuet(rigState, now);       // full-screen anchor placement (see placeDuet)
+          dance(rigState, dt, now, clk);
+          applyRig(rigState);             // proxy joints → real bones (retarget)
+          updateDanglers(rigState, dt);   // hair/cloth secondary motion (fairy-punk only)
 
-      // Refresh bone world matrices → skeleton bone matrices BEFORE render.
-      // GPU skinning does the per-vertex work.
-      rigState.rigGroup.updateMatrixWorld(true);
-      for (let j = 0; j < rigState.skinnedMeshes.length; j++) {
-        const sk = rigState.skinnedMeshes[j].skeleton;
-        if (sk) sk.update();
+          // Refresh bone world matrices → skeleton bone matrices BEFORE render.
+          rigState.rigGroup.updateMatrixWorld(true);
+          for (let j = 0; j < rigState.skinnedMeshes.length; j++) {
+            const sk = rigState.skinnedMeshes[j].skeleton;
+            if (sk) sk.update();
+          }
+        }
+
+        // Beat illumination for the featured pair's SHARED materials: energy
+        // sets the floor, beatAccent's smooth decay blooms it on each beat. The
+        // wireframe accent's opacity (glowing "circuitry" pulse) + the chrome
+        // pass's colour multiplier (subtler whole-body brighten on hard beats).
+        // The crowd's per-instance cloned mats are lit with the SAME formula
+        // inside updateAmbient. Keep chromeColor ≤ 1.0 — MeshMatcapMaterial
+        // multiplies `.color` into both the matcap tone AND the real diffuse
+        // `.map`, so >1.0 blows the texture out toward flat white. See the
+        // WCAG 2.3.1 note in the header comment.
+        const glow = Math.min(1, 0.15 + energy * 0.3 + beatAccent * 0.4);
+        wireMat.opacity = Math.min(0.5, 0.06 + glow * 0.28);
+        const chromeColor = Math.min(1, 0.62 + glow * 0.38);
+        for (let i = 0; i < chromeMats.length; i++) { const m = chromeMats[i]; if (m.__base) m.color.copy(m.__base).multiplyScalar(chromeColor); else m.color.setScalar(chromeColor); }
+
+        // Ambient armadrillo crowd — only once the clone-source armadrillo
+        // (rigA) has loaded (we clone from it).
+        if (rigA.modelReady) updateAmbient(dt, now, clk);
+        // Giant "presenter" (welcome + drop takeover) — also clones rigA, hides
+        // the HUD while it holds the stage. Runs after the crowd so it paints last.
+        updateGiant(dt, now, clk);
       }
-    }
-
-    // Beat illumination (shared across both rigs): energy sets the floor,
-    // beatAccent's smooth decay curve blooms it on each beat (bar-weighted,
-    // so the downbeat reads brightest). Two knobs carry this: the wireframe
-    // accent's opacity (the glowing "circuitry" pulse, one shared material)
-    // and the chrome pass's colour multiplier (a subtler whole-body
-    // brightening on hard beats) — applied to EVERY chrome material instance
-    // (one per unique diffuse texture now that real textures are restored,
-    // not just the single flat-color instance this used to be). See the
-    // WCAG 2.3.1 note in the header comment.
-    const glow = Math.min(1, 0.15 + energy * 0.3 + beatAccent * 0.4);
-    wireMat.opacity = Math.min(0.5, 0.06 + glow * 0.28);
-    // Keep this at/below 1.0 — MeshMatcapMaterial multiplies `.color` into
-    // BOTH the matcap tone and the real diffuse `.map`, so anything above 1.0
-    // blows out the texture (and the matcap's own highlight) toward flat
-    // white instead of brightening it, which is what was washing out the
-    // real skin tone/texture detail under the chrome shading.
-    const chromeColor = Math.min(1, 0.62 + glow * 0.38);
-    for (let i = 0; i < chromeMats.length; i++) chromeMats[i].color.setScalar(chromeColor);
-
-    renderer.render(scene, camera);
-
-    // ── ambient armadrillo crowd (tablet/desktop, own renderer/scene/camera) ──
-    // Only runs once the armadrillo template has loaded (we clone from it). The
-    // scheduler pauses for free when the tab hides, since frame() itself stops.
-    if (ambientRenderer && rigA.modelReady) {
-      if (ambientEnabled) updateAmbient(dt, now, clk);
       if (ambientEnabled || ambientNeedsClear) {
         ambientRenderer.render(ambientScene, ambientCamera);
         ambientNeedsClear = false;
-        if (!ambientLive) { ambientLive = true; ambientCanvas.classList.add('is-live'); }
+        if (!ambientLive) { ambientLive = true; ambientCanvas.classList.add('is-live'); }   // CSS fades it in
       }
     }
 
-    if (!live) { live = true; canvas.classList.add('is-live'); }  // CSS fades it in
     raf = requestAnimationFrame(frame);
   }
 
@@ -2212,19 +2420,15 @@ export function initKineticDancer() {
     // teardown anything half-built and bail (no context left running)
     try { for (const g of disposables) g.dispose(); } catch (_) {}
     try { disposeAmbient(); } catch (_) {}
-    try { renderer && renderer.dispose(); } catch (_) {}
     dead = true;
     return;
   }
 
-  // resize: prefer a ResizeObserver on the canvas (its CSS box drives us);
-  // fall back to the window resize event where RO is unavailable.
-  if (window.ResizeObserver) {
-    const ro = new ResizeObserver(() => sizeToCanvas());
-    ro.observe(canvas);
-  } else {
-    window.addEventListener('resize', sizeToCanvas, { passive: true });
-  }
+  // Resize is handled by the shared-context path (build()'s window 'resize'
+  // listener → sizeAmbient + evalAmbientGate). The featured pair need no
+  // re-frame: their world scale is fixed and the camera's VERTICAL fov is
+  // aspect-independent, so on-screen height holds; placeDuet re-derives the
+  // horizontal anchor against the live aspect every frame.
 
   document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); else start(); });
 
@@ -2238,7 +2442,7 @@ export function initKineticDancer() {
     // geometry diagnostics (loaded glTF budget, summed across both rigs)
     get tris() { return rigA.triCount + rigB.triCount; },
     get verts() { return rigA.vertCount + rigB.vertCount; },
-    get ready() { return rigA.modelReady && rigB.modelReady; },
+    get ready() { return rigA.modelReady && (!SHOW_FAIRY_PUNK || rigB.modelReady); },
     get phase() { return +phase.toFixed(2); },
     get energy() { return +energy.toFixed(2); },
     // current choreography move per dancer (for tuning/iteration) — `move`

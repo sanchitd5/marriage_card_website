@@ -112,21 +112,42 @@
       </g>
     </symbol>
   </svg>
-  <!-- Chromatic-aberration RGB-split filters for the archive gallery photos
-       (console/glitch accent). k-chroma = ambient rest state, k-chroma-hover
-       = the stronger split on hover/focus/touch. `lighten` (per-channel max)
-       instead of `screen` avoids the additive wash-out screen causes when
-       stacked with the CSS saturate/contrast pass; the closing gamma bump
-       restores punch screen/lighten flattens. Static offsets, no animated
-       primitives, so there's nothing for prefers-reduced-motion to strip.
-       The .gframe img is scaled 3% oversize (css/kinetic.css) so the offset
-       channels sample real bled pixels instead of clipping to transparent
-       at the frame edge — that clip is what read as a solid colour bar. -->
+  <!-- Duotone + chromatic-aberration RGB-split filters for the archive
+       gallery photos (console/glitch accent, one filter graph each).
+       Stage 1 (duotone): desaturate to luminance, then feComponentTransfer
+       4-stop table-remaps it toward the theme's one accent colour #22d3ee,
+       keeping the gallery on the theme's single-accent-colour rule instead
+       of importing a second (e.g. the reference photo's slate/teal). A flat
+       2-stop (shadow->highlight) table blew the whole frame to solid cyan
+       on these high-key/cream-toned photos, since most pixels sit in the
+       bright half; the 4-stop curve adds a muted-teal midtone anchor and
+       caps the highlight well short of white (R lags G/B throughout so the
+       cyan identity survives even on bright fabric/walls) so faces and
+       fabric folds keep visible tone instead of bleaching out. Stage 2
+       (aberration): isolates R/G/B off the DUOTONE result (not
+       SourceGraphic) so the RGB split only ever fringes cyan/obsidian
+       mixes, never arbitrary photo colour, which is why duotone must run
+       first, not after. k-chroma = ambient rest state, k-chroma-hover = the
+       stronger split on hover/focus/touch (kept modest at 1.7px — much
+       past that reads as coloured noise on the busy floral/rug texture
+       rather than a fringe on the couple's silhouette). `lighten`
+       (per-channel max) instead of `screen` avoids the additive wash-out
+       screen causes; the closing gamma bump restores punch lighten flattens.
+       Static offsets, no animated primitives, so there's nothing for
+       prefers-reduced-motion to strip. The .gframe img is scaled 3% oversize
+       (css/kinetic.css) so the offset channels sample real bled pixels
+       instead of clipping to transparent at the frame edge. -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
     <filter id="k-chroma" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
-      <feColorMatrix in="SourceGraphic" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="r"/>
-      <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="g"/>
-      <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="b"/>
+      <feColorMatrix in="SourceGraphic" type="saturate" values="0" result="gray"/>
+      <feComponentTransfer in="gray" result="duo">
+        <feFuncR type="table" tableValues=".09 .25 .42 .48"/>
+        <feFuncG type="table" tableValues=".11 .39 .67 .80"/>
+        <feFuncB type="table" tableValues=".14 .41 .69 .83"/>
+      </feComponentTransfer>
+      <feColorMatrix in="duo" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="r"/>
+      <feColorMatrix in="duo" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="g"/>
+      <feColorMatrix in="duo" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="b"/>
       <feOffset in="r" dx="-1.1" dy="0" result="rOff"/>
       <feOffset in="b" dx="1.1" dy="0" result="bOff"/>
       <feBlend in="rOff" in2="g" mode="lighten" result="rg"/>
@@ -138,11 +159,17 @@
       </feComponentTransfer>
     </filter>
     <filter id="k-chroma-hover" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
-      <feColorMatrix in="SourceGraphic" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="r"/>
-      <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="g"/>
-      <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="b"/>
-      <feOffset in="r" dx="-2.4" dy="0" result="rOff"/>
-      <feOffset in="b" dx="2.4" dy="0" result="bOff"/>
+      <feColorMatrix in="SourceGraphic" type="saturate" values="0" result="gray"/>
+      <feComponentTransfer in="gray" result="duo">
+        <feFuncR type="table" tableValues=".09 .25 .42 .48"/>
+        <feFuncG type="table" tableValues=".11 .39 .67 .80"/>
+        <feFuncB type="table" tableValues=".14 .41 .69 .83"/>
+      </feComponentTransfer>
+      <feColorMatrix in="duo" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="r"/>
+      <feColorMatrix in="duo" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="g"/>
+      <feColorMatrix in="duo" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="b"/>
+      <feOffset in="r" dx="-1.7" dy="0" result="rOff"/>
+      <feOffset in="b" dx="1.7" dy="0" result="bOff"/>
       <feBlend in="rOff" in2="g" mode="lighten" result="rg"/>
       <feBlend in="rg" in2="bOff" mode="lighten" result="rgb"/>
       <feComponentTransfer in="rgb">
@@ -229,9 +256,21 @@
       <span class="cue-chevrons" aria-hidden="true"><i></i><i></i></span>
     </button>
     <div id="music-dock" hidden>
-      <button id="music-toggle" aria-label="Pause the music" aria-pressed="false" data-magnetic>
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path class="icon-note" d="M9 18V5l12-2v13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="18" cy="16" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
-      </button>
+      <span id="music-track" class="k-track" aria-live="polite" aria-label="Now playing track"></span>
+      <div id="music-player" role="group" aria-label="Music player">
+        <button id="music-prev" class="k-mskip" type="button" aria-label="Previous track" data-magnetic>
+          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M18 5v14l-9-7 9-7z M7 5v14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button id="music-toggle" aria-label="Pause the music" aria-pressed="false" data-magnetic>
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <path class="icon-play" d="M8 5v14l11-7-11-7z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+            <path class="icon-pause" d="M9 5v14 M15 5v14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <button id="music-next" class="k-mskip" type="button" aria-label="Next track" data-magnetic>
+          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M6 5v14l9-7-9-7z M17 5v14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
     </div>
   </div>
 

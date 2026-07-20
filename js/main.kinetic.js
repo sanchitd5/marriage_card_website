@@ -18,6 +18,7 @@ import {
   initCalendarButtons,
   initScrollCue,
   initMusicToggle,
+  initMusicSwitcher,
   initFullscreenToggle,
   initTilt,
 } from './app/ui.js';
@@ -25,6 +26,7 @@ import {
 // DOM-ready execution order preserved from main.js (kinetic init set).
 buildGallery();
 initMusicToggle();
+initMusicSwitcher();
 initFullscreenToggle();
 initCountdown();
 initScratch();

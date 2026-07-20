@@ -353,21 +353,23 @@ html[data-variant="kinetic"] .gate-hint .k-click { display: none; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   SIDE WIREFRAME DANCER (#k-dancer-canvas)
-   A persistent procedural wireframe humanoid (Iron-Man-suit read) that dances
-   to the music on the right side, across ALL panels. Own low-DPR WebGL canvas
-   (js/app/kinetic-dancer.js), fixed, BEHIND panel content (z1) — panels are
-   transparent where there's no text, so the figure reads as an ambient
-   companion. Hidden on narrow screens (no room beside content) and under
-   reduced-motion (no canvas is created there).
+   SIDE WIREFRAME DANCER (#k-dancer-canvas) — RETIRED
+   The two featured "hero" dancers used to render on this narrow right-side
+   strip via their own WebGL context. They now render into the full-viewport
+   #k-ambient-dancers canvas alongside the ambient crowd (one context total —
+   see js/app/kinetic-dancer.js). This element is kept in the DOM but rendered
+   to nothing; hidden here so the many per-panel opacity/transform rules below
+   that still reference it are simply dead (harmless) selectors. Everything
+   #k-dancer-canvas is now display:none — DO NOT rely on it for layout.
    ═══════════════════════════════════════════════════════════════════ */
 #k-dancer-canvas {
+  display: none;            /* retired — featured pair moved to #k-ambient-dancers */
   position: fixed;
   top: 0; right: 0;
   width: min(38vw, 560px); height: 100svh;
   z-index: 1;               /* above backdrop/vignette (0–1), below panels (2) */
   pointer-events: none;
-  opacity: 0;               /* faded in by JS once the first frame renders */
+  opacity: 0;
   transition: opacity 1.1s var(--k-ease);
 }
 #k-dancer-canvas.is-live { opacity: 1; }
@@ -393,6 +395,36 @@ html[data-variant="kinetic"] .gate-hint .k-click { display: none; }
 #k-ambient-dancers.is-live { opacity: .5; }
 @media (prefers-reduced-motion: reduce) { #k-ambient-dancers { display: none; } }
 @media (max-width: 767.98px) { #k-ambient-dancers { display: none; } }
+
+/* ═══ PRESENTER TAKEOVER (html.hud-hidden) ═══════════════════════════
+   The giant "presenter" armadrillo (js/app/kinetic-dancer.js) claims the
+   stage twice: a WELCOME right after the gate opens, and on every music
+   DROP. While it performs, the console furniture AND the #hero header — HUD,
+   side menu, wizard controls, right dock, crosshair cursor, hero — fade OUT
+   together so ONLY the giant is on stage, then fade back IN as it leaves so the
+   HUD and #hero reappear (the welcome giant leaving is what first reveals the
+   hero). Toggled
+   by a single root class the dancer module adds/removes on the show/hide
+   edge. The dancer CANVASES (#k-ambient-dancers, #k-dancer-canvas), #milkdrop,
+   #lightshow, .k-grain and the panel/act content are deliberately NOT hidden —
+   only the chrome. Reduced-motion / no-GSAP never add this class (that module
+   bails under REDUCED), so the HUD never vanishes for those users. Console
+   --k-ease glide, both directions. */
+#k-hud, #k-panel-menu, #k-panel-controls, #right-dock, #k-cursor, #hero {
+  transition: opacity var(--k-ease-dur) var(--k-ease);
+}
+html.hud-hidden #k-hud,
+html.hud-hidden #k-panel-menu,
+html.hud-hidden #k-panel-controls,
+html.hud-hidden #right-dock,
+html.hud-hidden #k-cursor,
+html.hud-hidden #hero {
+  opacity: 0 !important;   /* !important beats #k-cursor's inline opacity (set by kinetic.js) */
+  pointer-events: none;
+}
+/* Let the presenter read at full strength while it holds the stage (the
+   ambient canvas otherwise paints at .5). Reverts when the class is dropped. */
+html.hud-hidden #k-ambient-dancers.is-live { opacity: 1; }
 
 /* ═══════════════════════════════════════════════════════════════════
    CONTROL PANEL / SETUP-WIZARD (html.k-deck — added by kinetic.js in the
@@ -441,6 +473,67 @@ html.k-deck .k-index { display: none; }
 /* chrome only exists in panel mode */
 html:not(.k-deck) #k-panel-menu,
 html:not(.k-deck) #k-panel-controls { display: none; }
+
+/* ── Music player: prev / play-pause / next in one console pill, with a mono
+   "NN / NN" track readout above it (kinetic only; the main site keeps the bare
+   play/pause FAB). The three buttons live inside a single hairline pill so the
+   cluster reads as one instrument, not three loose FABs. ── */
+#music-dock { gap: .3rem; }
+#music-player {
+  display: flex; align-items: center; gap: .25rem;
+  padding: .26rem .3rem;
+  background: rgba(13, 15, 20, .92);
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  box-shadow: 0 8px 24px -10px rgba(0, 0, 0, .9);
+}
+/* the toggle is a chromed FAB in techno.css — reskin it as the DOMINANT centre
+   of the transport: larger than the skips, accent-tinted disc so the primary
+   action outweighs the two quiet flankers (hierarchy fix) */
+#music-player #music-toggle {
+  width: 46px; height: 46px; border-radius: 50%;
+  color: var(--accent);
+  background: rgba(var(--accent-rgb), .12);
+  border: 1px solid rgba(var(--accent-rgb), .5);
+  box-shadow: none;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+  transition: background .3s var(--k-ease), border-color .3s var(--k-ease);
+}
+#music-player #music-toggle:hover { background: rgba(var(--accent-rgb), .2); }
+/* play/pause transport glyph: aria-pressed="true" ⇒ audio playing ⇒ show the
+   PAUSE bars (the action); paused ⇒ show the PLAY triangle. Driven by
+   setPlaying() in ui.js. */
+#music-toggle .icon-pause { display: none; }
+#music-toggle[aria-pressed="true"] .icon-play { display: none; }
+#music-toggle[aria-pressed="true"] .icon-pause { display: block; }
+.k-mskip {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: none; border: 0; padding: 0; margin: 0; cursor: pointer;
+  color: var(--muted);
+  transition: color .3s var(--k-ease), transform .18s var(--k-ease);
+}
+.k-mskip:hover { color: var(--accent); }
+.k-mskip:active { transform: scale(.88); }
+.k-mskip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.k-track {
+  align-self: center;                 /* centre the readout over the pill */
+  font-family: var(--font-mono);
+  font-size: .56rem; letter-spacing: .24em;
+  color: var(--label); font-variant-numeric: tabular-nums;
+  padding: 0 .3rem; min-height: 1em; text-align: center;
+  text-transform: uppercase;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, .9);  /* legible over any bright frame */
+}
+.k-track::before {
+  content: "TRK "; opacity: .55; letter-spacing: .18em;
+}
+/* touch: real 44px targets for the skip buttons (icon stays small via grid) */
+@media (max-width: 720px) {
+  .k-mskip { width: 44px; height: 44px; }
+  #music-player #music-toggle { width: 48px; height: 48px; }
+}
 
 /* ── side menu: jump to any panel (left rail, mono labels) ── */
 #k-panel-menu {
@@ -529,7 +622,13 @@ html[data-variant="kinetic"] .k-eyebrow { letter-spacing: .16em; }
 
 /* ── Dancer: drop to atmosphere + obsidian scrim on its left edge ── */
 #k-dancer-canvas.is-live { opacity: .55; }
+/* RETIRED with #k-dancer-canvas: this scrim darkened the LEFT + RIGHT edges of
+   the viewport to back the old right-side dancer strip. With the featured pair
+   now spread ACROSS the full viewport, that side-darkening would mask them into
+   a central band — so the scrim is fully disabled. Kept in the DOM; the desktop
+   background overrides further down are dead (harmless) selectors. */
 #k-dancer-scrim {
+  display: none !important;
   position: fixed; inset: 0; z-index: 1; pointer-events: none;
   background: linear-gradient(90deg, var(--bg) 0%, var(--bg) 38%, rgba(11,12,15,0) 80%);
 }
@@ -567,31 +666,35 @@ html.k-deck[data-panel="rsvp"]      #k-dancer-canvas.is-live { opacity: .32; }
   html.k-deck[data-panel="archive"] .gallery { justify-content: safe flex-end; padding-bottom: clamp(4rem,10vh,8rem); }
 }
 
-/* ── Archive gallery: RGB-split (chromatic aberration) console accent ──
-   #k-chroma/#k-chroma-hover defined once in the kinetic template. Ambient
-   split is a 1.1px static offset (cheap, always on, still subtle); hover/
-   focus swaps to a legible 2.4px split. Both are static filter graphs — no
-   animated primitives — so there's no jitter loop for reduced-motion to
-   strip. object-fit:cover fills the frame edge-to-edge with zero bleed, so
-   an offset channel has no real pixel to sample at the true image edge and
-   clips to a solid colour bar; scaling the img 3% oversize gives the filter
-   real content to pull from (the parent .gframe's overflow:hidden clips the
-   3% excess, same as it already clips object-fit:cover). */
+/* ── Archive gallery: duotone + RGB-split (chromatic aberration) console
+   accent ── #k-chroma/#k-chroma-hover (defined once in the kinetic template)
+   now do the full job — duotone (shadows→#1a1c22, highlights→--accent
+   #22d3ee) feeding the RGB split — so the CSS-level saturate/contrast this
+   used to lean on is gone; it would just refight the SVG filter's own
+   colour mapping. Ambient split is a 1.1px static offset (cheap, always on,
+   still subtle); hover/focus swaps to a legible 2.4px split. Both are
+   static filter graphs — no animated primitives — so there's no jitter loop
+   for reduced-motion to strip. object-fit:cover fills the frame edge-to-edge
+   with zero bleed, so an offset channel has no real pixel to sample at the
+   true image edge and clips to a solid colour bar; scaling the img 3%
+   oversize gives the filter real content to pull from (the parent
+   .gframe's overflow:hidden clips the 3% excess, same as it already clips
+   object-fit:cover). */
 html[data-variant="kinetic"] .gframe img {
-  filter: url(#k-chroma) saturate(.7) contrast(1.05);
+  filter: url(#k-chroma);
   transform: scale(1.03);
   transition: filter .15s ease;
 }
 html[data-variant="kinetic"] .gframe:hover img,
 html[data-variant="kinetic"] .gframe:focus-within img {
-  filter: url(#k-chroma-hover) saturate(.7) contrast(1.05);
+  filter: url(#k-chroma-hover);
 }
 /* Touch has no hover — give it the fuller split as the resting state instead
    of never showing the effect's payoff (fine-pointer devices keep the subtle
    ambient rest state + hover reveal). */
 @media (hover: none) and (pointer: coarse) {
   html[data-variant="kinetic"] .gframe img {
-    filter: url(#k-chroma-hover) saturate(.7) contrast(1.05);
+    filter: url(#k-chroma-hover);
   }
 }
 
@@ -814,6 +917,17 @@ html.k-deck .gframe--veiled { justify-content: center; }
   html.k-deck #right-dock { top: 3.6rem; bottom: auto; right: 1rem; }
 }
 
+/* Desktop: dock the music player TOP-LEFT (under the HUD brand wordmark),
+   left-aligned, instead of the default bottom-right corner. */
+@media (min-width: 721px) {
+  html.k-deck #right-dock {
+    left: 2.4rem; right: auto; top: 2.7rem; bottom: auto;
+    align-items: flex-start;
+  }
+  html.k-deck #music-dock { align-items: flex-start; }
+  html.k-deck .k-track { align-self: flex-start; text-align: left; }
+}
+
 /* ═══════ 9.5 PUNCH-LIST — round 2b: mobile events fit ═══════ */
 @media (max-width: 720px) {
   /* compact the tracklist so all three fit without fighting the nav; FAB goes to
@@ -998,49 +1112,16 @@ html[data-variant="kinetic"] #hero { overflow: hidden; }
    internal scroll so short phones never clip content.
    ═══════════════════════════════════════════════════════════════════ */
 @media (max-width: 900px) {
-  /* ── Dancer: reserved stage, never shared with content ── */
-  html.k-deck #k-dancer-canvas {
-    display: block;
-    left: 0; right: 0; top: auto;
-    bottom: calc(4.85rem + env(safe-area-inset-bottom, 0px));
-    width: 100%; height: 38svh;
-    transform: none;
-    z-index: 1;
-  }
-  html.k-deck #k-dancer-canvas.is-live,
-  html.k-deck[data-panel="interlude"] #k-dancer-canvas.is-live,
-  html.k-deck[data-panel="rsvp"]       #k-dancer-canvas.is-live { opacity: .58; }
-  html.k-deck[data-panel="interlude"] #k-dancer-canvas,
-  html.k-deck[data-panel="rsvp"]      #k-dancer-canvas { transform: none; }
-
-  /* Dense panels (tracklist / archive) get a faint header watermark instead of
-     a bottom stage, so it never sits behind buttons or the tracklist rows. */
-  html.k-deck[data-panel="run-of-show"] #k-dancer-canvas,
-  html.k-deck[data-panel="archive"]     #k-dancer-canvas {
-    top: 0; bottom: auto; height: 28svh;
-  }
-  html.k-deck[data-panel="run-of-show"] #k-dancer-canvas.is-live,
-  html.k-deck[data-panel="archive"]     #k-dancer-canvas.is-live { opacity: .15; }
-
-  /* Reserve the stage: panel content padding stops at its edge, so text/buttons
-     can never render inside the dancer's band. */
+  /* ── Dancer stage RETIRED on phones ──
+     The whole dancer scene (featured pair + ambient crowd) is now a single
+     full-viewport canvas gated to tablet + desktop only (≥768px; #k-ambient-
+     dancers is display:none below that and JS never inits it). So phones show a
+     clean, dancer-free page: NO reserved bottom stage, NO stage padding — panel
+     content only needs to clear the fixed bottom nav bar (4.85rem + safe-area).
+     (The old #k-dancer-canvas bottom-stage + scrim rules here are removed; the
+     element itself is globally display:none.) */
   html.k-deck .hero, html.k-deck .band, html.k-deck .footer {
-    padding-bottom: calc(38svh + 4.85rem + env(safe-area-inset-bottom, 0px));
-  }
-  html.k-deck[data-panel="run-of-show"] .band,
-  html.k-deck[data-panel="archive"]     .band {
     padding-bottom: calc(4.85rem + env(safe-area-inset-bottom, 0px));
-  }
-
-  /* Scrim: display panels feather the TOP (behind the headline); dense panels
-     feather the top watermark down to fully opaque before the first content row. */
-  html.k-deck #k-dancer-scrim {
-    display: block; z-index: 1;
-    background: linear-gradient(180deg, rgba(6,7,10,.8) 0%, rgba(6,7,10,.45) 34%, rgba(6,7,10,0) 55%);
-  }
-  html.k-deck[data-panel="run-of-show"] #k-dancer-scrim,
-  html.k-deck[data-panel="archive"]     #k-dancer-scrim {
-    background: linear-gradient(180deg, rgba(6,7,10,.15) 0%, rgba(6,7,10,.9) 24%, rgba(6,7,10,.96) 38%, rgba(6,7,10,.96) 100%);
   }
 
   /* ── Music FAB: out of the Next / iOS home-indicator collision zone ── */

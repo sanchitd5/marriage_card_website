@@ -84,23 +84,28 @@ await page.waitForSelector('.gate-card', { timeout: 15000 });
 await page.evaluate(() => document.querySelector('.gate-card').click());
 await page.waitForTimeout(1500);   // gate dissolve + removal (~1.2s)
 
-// force the canvas fully opaque (k-deck intentionally dims it to 0.3–0.66)
-await page.addStyleTag({ content: '#k-dancer-canvas{opacity:1 !important} .gate{display:none !important}' });
+// Force the full-viewport crowd/featured canvas opaque (k-deck dims it to .5).
+// #k-dancer-canvas is display:none now — everything renders on #k-ambient-dancers.
+await page.addStyleTag({ content: '#k-ambient-dancers{opacity:1 !important} .gate{display:none !important}' });
 
-// wait for both glTF models (fall back to a fixed settle if the events were missed)
-for (let i = 0; i < 40 && loaded.size < 2; i++) await page.waitForTimeout(250);
-console.log(`models loaded: ${loaded.size}/2 — settling …`);
-await page.waitForSelector('#k-dancer-canvas.is-live', { timeout: 15000 });
-await page.waitForTimeout(2500);
+// Only the armadrillo (rigA) loads now — fairy-punk is suppressed — so wait for
+// ONE scene.gltf, then settle for model wire-up + the crowd pool + featured build.
+for (let i = 0; i < 40 && loaded.size < 1; i++) await page.waitForTimeout(250);
+console.log(`models loaded: ${loaded.size} — settling for crowd/featured/welcome …`);
+await page.waitForSelector('#k-ambient-dancers', { timeout: 15000 });
+await page.waitForTimeout(3000);   // crowd fills toward the floor + welcome giant window
 
-const canvas = await page.$('#k-dancer-canvas');
-if (!canvas) { console.error('no #k-dancer-canvas'); await browser.close(); server.close(); process.exit(1); }
-
-console.log(`capturing ${FRAMES} frames every ${GAP_MS}ms …`);
+// Full-VIEWPORT screenshots: the scene is full-screen now (crowd + featured
+// armadrillo + the welcome presenter giant), so capture the whole page, not one
+// canvas element. NOTE: headless has no trusted gesture, so audio stays blocked
+// → no real music DROP fires; the drop-takeover giant can't be verified here,
+// only the idle groove, crowd (5+), featured armadrillo, cyan tint, and (if
+// caught in-window) the post-gate welcome giant.
+console.log(`capturing ${FRAMES} full-viewport frames every ${GAP_MS}ms …`);
 const written = [];
 for (let i = 0; i < FRAMES; i++) {
   const f = path.join(outDir, `dancer-${String(i).padStart(2, '0')}.png`);
-  await canvas.screenshot({ path: f });
+  await page.screenshot({ path: f });
   written.push(f);
   await page.waitForTimeout(GAP_MS);
 }

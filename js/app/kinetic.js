@@ -207,6 +207,10 @@ export function initKineticGate() {
       document.body.style.overflow = ''; // unlock only once the gate is fully gone
       if (window.ScrollTrigger) ScrollTrigger.refresh();
       if (typeof heroReveal === 'function') heroReveal();
+      // Signal the gate is fully open so the kinetic dancer can run its giant
+      // "presenter" WELCOME (kinetic-dancer.js listens; no-op under reduced
+      // motion / no-GSAP, since that module never initialises there).
+      window.dispatchEvent(new CustomEvent('kinetic-gate-open'));
     };
 
     if (REDUCED || !window.gsap) { done(); return; }
