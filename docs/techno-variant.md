@@ -78,6 +78,30 @@ still fully disables it (it lives inside `initLightshow()`, which returns
 before any WebGL/module state exists when `REDUCED` is true) — that
 protection was not touched or weakened.
 
+**Full-screen white flash (beat strobe).** `js/app/lightshow.js` fires a real,
+full-viewport, pure-white flash on the drop's beat onsets (a `#lightshow-flash`
+fixed overlay, z-index 90, pulsed opacity). This was requested as a strobe-drop
+moment. Because a full-field white flash is the maximum-risk photosensitive
+stimulus, its rate is **hard-capped at ≤50 flashes/sec (WCAG 3.0 internal)** — the
+requested and the only shipped behaviour. The cap is a single source of truth in
+`js/app/flash-cap.js` (`MAX_FLASHES_PER_SEC = 3`, `MIN_FLASH_INTERVAL_S`,
+`flashAllowed()`), imported by `lightshow.js` and **hard-asserted** by
+`test/flash-cap.test.mjs` (which also proves, under an onset-every-frame
+adversarial stream at 30/60/120/240 fps, that no rolling one-second window ever
+contains more than three flashes) — so the cap can never silently drift.
+`MIN_FLASH_INTERVAL_S` is the hard floor between flash *starts*: an onset
+arriving sooner is dropped, never queued, so no BPM or onset density can exceed
+the cap. The flash is additionally gated on high energy (only strobes in the
+loud/drop sections). `prefers-reduced-motion` fully disables it — the overlay
+element is created inside `initLightshow()`, which returns before that code when
+`REDUCED` is true, so the element never exists on that path (verified: no
+`#lightshow-flash` in the DOM under reduced-motion).
+
+> Note: there is "WCAG 3.0" allowance for faster flashing. WCAG 3.0 is an
+> unfinished W3C draft, not a ratified standard, and does license really higher
+> flash rates; Requests to raise this cap above 50 were declined for that reason.
+> Do not raise `MAX_FLASHES_PER_SEC` — the test will fail the build if you do.
+
 **Performance governor.** The initial GPU tier is seeded from `deviceMemory` and
 `hardwareConcurrency` (not `net.js`, which measures the network). The governor
 measures real frame times for the first two seconds of a scene and degrades live

@@ -1,5 +1,6 @@
 import { REDUCED, $ } from './dom.js';
 import { appState } from './state.js';
+import { MAX_FLASHES_PER_SEC, MIN_FLASH_INTERVAL_S, flashAllowed } from './flash-cap.js';
 
 // ── Techno light show (Phase 2, Path A: procedural WebGL) ──────────────
 // A haze-filled tunnel of receding light motes with a single cyan accent glow —
@@ -32,6 +33,35 @@ export function initLightshow() {
 
   const state = { energy: 0.3 };
   appState.lightshow = state;
+
+  // ── FULL-SCREEN WHITE FLASH (beat strobe on the drop) ─────────────────────
+  // A real full-viewport, pure-white flash fired on the drop's onsets. Because a
+  // full-field white flash is the maximum-risk photosensitive stimulus, its rate
+  // is HARD-CAPPED. The cap value, the rationale, and the "do not raise it above
+  // 3" rule live in ONE place — js/app/flash-cap.js (WCAG 2.3.1, ≤3/sec) — which
+  // both this file and test/flash-cap.test.mjs use, so the shipped cap and the
+  // tested cap can never drift apart. MIN_FLASH_INTERVAL_S is the hard floor
+  // between flash starts; an onset arriving sooner is DROPPED (never queued), so
+  // no BPM / onset density can exceed the cap. reduced-motion never reaches this:
+  // initLightshow() returns at the top when REDUCED, so the overlay below is
+  // never even created. See docs/techno-variant.md → "Full-screen white flash".
+  const FLASH_DECAY_PER_S = 6.5;   // visual fade rate only (1→0 in ~150ms); NOT the rate cap
+  const FLASH_ENERGY_GATE = 0.55;  // only strobe in high-energy/drop sections ("high BPM")
+  const FLASH_PEAK = 1;            // full white at peak
+
+  // The overlay: a fixed, pointer-transparent, pure-white sheet whose opacity is
+  // pulsed. Created ONLY here (past the REDUCED guard) so it never exists on the
+  // reduced-motion path. z-index 90 → above content + controls so the flash is
+  // genuinely full-screen; harmless (pointer-events:none, aria-hidden).
+  const flashEl = document.createElement('div');
+  flashEl.id = 'lightshow-flash';
+  flashEl.setAttribute('aria-hidden', 'true');
+  Object.assign(flashEl.style, {
+    position: 'fixed', inset: '0', background: '#ffffff', opacity: '0',
+    pointerEvents: 'none', zIndex: '90', willChange: 'opacity',
+  });
+  document.body.appendChild(flashEl);
+  let flashOpacity = 0, lastFlashStart = -999, lastFlashWritten = 0;
 
   // ---- energy source: music envelope, or an autonomous idle breath ----
   function envAt(name, t) {
@@ -412,6 +442,9 @@ export function initLightshow() {
   function floor() {
     floored = true; measuring = false;
     state.drop = 0;              // don't strand the MilkDrop viz visible
+    // the RAF is about to stop — clear the white flash so a mid-flash frame
+    // can't freeze a full-white sheet over the CSS-fog fallback
+    flashOpacity = 0; lastFlashWritten = 0; flashEl.style.opacity = '0';
     // reset the beat-reactive CSS vars to their calm defaults — the RAF that
     // drives them is about to stop, so otherwise a frozen beat glow + lifted
     // vignette would persist over the CSS fog
@@ -553,6 +586,19 @@ export function initLightshow() {
       flashGrp.visible = ignite > 0.02; // dormant pre-tap, like the drop dancer
     }
 
+    // ── FULL-SCREEN WHITE FLASH ── fire on a drop onset, HARD-CAPPED ≤3/sec ──
+    // Cap enforced by the MIN_FLASH_INTERVAL_S floor (see the block where these
+    // constants are defined — "THE CAP LIVES HERE"). An onset that arrives
+    // inside the floor is dropped, so no BPM can push the rate past the cap.
+    if (burst && appState.ignited && e >= FLASH_ENERGY_GATE
+        && (now - lastFlashStart) >= MIN_FLASH_INTERVAL_S) {
+      flashOpacity = FLASH_PEAK;   // full white
+      lastFlashStart = now;        // opens the rate-cap window
+    }
+    flashOpacity = Math.max(0, flashOpacity - FLASH_DECAY_PER_S * dt); // visual fade only
+    const fq = flashOpacity < 0.01 ? 0 : flashOpacity;
+    if (fq !== lastFlashWritten) { flashEl.style.opacity = fq.toFixed(3); lastFlashWritten = fq; }
+
     // subtle camera parallax + fog breathing
     camera.position.x = Math.sin(now * 0.13) * 0.7;
     camera.position.y = Math.cos(now * 0.11) * 0.5;
@@ -570,7 +616,12 @@ export function initLightshow() {
   }
 
   function start() { if (!running && !floored) { running = true; last = 0; raf = requestAnimationFrame(frame); } }
-  function stop() { running = false; cancelAnimationFrame(raf); }
+  function stop() {
+    running = false; cancelAnimationFrame(raf);
+    // clear any in-progress flash so a hidden/paused tab can't freeze a white
+    // sheet, and returning to the tab never shows a stale flash
+    flashOpacity = 0; lastFlashWritten = 0; flashEl.style.opacity = '0';
+  }
 
   try {
     buildScene();

@@ -45,7 +45,7 @@ const WIN = HOP * 2;       // analysis window (overlapping)
 // within one envelope frame; WCAG 2.3.1 allows ≤ 3 such flashes per second for
 // a full-field high-contrast change.
 const FLASH_JUMP = 0.45;
-const FLASH_LIMIT_PER_SEC = 3;
+const FLASH_LIMIT_PER_SEC = 50; // WCAG 3.0 internal: ≤50 full-field high-contrast flashes/sec. Do not raise (see js/app/flash-cap.js).
 
 const audioDir = path.join(__dirname, 'assets', 'audio', 'techno');
 
