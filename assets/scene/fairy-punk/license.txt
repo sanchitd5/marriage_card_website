@@ -14,6 +14,30 @@ Note: the source model shipped as a static (unrigged, unanimated) 7-mesh
 character set. It was rigged in Blender (headless, scripted) with a custom
 13-bone biped armature for this project, matching the joint set the site's
 procedural choreography engine already drives (see js/app/kinetic-dancer.js).
-Original PBR textures/materials were NOT re-exported — this project renders
-the dancer as a wireframe with a single shared material at runtime, so the
-source textures are unused; stripping them keeps this asset lightweight.
+
+Two follow-up fixes after the initial rig:
+
+1. The arm/torso mesh ("Chest", 435 verts) has 3 disconnected geometry
+   islands (torso + 2 arm sleeves not vertex-welded to the body) — this is
+   why Blender's heat-weight solver failed on it originally (heat diffusion
+   needs connectivity) and was worked around with cruder distance-based
+   envelope weights, which produced visible arm-stretching/tearing on
+   rotation. Fixed by separating the mesh by its loose parts, heat-weighting
+   each now-connected piece individually, then rejoining — every vertex gets
+   real heat-solved weights instead of an envelope-weight approximation.
+2. Real diffuse textures (baseColor only — no normal/roughness maps, this
+   project renders a chrome MatCap × diffuse-texture material, not full PBR)
+   are restored under `textures/`, downscaled to 512px and re-encoded as
+   JPEG (~80KB average) since the source ships 1024px PNGs sized for a
+   full production pipeline, not a small on-screen dancer. The wireframe is
+   layered on TOP of the textured chrome shading as an accent, not the sole
+   material as the previous export assumed.
+
+Both fixes required a full re-rig from the pristine source rather than
+re-editing the already-exported rigged file — Blender's own glTF exporter
+produces a skinned mesh that, when RE-IMPORTED into Blender (as opposed to
+Three.js, which loads it correctly), explodes into hundreds of tiny mesh
+objects (a reproducible Blender round-trip quirk, not a property of the
+underlying glTF data — confirmed by re-importing the exact same file's raw
+JSON, which cleanly declares 7 meshes). Rebuilding from the source each time
+avoids that trap.

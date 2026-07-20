@@ -129,17 +129,43 @@ export function initKineticDancer() {
   }
 
   // ── shared materials (both rigs): chrome body + wireframe accent ─────
-  // `chromeMat` is the BASE pass on every mesh — sculpted form (incl. facial
-  // features) reads via matcap shading. `wireMat` is a SECOND, additive
-  // no-depth-write pass rendered on a `.clone()` of each mesh (see
-  // onModelLoaded) — a thin glowing "circuitry" accent over the chrome body,
-  // not the only material anymore. Both need `skinning: true` in r128 so the
-  // skinning shader chunks are injected and each pass deforms with its rig's
-  // skeleton. `chromeMat.color` and `wireMat.opacity` are the two brightness
-  // knobs driven per-frame for beat illumination (see frame()).
-  const chromeMat = new THREE.MeshMatcapMaterial({ matcap: makeChromeMatcap(), color: 0xffffff, transparent: true, opacity: 1, skinning: true });
+  // Every mesh gets a chrome BASE pass — one MeshMatcapMaterial instance PER
+  // UNIQUE source diffuse texture (see getChromeMat below), so sculpted form
+  // AND the real restored surface texture both read via matcap shading
+  // multiplied by `.map`. `wireMat` is a SECOND, additive no-depth-write pass
+  // rendered on a `.clone()` of each mesh (see onModelLoaded) — a thin
+  // glowing "circuitry" accent over the chrome body, not the only material.
+  // Both need `skinning: true` in r128 so the skinning shader chunks are
+  // injected and each pass deforms with its rig's skeleton. Every chrome
+  // instance's `.color` + `wireMat.opacity` are the two brightness knobs
+  // driven per-frame for beat illumination (see frame()).
+  const chromeMatcapTex = makeChromeMatcap();
+  // One chrome material PER UNIQUE diffuse texture (both rigs' meshes share
+  // an instance when they carry the same texture, or `null` for meshes with
+  // no map — the Armadrillo's plain-grey material). Built lazily as meshes
+  // load (see getChromeMat below); `chromeMats` is what the per-frame beat-
+  // illumination loop iterates instead of one shared material's `.color`.
+  const chromeMats = [];
+  function getChromeMat(srcMat) {
+    const map = srcMat && srcMat.map ? srcMat.map : null;
+    const key = map ? map.uuid : 'none';
+    for (const m of chromeMats) if (m.__key === key) return m;
+    const opts = { matcap: chromeMatcapTex, color: 0xffffff, skinning: true };
+    if (map) opts.map = map;
+    // carry over transparency/alpha-cutout from the SOURCE material (e.g. a
+    // hair card rendered with an alpha-masked texture) so restoring the real
+    // texture doesn't also lose whatever cutout it needs to read correctly.
+    if (srcMat && srcMat.transparent) opts.transparent = true;
+    if (srcMat && srcMat.alphaTest) opts.alphaTest = srcMat.alphaTest;
+    if (srcMat && srcMat.side !== undefined) opts.side = srcMat.side;
+    const mat = new THREE.MeshMatcapMaterial(opts);
+    mat.__key = key;
+    chromeMats.push(mat);
+    disposables.push(mat);
+    return mat;
+  }
   const wireMat = new THREE.MeshBasicMaterial({ color: 0x66f0ff, wireframe: true, transparent: true, opacity: 0.14, blending: THREE.AdditiveBlending, depthWrite: false, skinning: true });
-  const disposables = [chromeMat, wireMat, chromeMat.matcap];   // materials/geometries to dispose on teardown
+  const disposables = [wireMat, chromeMatcapTex];   // chromeMats are pushed in as they're created (see below)
 
   // ── shared renderer/scene/camera + lifecycle ─────────────────────────
   let renderer, scene, camera;
@@ -202,7 +228,11 @@ export function initKineticDancer() {
     // Hanging-arms bind pose (built this way specifically to avoid a T-pose
     // rest hack) — near-zero rest offsets; small elbow bend to match.
     armDown: 0, foreRest: 0.12,
-    fitH: 0.82, fitW: 0.34, xOffset: 1.0,
+    // fitH lower than the Armadrillo's: this rig's hair/headdress mesh
+    // extends well above the Head bone itself, which frameModel() fits by
+    // (bone positions only, not mesh extent) -- at 0.82 that overhang
+    // clipped the top of the canvas. Leave more headroom.
+    fitH: 0.62, fitW: 0.34, xOffset: 1.0,
   };
 
   // ── per-panel duet placement ─────────────────────────────────────────
@@ -340,7 +370,12 @@ export function initKineticDancer() {
     const meshList = [];
     model.traverse((o) => { if (o.isMesh || o.isSkinnedMesh) meshList.push(o); });
     for (const o of meshList) {
-      o.material = chromeMat;
+      // capture whatever GLTFLoader already parsed (diffuse map + alpha
+      // mode) BEFORE overwriting the material, so the real source texture
+      // (restored in Blender — see assets/scene/*/license.txt) survives
+      // underneath the chrome shading instead of being replaced by it.
+      const srcMat = o.material;
+      o.material = getChromeMat(srcMat);
       o.frustumCulled = false;   // skinned bounds move; don't let it cull out
       if (o.isSkinnedMesh) rigState.skinnedMeshes.push(o);
       const g = o.geometry;
@@ -1305,16 +1340,19 @@ export function initKineticDancer() {
       }
     }
 
-    // Beat illumination (shared materials, both rigs): energy sets the
-    // floor, beatAccent's smooth decay curve blooms it on each beat
-    // (bar-weighted, so the downbeat reads brightest). Two knobs now carry
-    // this instead of one wireframe-only opacity: the wireframe accent's
-    // opacity (the glowing "circuitry" pulse) and the chrome pass's colour
-    // multiplier (a subtler whole-body brightening on hard beats). See the
+    // Beat illumination (shared across both rigs): energy sets the floor,
+    // beatAccent's smooth decay curve blooms it on each beat (bar-weighted,
+    // so the downbeat reads brightest). Two knobs carry this: the wireframe
+    // accent's opacity (the glowing "circuitry" pulse, one shared material)
+    // and the chrome pass's colour multiplier (a subtler whole-body
+    // brightening on hard beats) — applied to EVERY chrome material instance
+    // (one per unique diffuse texture now that real textures are restored,
+    // not just the single flat-color instance this used to be). See the
     // WCAG 2.3.1 note in the header comment.
     const glow = Math.min(1, 0.5 + energy * 0.3 + beatAccent * 0.4);
     wireMat.opacity = Math.min(0.5, 0.06 + glow * 0.28);
-    chromeMat.color.setScalar(0.72 + glow * 0.5);
+    const chromeColor = 0.72 + glow * 0.5;
+    for (let i = 0; i < chromeMats.length; i++) chromeMats[i].color.setScalar(chromeColor);
 
     renderer.render(scene, camera);
 
