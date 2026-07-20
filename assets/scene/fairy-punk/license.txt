@@ -11,33 +11,29 @@ If you use this 3D model in your project be sure to copy paste this credit where
 This work is based on "DP Techno Fairy Punk Set HD Textures" (https://sketchfab.com/3d-models/dp-techno-fairy-punk-set-hd-textures-6c2d6ff1ca3043ff9ffdf884ffbba1b8) by BilloXD (https://sketchfab.com/BilloXD) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
 
 Note: the source model shipped as a static (unrigged, unanimated) 7-mesh
-character set. It was rigged in Blender (headless, scripted) with a custom
-13-bone biped armature for this project, matching the joint set the site's
-procedural choreography engine already drives (see js/app/kinetic-dancer.js).
+character set. Rigged in Blender (headless, scripted) with a custom
+13-bone biped armature in a hanging-arms bind pose, matching the joint set
+the site's procedural choreography engine drives (see js/app/kinetic-dancer.js).
 
-Two follow-up fixes after the initial rig:
+Re-rigged from a pristine, never-round-tripped export
+(source/untitled.gltf from the fuller Sketchfab download package) after
+the first rigging pass -- built from a single .glb export and repeatedly
+patched in place -- accumulated damage from a known Blender bug where
+re-importing an already-exported skinned glTF explodes it into hundreds
+of mesh objects. This rebuild applies object transforms (the classic
+"unapplied 0.01 scale" cause of a 100x rest-pose blowup) before parenting,
+uses Blender's automatic (heat) weights where the solver succeeds, and a
+rigid nearest-bone-segment fallback (single-bone weight, no blending) for
+meshes the heat solver cannot traverse -- the Face and Hairs meshes, both
+built from many disconnected geometry islands (a face plate and hundreds
+of separate hair-strand pieces) that heat diffusion cannot solve across.
+The Chest mesh (the wing/pauldron piece) has its spurious blend weight
+onto the arm bones removed and renormalized, so it moves with the torso
+rather than tearing at the shoulder seam when an arm swings through a
+real choreography angle.
 
-1. The arm/torso mesh ("Chest", 435 verts) has 3 disconnected geometry
-   islands (torso + 2 arm sleeves not vertex-welded to the body) — this is
-   why Blender's heat-weight solver failed on it originally (heat diffusion
-   needs connectivity) and was worked around with cruder distance-based
-   envelope weights, which produced visible arm-stretching/tearing on
-   rotation. Fixed by separating the mesh by its loose parts, heat-weighting
-   each now-connected piece individually, then rejoining — every vertex gets
-   real heat-solved weights instead of an envelope-weight approximation.
-2. Real diffuse textures (baseColor only — no normal/roughness maps, this
-   project renders a chrome MatCap × diffuse-texture material, not full PBR)
-   are restored under `textures/`, downscaled to 512px and re-encoded as
-   JPEG (~80KB average) since the source ships 1024px PNGs sized for a
-   full production pipeline, not a small on-screen dancer. The wireframe is
-   layered on TOP of the textured chrome shading as an accent, not the sole
-   material as the previous export assumed.
-
-Both fixes required a full re-rig from the pristine source rather than
-re-editing the already-exported rigged file — Blender's own glTF exporter
-produces a skinned mesh that, when RE-IMPORTED into Blender (as opposed to
-Three.js, which loads it correctly), explodes into hundreds of tiny mesh
-objects (a reproducible Blender round-trip quirk, not a property of the
-underlying glTF data — confirmed by re-importing the exact same file's raw
-JSON, which cleanly declares 7 meshes). Rebuilding from the source each time
-avoids that trap.
+Textures: baseColor images restored from the same pristine download
+package's named texture files (BaseColor Chest/Face/Legs/Lower/Shirt/Band),
+downscaled and JPEG-compressed. The runtime renders the dancer as a
+chrome MatCap pass with the real texture multiplied in, plus a thin
+wireframe accent pass on top -- see js/app/kinetic-dancer.js.
