@@ -438,6 +438,13 @@ export function initKineticDancer() {
   // PREVIOUS move left it at instead of easing back to rest, breaking the
   // "moves crossfade for free through the shared damping" property.
   const REST_ARM_X = 0.20, REST_FORE_X = 0.12, REST_LEG_X = 0.06;
+  // Ease-in-out for every move's draw/hold/release-style envelope (0..1 in,
+  // 0 slope at both ends) instead of a raw linear ramp — a linear ramp has a
+  // velocity CORNER where it meets a hold or another ramp, which the shared
+  // damping softens but doesn't fully round out. smoothstep gives the pose a
+  // continuous velocity through every phase handoff, which is what reads as
+  // fluid weight transfer rather than a mechanical step.
+  const smoothstep = (t) => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
 
   // A. Groove sway — the retuned workhorse (was the only move). Whole-figure
   // sway + alternating hands-to-face reach, on grooveSway's own `p` oscillator.
@@ -486,7 +493,7 @@ export function initKineticDancer() {
   function handsFace(c) {
     const { b, tgt, set, A, elapsedBeats } = c;
     const eb = elapsedBeats % 8;
-    const drawAmt = eb < 3 ? eb / 3 : eb < 6 ? 1 : Math.max(0, 1 - (eb - 6) / 2);
+    const drawAmt = eb < 3 ? smoothstep(eb / 3) : eb < 6 ? 1 : 1 - smoothstep(Math.min(1, (eb - 6) / 2));
     const breathe = Math.sin(eb * 1.3) * 0.03;
 
     set(b.pelvis.position, 'x', 0);
@@ -516,7 +523,7 @@ export function initKineticDancer() {
     const { b, tgt, set, add, A, elapsedBeats } = c;
     const eb = elapsedBeats;
     if (eb < 2) {
-      const w = eb / 2;
+      const w = smoothstep(eb / 2);
       set(b.pelvis.position, 'x', 0); set(b.pelvis.position, 'y', 0.10 - w * 0.03 * A);
       tgt(b.upperArmL.rotation, 'x', 0.25 - w * 0.6 * A); tgt(b.upperArmL.rotation, 'z', 0.10);
       tgt(b.upperArmR.rotation, 'x', 0.25 - w * 0.6 * A); tgt(b.upperArmR.rotation, 'z', -0.10);
@@ -526,7 +533,7 @@ export function initKineticDancer() {
       tgt(b.head.rotation, 'x', -0.12); tgt(b.head.rotation, 'z', 0); tgt(b.head.rotation, 'y', 0);
       tgt(b.neck.rotation, 'x', 0.03); tgt(b.neck.rotation, 'z', 0); tgt(b.neck.rotation, 'y', 0);
     } else {
-      const punch = Math.max(0, 1 - (eb - 2) / 6);
+      const punch = 1 - smoothstep(Math.min(1, (eb - 2) / 6));
       set(b.pelvis.position, 'x', 0); set(b.pelvis.position, 'y', 0.11 + punch * 0.03 * A);
       tgt(b.upperArmL.rotation, 'x', 0.25 + 1.5 * punch * A); tgt(b.upperArmL.rotation, 'z', 0.10 * (1 - punch));
       tgt(b.upperArmR.rotation, 'x', 0.25 + 1.5 * punch * A); tgt(b.upperArmR.rotation, 'z', -0.10 * (1 - punch));
@@ -548,7 +555,7 @@ export function initKineticDancer() {
     const { b, tgt, set, A, elapsedBeats } = c;
     const eb = elapsedBeats % 16;
     const breathe = Math.sin(eb * 0.4) * 0.03 * A;
-    const shift = (eb < 8 ? eb / 8 : 1 - (eb - 8) / 8) - 0.5;
+    const shift = (eb < 8 ? smoothstep(eb / 8) : 1 - smoothstep((eb - 8) / 8)) - 0.5;
     const gaze = Math.sin((eb / 16) * Math.PI * 2 + 0.3) * 0.26 * A;
 
     set(b.pelvis.position, 'x', shift * 0.10 * A);
@@ -625,7 +632,7 @@ export function initKineticDancer() {
   function reachOpen(c) {
     const { b, tgt, set, A, elapsedBeats, mirror } = c;
     const eb = elapsedBeats % 8;
-    const amt = eb < 4 ? eb / 4 : Math.max(0, 1 - (eb - 4) / 4);
+    const amt = eb < 4 ? smoothstep(eb / 4) : 1 - smoothstep(Math.min(1, (eb - 4) / 4));
     const L = mirror > 0, featUp = L ? b.upperArmR : b.upperArmL, featFore = L ? b.forearmR : b.forearmL;
     const restUp = L ? b.upperArmL : b.upperArmR, restFore = L ? b.forearmL : b.forearmR;
 
