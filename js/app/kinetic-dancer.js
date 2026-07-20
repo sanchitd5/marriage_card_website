@@ -102,24 +102,37 @@ export function initKineticDancer() {
     const c = document.createElement('canvas');
     c.width = size; c.height = size;
     const ctx = c.getContext('2d');
-    ctx.fillStyle = '#0d1620';
+    ctx.fillStyle = '#141518';
     ctx.fillRect(0, 0, size, size);
-    // WIDER lit zone than a typical specular hotspot — most of the surface
-    // should read some tonal gradient (that's what makes sculpted form/
-    // facial features visible), not just a small bright dot on a mostly-dark
-    // field with the rest reading flat/black.
+    // NEUTRAL/GREY tonal ramp (not saturated cyan) — MeshMatcapMaterial
+    // MULTIPLIES this into the real diffuse `.map` (see getChromeMat below),
+    // so a strongly cyan-biased ramp here suppresses the red channel of
+    // whatever the source texture actually is and desaturates/browns any
+    // warm or magenta/purple colour underneath (confirmed: the fairy-punk
+    // source is a vivid magenta-and-grey armour, per its Sketchfab listing —
+    // an earlier, more saturated-cyan version of this ramp was muting that
+    // down toward mud). A near-neutral grey ramp (hotspot -> midtone -> dark,
+    // all channels close together) still reads as a metallic sheen/gradient
+    // (that's what makes sculpted form/facial features visible) WITHOUT
+    // fighting the source texture's own hue — the cyan "chrome" identity
+    // comes from the separate wireframe accent pass + the beat-driven
+    // colour multiplier, not from tinting the base shading itself.
     const hlX = size * 0.36, hlY = size * 0.32;
     const key = ctx.createRadialGradient(hlX, hlY, 0, hlX, hlY, size * 0.85);
-    key.addColorStop(0, '#f4feff');
-    key.addColorStop(0.16, '#cdf5ff');
-    key.addColorStop(0.36, '#7fe2f5');
-    key.addColorStop(0.58, '#3a8fa3');
-    key.addColorStop(0.8, '#1c4855');
-    key.addColorStop(1, '#0d1620');
+    key.addColorStop(0, '#fbfcfd');
+    key.addColorStop(0.16, '#e7ebee');
+    key.addColorStop(0.36, '#aeb6ba');
+    key.addColorStop(0.58, '#666d70');
+    key.addColorStop(0.8, '#2c2f31');
+    key.addColorStop(1, '#141518');
     ctx.fillStyle = key;
     ctx.fillRect(0, 0, size, size);
-    const rim = ctx.createRadialGradient(size * 0.75, size * 0.82, 0, size * 0.75, size * 0.82, size * 0.45);
-    rim.addColorStop(0, 'rgba(120,220,255,0.45)');
+    // a faint cyan rim-light accent (kept SMALL/subtle) — enough to still
+    // read as a cool "instrument" sheen at the silhouette edge without
+    // desaturating the broad diffuse-lit area the way a full-surface cyan
+    // tint did.
+    const rim = ctx.createRadialGradient(size * 0.75, size * 0.82, 0, size * 0.75, size * 0.82, size * 0.4);
+    rim.addColorStop(0, 'rgba(120,220,255,0.22)');
     rim.addColorStop(1, 'rgba(120,220,255,0)');
     ctx.fillStyle = rim;
     ctx.fillRect(0, 0, size, size);
