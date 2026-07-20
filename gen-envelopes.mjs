@@ -5,8 +5,15 @@
 // Like the other gen-* scripts, this is a MANUAL asset step — it is NOT wired
 // into `node build.js`. It decodes each techno track with ffmpeg and computes,
 // per track:
-//   • env      — a normalized 0..1 energy envelope at ENV_FPS (drives continuous
-//                params: glow, tunnel speed, bar height)
+//   • env      — a normalized 0..1 BROADBAND energy envelope at ENV_FPS (drives
+//                continuous params: glow, tunnel speed, bar height)
+//   • envLow/envMid/envHigh — the same RMS-envelope technique applied to THREE
+//                ffmpeg-bandpass-filtered decodes of the same track (~20-150Hz
+//                kick/bass, ~150-2000Hz melodic/vocal, ~2000Hz+ hi-hat/cymbal/
+//                percussion), frame-aligned to `env` (same ENV_FPS hop/window).
+//                Lets the kinetic dancer pick WHICH move to run based on which
+//                instrument register is dominant right now, not just how loud
+//                the mix is overall.
 //   • onsets   — beat/onset times in seconds (drives discrete "drop" cues)
 //   • flash    — a WCAG 2.3.1 flash-safety report: the max number of large
 //                energy jumps per any 1s window. The runtime maps the envelope
@@ -14,7 +21,9 @@
 //                high-contrast flash exceeds 3/sec for anyone. This build-time
 //                lint is the PRIMARY guard (stronger than a runtime clamp);
 //                tracks over the limit are flagged so the runtime damps their
-//                full-field response to small-area accents only.
+//                full-field response to small-area accents only. (Kept as
+//                telemetry even though WCAG compliance is no longer a hard
+//                project requirement — harmless to leave in.)
 //
 // Output: assets/audio/techno/envelopes.json  (indexed by track name at runtime
 // against audio.currentTime; ships with the techno build).
@@ -40,14 +49,28 @@ const FLASH_LIMIT_PER_SEC = 3;
 
 const audioDir = path.join(__dirname, 'assets', 'audio', 'techno');
 
-function decodePCM(file) {
-  // mono float32 little-endian to stdout
-  const r = spawnSync('ffmpeg', ['-v', 'error', '-i', file, '-ac', '1', '-ar', String(SR), '-f', 'f32le', '-'],
-    { maxBuffer: 1 << 30 });
-  if (r.status !== 0) throw new Error(`ffmpeg failed for ${file}: ${r.stderr}`);
+function decodePCM(file, audioFilter) {
+  // mono float32 little-endian to stdout; an optional -af filter chain (e.g. a
+  // band-pass) lets the same decode+RMS pipeline serve the per-band envelopes.
+  const args = ['-v', 'error', '-i', file];
+  if (audioFilter) args.push('-af', audioFilter);
+  args.push('-ac', '1', '-ar', String(SR), '-f', 'f32le', '-');
+  const r = spawnSync('ffmpeg', args, { maxBuffer: 1 << 30 });
+  if (r.status !== 0) throw new Error(`ffmpeg failed for ${file} (filter=${audioFilter || 'none'}): ${r.stderr}`);
   const buf = r.stdout;
   return new Float32Array(buf.buffer, buf.byteOffset, Math.floor(buf.byteLength / 4));
 }
+
+// Instrument-band split: three ffmpeg-filtered decodes of the SAME file, each
+// run through the identical rmsEnvelope()/normalize() pipeline as the
+// broadband envelope. Frame counts may differ by a frame or two from filter
+// group delay — the runtime samples each band's array independently by its
+// own length, so no forced alignment/truncation is needed here.
+const BANDS = {
+  Low: 'lowpass=f=150',                  // kick/bass
+  Mid: 'highpass=f=150,lowpass=f=2000',  // melodic instruments/vocals
+  High: 'highpass=f=2000',               // hi-hats/cymbals/percussion
+};
 
 function rmsEnvelope(pcm) {
   const frames = Math.max(1, Math.floor((pcm.length - WIN) / HOP));
@@ -118,19 +141,28 @@ function run() {
   for (const f of files) {
     const name = 'techno/' + f.replace(/\.mp3$/, '');
     process.stdout.write(`· ${f} … `);
-    const pcm = decodePCM(path.join(audioDir, f));
+    const filePath = path.join(audioDir, f);
+    const pcm = decodePCM(filePath);
     const env = normalize(rmsEnvelope(pcm));
     const onsets = detectOnsets(env);
     const flash = flashReport(env);
     if (!flash.safe) anyUnsafe = true;
+
+    const bandOut = {};
+    for (const band in BANDS) {
+      const bandPcm = decodePCM(filePath, BANDS[band]);
+      bandOut[`env${band}`] = Array.from(normalize(rmsEnvelope(bandPcm)), (v) => +v.toFixed(3));
+    }
+
     out.tracks[name] = {
       duration: +(pcm.length / SR).toFixed(2),
       env: Array.from(env, (v) => +v.toFixed(3)),
+      ...bandOut,
       onsets,
       flashMaxPerSec: flash.maxPerSec,
       flashSafe: flash.safe, // false → runtime damps full-field response to small-area accents
     };
-    console.log(`${(pcm.length / SR).toFixed(0)}s, ${onsets.length} onsets, flash ${flash.maxPerSec}/s ${flash.safe ? 'OK' : '⚠ DAMPED'}`);
+    console.log(`${(pcm.length / SR).toFixed(0)}s, ${onsets.length} onsets, flash ${flash.maxPerSec}/s ${flash.safe ? 'OK' : '⚠ DAMPED'}, bands ✓`);
   }
 
   const outFile = path.join(audioDir, 'envelopes.json');

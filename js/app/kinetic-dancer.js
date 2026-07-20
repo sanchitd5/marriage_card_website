@@ -411,6 +411,27 @@ export function initKineticDancer() {
     }
     return found ? Math.max(0, Math.min(1, peak)) : 0.6;
   }
+
+  // Instrument-band mix at time `tSec`: which register (bass/kick, mid melodic/
+  // vocal, hi-hat/cymbal/percussion) dominates RIGHT NOW, from the offline
+  // envLow/envMid/envHigh (gen-envelopes.mjs ffmpeg band-pass decodes, same
+  // fps-aligned technique as `env`). Returned normalized (sums to ~1) so it's a
+  // MIX, not an absolute-loudness triple — move selection weights against the
+  // mix, not against how loud the track is overall (that's already `energy`).
+  function bandMix(trackName, tSec) {
+    const tr = ENV && ENV.tracks && ENV.tracks[trackName];
+    if (!tr || !tr.envLow || !tr.envMid || !tr.envHigh) return { low: 0.33, mid: 0.34, high: 0.33 };
+    const fps = (ENV.fps && ENV.fps > 0) ? ENV.fps : 25;
+    const sampleAt = (arr) => {
+      const i = Math.round(tSec * fps);
+      return (i >= 0 && i < arr.length && Number.isFinite(arr[i])) ? arr[i] : 0;
+    };
+    const low = sampleAt(tr.envLow), mid = sampleAt(tr.envMid), high = sampleAt(tr.envHigh);
+    const sum = low + mid + high;
+    if (sum < 1e-4) return { low: 0.33, mid: 0.34, high: 0.33 };
+    return { low: low / sum, mid: mid / sum, high: high / sum };
+  }
+
   fetch('assets/audio/techno/envelopes.json').then(r => r.ok ? r.json() : null).then(j => {
     if (!j || !j.tracks) return;
     ENV = j;
@@ -754,23 +775,29 @@ export function initKineticDancer() {
   // of the body stays quiet and grounded rather than travelling.
   function groundedIsolation(c) {
     const { b, tgt, set, A, elapsedBeats } = c;
-    const q = (elapsedBeats / 2) * Math.PI * 2;
+    // Curation pass: the arms originally held a FIXED pose regardless of the
+    // torso isolation, so from a front-on camera this barely read as distinct
+    // from grooveSway/tribalStomp — the isolation is a Z-axis torso twist,
+    // which is nearly invisible face-on unless something else visibly tracks
+    // it. Arms now counter-sway with `iso` (a small circular hand-trace) and
+    // the cycle runs faster, so the isolation actually shows.
+    const q = (elapsedBeats / 1.6) * Math.PI * 2;
     const iso = Math.sin(q), iso2 = Math.sin(q * 2) * 0.5;
 
-    set(b.pelvis.position, 'x', -iso * 0.10 * A); set(b.pelvis.position, 'y', 0.06 + Math.abs(iso2) * 0.03 * A);
-    tgt(b.pelvis.rotation, 'z', -iso * 0.14 * A); tgt(b.pelvis.rotation, 'y', iso2 * 0.10 * A);
-    tgt(b.spine.rotation, 'x', 0.10); tgt(b.spine.rotation, 'z', iso * 0.10 * A);
-    tgt(b.chest.rotation, 'z', iso * 0.22 * A); tgt(b.chest.rotation, 'y', -iso2 * 0.16 * A);
+    set(b.pelvis.position, 'x', -iso * 0.13 * A); set(b.pelvis.position, 'y', 0.06 + Math.abs(iso2) * 0.04 * A);
+    tgt(b.pelvis.rotation, 'z', -iso * 0.18 * A); tgt(b.pelvis.rotation, 'y', iso2 * 0.14 * A);
+    tgt(b.spine.rotation, 'x', 0.10); tgt(b.spine.rotation, 'z', iso * 0.14 * A);
+    tgt(b.chest.rotation, 'z', iso * 0.30 * A); tgt(b.chest.rotation, 'y', -iso2 * 0.22 * A);
 
-    tgt(b.upperArmL.rotation, 'z', 0.14); tgt(b.upperArmL.rotation, 'x', REST_ARM_X + 0.05);
-    tgt(b.upperArmR.rotation, 'z', -0.14); tgt(b.upperArmR.rotation, 'x', REST_ARM_X + 0.05);
-    tgt(b.forearmL.rotation, 'x', REST_FORE_X); tgt(b.forearmR.rotation, 'x', REST_FORE_X);
+    tgt(b.upperArmL.rotation, 'z', 0.14 + iso * 0.20 * A); tgt(b.upperArmL.rotation, 'x', REST_ARM_X + 0.05 + Math.max(0, -iso) * 0.30 * A);
+    tgt(b.upperArmR.rotation, 'z', -(0.14 + iso * 0.20 * A)); tgt(b.upperArmR.rotation, 'x', REST_ARM_X + 0.05 + Math.max(0, iso) * 0.30 * A);
+    tgt(b.forearmL.rotation, 'x', REST_FORE_X + Math.max(0, -iso) * 0.25); tgt(b.forearmR.rotation, 'x', REST_FORE_X + Math.max(0, iso) * 0.25);
 
     tgt(b.thighL.rotation, 'x', REST_LEG_X + 0.14); tgt(b.thighR.rotation, 'x', REST_LEG_X + 0.14);
     tgt(b.shinL.rotation, 'x', REST_LEG_X + 0.10); tgt(b.shinR.rotation, 'x', REST_LEG_X + 0.10);
 
-    tgt(b.neck.rotation, 'x', 0.03); tgt(b.neck.rotation, 'z', -iso * 0.05 * A); tgt(b.neck.rotation, 'y', 0);
-    tgt(b.head.rotation, 'x', -0.08); tgt(b.head.rotation, 'z', -iso * 0.06 * A); tgt(b.head.rotation, 'y', 0);
+    tgt(b.neck.rotation, 'x', 0.03); tgt(b.neck.rotation, 'z', -iso * 0.08 * A); tgt(b.neck.rotation, 'y', iso2 * 0.06 * A);
+    tgt(b.head.rotation, 'x', -0.08); tgt(b.head.rotation, 'z', -iso * 0.09 * A); tgt(b.head.rotation, 'y', iso2 * 0.08 * A);
   }
 
   // K. Crouch-prowl — a low, martial crouch stalking side to side: deep bent
@@ -831,21 +858,40 @@ export function initKineticDancer() {
     tgt(b.head.rotation, 'x', -0.08); tgt(b.head.rotation, 'z', 0); tgt(b.head.rotation, 'y', -mirror * accent * 0.16 * A);
   }
 
+  // `affinity` tags which instrument register a move's vocabulary suits —
+  // used to WEIGHT (not gate) the pick below, so the dancer leans into moves
+  // that fit what's actually playing right now: LOW (bass/kick) → grounded/
+  // percussive; HIGH (hi-hat/cymbal/perc) → sharp/snappy isolations; MID
+  // (melodic/vocal) → flowing/held gestures. Moves with no `affinity` (the
+  // original general-purpose workhorses) are untagged and get a flat baseline
+  // weight regardless of the mix, so the vocabulary never narrows to ONLY
+  // instrument-matched moves — it leans, it doesn't lock.
   const MOVE_TABLE = {
     grooveSway: { beats: 8, pool: ['idle', 'low', 'high'], run: grooveSway },
-    handsFace: { beats: 8, pool: ['idle', 'low'], run: handsFace },
+    handsFace: { beats: 8, pool: ['idle', 'low'], affinity: 'mid', run: handsFace },
     strike: { beats: 8, pool: ['high'], run: strike },
     breakdown: { beats: 16, pool: ['idle', 'low'], run: breakdown },
-    stepTouch: { beats: 4, pool: ['high'], run: stepTouch },
-    bodyWave: { beats: 4, pool: ['idle', 'low', 'high'], run: bodyWave },
-    reachOpen: { beats: 8, pool: ['low', 'high'], mirrored: true, run: reachOpen },
-    tribalStomp: { beats: 4, pool: ['idle', 'low', 'high'], run: tribalStomp },
-    invocation: { beats: 12, pool: ['idle', 'low', 'high'], run: invocation },
-    groundedIsolation: { beats: 8, pool: ['idle', 'low', 'high'], run: groundedIsolation },
-    crouchProwl: { beats: 8, pool: ['low', 'high'], run: crouchProwl },
-    polyStep: { beats: 6, pool: ['low', 'high'], mirrored: true, run: polyStep },
+    stepTouch: { beats: 4, pool: ['high'], affinity: 'low', run: stepTouch },
+    bodyWave: { beats: 4, pool: ['idle', 'low', 'high'], affinity: 'mid', run: bodyWave },
+    reachOpen: { beats: 8, pool: ['low', 'high'], mirrored: true, affinity: 'mid', run: reachOpen },
+    tribalStomp: { beats: 4, pool: ['idle', 'low', 'high'], affinity: 'low', run: tribalStomp },
+    invocation: { beats: 12, pool: ['idle', 'low', 'high'], affinity: 'mid', run: invocation },
+    groundedIsolation: { beats: 8, pool: ['idle', 'low', 'high'], affinity: 'high', run: groundedIsolation },
+    crouchProwl: { beats: 8, pool: ['low', 'high'], affinity: 'low', run: crouchProwl },
+    polyStep: { beats: 6, pool: ['low', 'high'], mirrored: true, affinity: 'high', run: polyStep },
   };
   currentMove = MOVE_TABLE.grooveSway;
+
+  // Weighted pick: `weights[i]` is the relative chance of `names[i]`. Used so
+  // instrument-affinity BIASES the pick instead of gating it (every eligible
+  // move stays reachable; the mix just tilts the odds).
+  function weightedPick(names, weights) {
+    let total = 0; for (let i = 0; i < weights.length; i++) total += weights[i];
+    if (!(total > 0)) return names[Math.floor(Math.random() * names.length)];
+    let r = Math.random() * total;
+    for (let i = 0; i < names.length; i++) { r -= weights[i]; if (r <= 0) return names[i]; }
+    return names[names.length - 1];
+  }
 
   // Re-selects the active move every 8 beats, AND immediately on a drop's
   // rising edge (so the strike accent lands right when the section changes,
@@ -854,7 +900,11 @@ export function initKineticDancer() {
   // cleanly via the shared damping). Context gates the eligible pool: idle
   // (no track locked yet) / low (playing, not in a sustained-loud section) /
   // high (`appState.lightshow.drop` — the repo's existing Schmitt-triggered,
-  // slow-eased sustained-loud-section flag).
+  // slow-eased sustained-loud-section flag). WITHIN that pool, the pick is
+  // weighted toward whichever move's `affinity` matches the instrument mix
+  // dominating the track right now (bandMix), so a bass-heavy passage favours
+  // grounded/percussive moves, a hi-hat-heavy passage favours sharp snappy
+  // ones, and a melodic/vocal passage favours the flowing/held gestures.
   function updateMoveSelection(clk) {
     const drop = !!(appState.lightshow && appState.lightshow.drop);
     const ctx = !clk.locked ? 'idle' : (drop ? 'high' : 'low');
@@ -872,7 +922,16 @@ export function initKineticDancer() {
     if (bar8 !== lastBar8) {
       lastBar8 = bar8;
       const pool = Object.keys(MOVE_TABLE).filter((n) => n !== 'strike' && MOVE_TABLE[n].pool.includes(ctx));
-      const name = pool.length ? pool[Math.floor(Math.random() * pool.length)] : 'grooveSway';
+      let name = 'grooveSway';
+      if (pool.length) {
+        const a = appState.music && appState.music.audio;
+        const mix = (clk.locked && a && a._trackName) ? bandMix(a._trackName, a.currentTime) : { low: 0.33, mid: 0.34, high: 0.33 };
+        const weights = pool.map((n) => {
+          const aff = MOVE_TABLE[n].affinity;
+          return aff ? 0.5 + mix[aff] * 3 : 1;   // untagged moves: flat baseline; tagged moves: lean toward their band
+        });
+        name = weightedPick(pool, weights);
+      }
       currentMoveName = name; currentMove = MOVE_TABLE[name];
       moveStartBeat = clk.beatPos;
       moveMirror = (currentMove.mirrored && Math.random() < 0.5) ? -1 : 1;
