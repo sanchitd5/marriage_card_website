@@ -78,10 +78,15 @@ still fully disables it (it lives inside `initLightshow()`, which returns
 before any WebGL/module state exists when `REDUCED` is true) — that
 protection was not touched or weakened.
 
-**Full-screen white flash (beat strobe).** `js/app/lightshow.js` fires a real,
-full-viewport, pure-white flash on the drop's beat onsets (a `#lightshow-flash`
-fixed overlay, z-index 90, pulsed opacity). This was requested as a strobe-drop
-moment. Because a full-field white flash is the maximum-risk photosensitive
+**Full-screen white/cyan flash (beat strobe).** `js/app/lightshow.js` fires a
+real, full-viewport flash on the drop's beat onsets (a `#lightshow-flash` fixed
+overlay, z-index 90, pulsed opacity). This was requested as a strobe-drop
+moment. **Colour is energy-tinted:** standard drops flash white, and the flash
+blends white→cyan (`#2ad9ff`, same family as the wireframe cluster's `0x8fe9ff`)
+as energy climbs above the gate — so the heaviest upbeats flash cyan and the
+strobe reads as a white/cyan mixture across a track (`flashTint()`, endpoints
+`FLASH_ENERGY_GATE`→`FLASH_HEAVY_E = 0.82`). Colour is orthogonal to the rate
+cap below; only the tint changed, never the flash rate. Because a full-field white flash is the maximum-risk photosensitive
 stimulus, its rate is **hard-capped at ≤50 flashes/sec (WCAG 3.0 internal)** — the
 requested and the only shipped behaviour. The cap is a single source of truth in
 `js/app/flash-cap.js` (`MAX_FLASHES_PER_SEC = 50`, `MIN_FLASH_INTERVAL_S`,

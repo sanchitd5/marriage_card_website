@@ -49,6 +49,21 @@ export function initLightshow() {
   const FLASH_ENERGY_GATE = 0.55;  // only strobe in high-energy/drop sections ("high BPM")
   const FLASH_PEAK = 1;            // full white at peak
 
+  // Flash TINT (not the rate — that's capped above): standard drops flash white;
+  // the HEAVIEST upbeats flash cyan, from the same family as the wireframe
+  // cluster (0x8fe9ff). The colour is blended white→cyan by how far the energy
+  // sits above the gate, so across a track the strobe reads as a WHITE/CYAN
+  // MIXTURE — going full cyan only on the biggest hits. Blue channel is 255 at
+  // both ends, so only R/G drop as it cools toward cyan.
+  const FLASH_HEAVY_E = 0.82;         // energy at/above which the flash is fully cyan
+  const FLASH_CYAN = [42, 217, 255];  // #2ad9ff — punchy cyan that still reads at opacity 1
+  function flashTint(energy) {
+    const t = Math.max(0, Math.min(1, (energy - FLASH_ENERGY_GATE) / (FLASH_HEAVY_E - FLASH_ENERGY_GATE)));
+    const r = Math.round(255 + (FLASH_CYAN[0] - 255) * t);
+    const g = Math.round(255 + (FLASH_CYAN[1] - 255) * t);
+    return `rgb(${r},${g},255)`;
+  }
+
   // The overlay: a fixed, pointer-transparent, pure-white sheet whose opacity is
   // pulsed. Created ONLY here (past the REDUCED guard) so it never exists on the
   // reduced-motion path. z-index 90 → above content + controls so the flash is
@@ -61,7 +76,7 @@ export function initLightshow() {
     pointerEvents: 'none', zIndex: '90', willChange: 'opacity',
   });
   document.body.appendChild(flashEl);
-  let flashOpacity = 0, lastFlashStart = -999, lastFlashWritten = 0;
+  let flashOpacity = 0, lastFlashStart = -999, lastFlashWritten = 0, lastFlashColor = '#ffffff';
 
   // ---- energy source: music envelope, or an autonomous idle breath ----
   function envAt(name, t) {
@@ -592,7 +607,9 @@ export function initLightshow() {
     // inside the floor is dropped, so no BPM can push the rate past the cap.
     if (burst && appState.ignited && e >= FLASH_ENERGY_GATE
         && (now - lastFlashStart) >= MIN_FLASH_INTERVAL_S) {
-      flashOpacity = FLASH_PEAK;   // full white
+      const tint = flashTint(e);   // white on normal drops, cyan on the heaviest upbeats
+      if (tint !== lastFlashColor) { flashEl.style.background = tint; lastFlashColor = tint; }
+      flashOpacity = FLASH_PEAK;   // full peak
       lastFlashStart = now;        // opens the rate-cap window
     }
     flashOpacity = Math.max(0, flashOpacity - FLASH_DECAY_PER_S * dt); // visual fade only

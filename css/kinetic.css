@@ -373,6 +373,27 @@ html[data-variant="kinetic"] .gate-hint .k-click { display: none; }
 #k-dancer-canvas.is-live { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { #k-dancer-canvas { display: none; } }
 
+/* ── AMBIENT armadrillo crowd (#k-ambient-dancers) ──
+   Full-viewport canvas: lone armadrillo dancers fade in at random spots across
+   the whole window, groove, and fade out (js/app/kinetic-dancer.js). Its own
+   renderer/scene/camera so it never disturbs the duet's narrow strip above.
+   Sits in the SAME z-band as the duet (above backdrop, below panels) and comes
+   FIRST in the DOM so the duet paints over it. Tablet + desktop only: hidden
+   below 768px and under reduced-motion (JS also never inits the crowd there),
+   so phones stay a clean duet-only page. */
+#k-ambient-dancers {
+  position: fixed;
+  inset: 0;
+  width: 100vw; height: 100svh;
+  z-index: 1;               /* same band as #k-dancer-canvas: above backdrop, below panels */
+  pointer-events: none;     /* page interaction must still work through it */
+  opacity: 0;
+  transition: opacity 1.4s var(--k-ease);
+}
+#k-ambient-dancers.is-live { opacity: .5; }
+@media (prefers-reduced-motion: reduce) { #k-ambient-dancers { display: none; } }
+@media (max-width: 767.98px) { #k-ambient-dancers { display: none; } }
+
 /* ═══════════════════════════════════════════════════════════════════
    CONTROL PANEL / SETUP-WIZARD (html.k-deck — added by kinetic.js in the
    full-motion path only; reduced-motion / no-JS keep a normal scrolling

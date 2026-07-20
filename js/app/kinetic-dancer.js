@@ -214,6 +214,41 @@ export function initKineticDancer() {
   let renderer, scene, camera;
   let running = true, raf = 0, live = false, dead = false;
 
+  // ── AMBIENT armadrillo crowd (tablet + desktop only) ─────────────────────
+  // A time-based (NOT tap-driven) effect: at random intervals lone armadrillo
+  // dancers fade in at random spots across the WHOLE viewport, groove to the
+  // same music clock as the duet, then fade out. Deliberately on its OWN
+  // full-viewport canvas / renderer / scene / camera (#k-ambient-dancers) so
+  // the duet's narrow-strip canvas (#k-dancer-canvas) and ALL its delicately
+  // tuned per-panel CSS (transform/opacity/mix-blend) + frameModel/updateDuetSlot
+  // aspect framing stay byte-identical — zero regression to the 2-dancer duet,
+  // which is the hard constraint here. Spawns REUSE the duet's dance() engine,
+  // MOVE_TABLE, retarget adapters and the shared music clock, so they read as
+  // the same performers; each gets its OWN rigState (move pick, phase, lean,
+  // amp) so they never move in lockstep. Instances are POOLED (skinned-mesh
+  // cloning is expensive) via THREE.SkeletonUtils.clone of the loaded
+  // armadrillo — spawn = reactivate a pooled clone at a new position; despawn =
+  // hide + return to pool (never per-spawn dispose). Only the armadrillo is
+  // ever spawned (never the fairy-punk).
+  const ambientCanvas = $('#k-ambient-dancers');
+  let ambientRenderer = null, ambientScene = null, ambientCamera = null;
+  let ambientInited = false, ambientEnabled = false, ambientLive = false, ambientNeedsClear = false;
+  let ambientSpawnTimer = 0, spawnSeq = 0;
+  const ambientPool = [];              // all built pooled instances (active or not)
+  const ambientDisposables = [];       // per-instance cloned materials (disposed on teardown)
+  const AMBIENT_MIN_WIDTH = 768;       // tablet + desktop only; phones skip entirely
+  // Crowd size floor/ceiling. At least AMBIENT_MIN armadrillos are always in the
+  // scene once enabled; the count climbs toward AMBIENT_MAX as a section builds
+  // into a high upbeat (see updateAmbient's energy-driven target). MAX is tiered
+  // by rough device capability (hardwareConcurrency/deviceMemory) so 20 skinned
+  // clones can't stall a weak tablet — the MIN floor of 5 holds on every device.
+  const _cores = navigator.hardwareConcurrency || 4;
+  const _mem = navigator.deviceMemory || 4;
+  const AMBIENT_MIN = 5;
+  const AMBIENT_MAX = (_cores >= 8 && _mem >= 8) ? 20 : (_cores <= 4 || _mem <= 4) ? 12 : 16;
+  const AMBIENT_SCALE_BASE = 0.34;     // fraction of the armadrillo's duet fit scale → scattered-crowd size
+  const _ndc = new THREE.Vector3();    // scratch for screen→world unprojection (spawn-time only)
+
   // ── shared music-driven state (both rigs read the same beat/energy) ──
   // Idle-energy baseline lifted to ~0.28 so the groove amplitude reads even
   // without music (both figures still visibly dance when silent).
@@ -415,7 +450,7 @@ export function initKineticDancer() {
     renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'high-performance' });
     // A lost GL context (iOS backgrounding etc.) must not freeze a dead frame:
     // stop cleanly and leave the canvas transparent.
-    canvas.addEventListener('webglcontextlost', (ev) => { ev.preventDefault(); stop(); dead = true; }, false);
+    canvas.addEventListener('webglcontextlost', (ev) => { ev.preventDefault(); stop(); dead = true; try { disposeAmbient(); } catch (_) {} }, false);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));   // DPR capped
 
     scene = new THREE.Scene();
@@ -452,6 +487,14 @@ export function initKineticDancer() {
 
       loader.load(rigState.cfg.url, (gltf) => onModelLoaded(rigState, gltf), undefined, () => { /* load error → that rig stays empty, fail safe */ });
     }
+
+    // Ambient crowd: create its own full-viewport renderer lazily on the first
+    // frame the viewport is wide enough (tablet/desktop). Re-evaluate the gate
+    // on window resize (a narrow window despawns everything + stops spawning;
+    // a wide one resumes). Its RAF is the duet's frame() — no second loop — so
+    // the scheduler pauses for free whenever the tab hides (frame() stops).
+    evalAmbientGate();
+    window.addEventListener('resize', () => { sizeAmbient(); evalAmbientGate(); }, { passive: true });
   }
 
   // ── on model load: wire the rig, retarget the dance ──────────────────────
@@ -881,8 +924,11 @@ export function initKineticDancer() {
   }
 
   // ── move library ─────────────────────────────────────────────────────
-  // Twelve move phrases (the original seven A-G plus five more H-L, including
-  // a tribal-house/tribal-fusion-grounded vein) — every move is a pure
+  // Twenty-five move phrases: five surviving high-energy originals (grooveSway
+  // the workhorse, strike the drop accent, stepTouch, tribalStomp, polyStep —
+  // the calm/flowing wedding-vein moves were removed) plus twenty techno floor
+  // moves M-AF (stomps/shuffles/hardstyle/rave, see the applyPose section
+  // below). Every move is a pure
   // function of a shared context — `b` (proxy joints), the damping helpers,
   // amplitude `A`/beat accent `hit`, the grooveSway oscillator `p`/`s`, this
   // move's own `elapsedBeats` (beats since it was selected, tempo-scaled),
@@ -968,51 +1014,6 @@ export function initKineticDancer() {
     tgt(b.head.rotation, 'y', look * 0.22 * A);
   }
 
-  // B. Hands-to-face hold — draw up over 3 beats, HOLD near the face for 3
-  // (only a soft breath moving), release over 2. Stillness itself is
-  // choreography (Anyma Syren's held, contemplative poses).
-  function handsFace(c) {
-    const { b, tgt, set, A, elapsedBeats } = c;
-    const eb = elapsedBeats % 8;
-    const draw = (e) => e < 3 ? smoothstep(e / 3) : e < 6 ? 1 : 1 - smoothstep(Math.min(1, (e - 6) / 2));
-    const drawAmt = draw(eb);
-    // Clavicle LEADS the arm (scapulohumeral rhythm): the girdle initiates a
-    // few frames ahead and carries ~a third of the raise. It stays near-zero
-    // for the first slice of the raise (the first ~30° of elevation is almost
-    // pure glenohumeral) then ramps in — hence the max(0, lead-0.15).
-    const lead = draw(eb + 0.3);                       // ~0.3-beat anticipation
-    const shrug = Math.max(0, lead - 0.15) * 0.30 * A; // ≤~0.26rad girdle elevation
-    const breathe = Math.sin(eb * 1.3) * 0.03;
-
-    set(b.pelvis.position, 'x', 0);
-    set(b.pelvis.position, 'y', 0.11 + breathe * A);
-    tgt(b.pelvis.rotation, 'z', 0); tgt(b.pelvis.rotation, 'y', 0);
-    tgt(b.spine.rotation, 'x', 0.08 + drawAmt * 0.12 * A); tgt(b.spine.rotation, 'z', 0);
-    tgt(b.spine2.rotation, 'x', REST_SPINE2_X + drawAmt * 0.06 * A); tgt(b.spine2.rotation, 'z', 0); tgt(b.spine2.rotation, 'y', 0);
-    tgt(b.chest.rotation, 'z', 0); tgt(b.chest.rotation, 'y', drawAmt * 0.08 * A);
-    tgt(b.upperChest.rotation, 'x', REST_UCHEST_X); tgt(b.upperChest.rotation, 'z', 0); tgt(b.upperChest.rotation, 'y', 0);
-
-    tgt(b.shoulderL.rotation, 'z', shrug); tgt(b.shoulderL.rotation, 'x', 0); tgt(b.shoulderL.rotation, 'y', 0);
-    tgt(b.shoulderR.rotation, 'z', -shrug); tgt(b.shoulderR.rotation, 'x', 0); tgt(b.shoulderR.rotation, 'y', 0);
-    tgt(b.upperArmL.rotation, 'z', 0.10 + drawAmt * 0.30 * A);
-    tgt(b.upperArmL.rotation, 'x', 0.25 + drawAmt * 1.35 * A);
-    tgt(b.forearmL.rotation, 'x', -0.6 - drawAmt * 1.6 * A);
-    tgt(b.upperArmR.rotation, 'z', -(0.10 + drawAmt * 0.30 * A));
-    tgt(b.upperArmR.rotation, 'x', 0.25 + drawAmt * 1.35 * A);
-    tgt(b.forearmR.rotation, 'x', -0.6 - drawAmt * 1.6 * A);
-    // wrists break slightly toward the face; fingers CURL into a soft cradle as
-    // the hands settle (peaks on the hold, relaxes on the release).
-    tgt(b.handL.rotation, 'x', drawAmt * 0.25 * A); tgt(b.handL.rotation, 'z', 0);
-    tgt(b.handR.rotation, 'x', drawAmt * 0.25 * A); tgt(b.handR.rotation, 'z', 0);
-    tgt(b.fingersL.rotation, 'x', drawAmt * 0.55 * A); tgt(b.fingersR.rotation, 'x', drawAmt * 0.55 * A);
-
-    tgt(b.thighL.rotation, 'x', REST_LEG_X); tgt(b.thighR.rotation, 'x', REST_LEG_X);
-    tgt(b.shinL.rotation, 'x', REST_LEG_X); tgt(b.shinR.rotation, 'x', REST_LEG_X);
-
-    tgt(b.neck.rotation, 'x', 0.03 + drawAmt * 0.28 * A); tgt(b.neck.rotation, 'z', 0); tgt(b.neck.rotation, 'y', 0);
-    tgt(b.head.rotation, 'x', -0.12 + drawAmt * 0.66 * A); tgt(b.head.rotation, 'z', 0); tgt(b.head.rotation, 'y', 0);
-  }
-
   // C. Barrier strike — the Anyma signature accent. Triggered on the RISING
   // edge of a sustained-loud ("drop") section: 2-beat wind-up (coil back),
   // then an eased 6-beat recoil out of the strike. Motion-only (no opacity).
@@ -1047,35 +1048,6 @@ export function initKineticDancer() {
     tgt(b.shinL.rotation, 'x', REST_LEG_X); tgt(b.shinR.rotation, 'x', REST_LEG_X);
   }
 
-  // D. Slow groove — the CALMEST move but still energetic (brief: every move
-  // energetic): a rolling 4-beat weight shift with pelvis sway, pendulum arm
-  // swing that lags the torso (overlapping action), knee weight-transfer and a
-  // head that follows the sway. Replaces the old 16-beat near-freeze — it's now
-  // the flowing/low-intensity end of the vocabulary, not a stop.
-  function breakdown(c) {
-    const { b, tgt, set, A, elapsedBeats } = c;
-    const w = Math.sin((elapsedBeats / 2) * Math.PI);            // full L→R→L per 4 beats
-    const wLag = Math.sin(((elapsedBeats - 0.4) / 2) * Math.PI); // arms lag the torso ~0.4 beat
-    const breathe = Math.sin(elapsedBeats * 0.8) * 0.03 * A;
-    const reach = 0.5 - 0.5 * Math.cos(elapsedBeats * Math.PI);
-
-    set(b.pelvis.position, 'x', w * 0.15 * A);
-    set(b.pelvis.position, 'y', 0.11 + Math.abs(w) * 0.05 * A + breathe);
-    tgt(b.pelvis.rotation, 'z', w * 0.14 * A); tgt(b.pelvis.rotation, 'y', w * 0.14 * A);
-    tgt(b.spine.rotation, 'x', 0.08); tgt(b.spine.rotation, 'z', -w * 0.12 * A);
-    tgt(b.chest.rotation, 'z', wLag * 0.12 * A); tgt(b.chest.rotation, 'y', -w * 0.10 * A);
-
-    tgt(b.upperArmL.rotation, 'z', 0.12 + Math.max(0, wLag) * 0.20 * A); tgt(b.upperArmL.rotation, 'x', REST_ARM_X + Math.max(0, wLag) * 0.35 * A);
-    tgt(b.upperArmR.rotation, 'z', -(0.12 + Math.max(0, -wLag) * 0.20 * A)); tgt(b.upperArmR.rotation, 'x', REST_ARM_X + Math.max(0, -wLag) * 0.35 * A);
-    tgt(b.forearmL.rotation, 'x', REST_FORE_X - Math.max(0, wLag) * 0.30); tgt(b.forearmR.rotation, 'x', REST_FORE_X - Math.max(0, -wLag) * 0.30);
-
-    tgt(b.thighL.rotation, 'x', REST_LEG_X + Math.max(0, w) * 0.18 * A); tgt(b.thighR.rotation, 'x', REST_LEG_X + Math.max(0, -w) * 0.18 * A);
-    tgt(b.shinL.rotation, 'x', REST_LEG_X + Math.max(0, w) * 0.22 * A); tgt(b.shinR.rotation, 'x', REST_LEG_X + Math.max(0, -w) * 0.22 * A);
-
-    tgt(b.neck.rotation, 'x', 0.03 + reach * 0.10 * A); tgt(b.neck.rotation, 'z', w * 0.06 * A); tgt(b.neck.rotation, 'y', w * 0.10 * A);
-    tgt(b.head.rotation, 'x', -0.10); tgt(b.head.rotation, 'z', w * 0.10 * A); tgt(b.head.rotation, 'y', w * 0.14 * A);
-  }
-
   // E. Step-touch — a 4-beat weight-shifting step with elbow pumps ON the
   // beat. High-energy pool only; the one move where the accent reads in the
   // arms as much as the knees.
@@ -1102,88 +1074,6 @@ export function initKineticDancer() {
 
     tgt(b.neck.rotation, 'x', 0.03); tgt(b.neck.rotation, 'z', dir * 0.05); tgt(b.neck.rotation, 'y', 0);
     tgt(b.head.rotation, 'x', -0.08); tgt(b.head.rotation, 'z', dir * 0.06); tgt(b.head.rotation, 'y', 0);
-  }
-
-  // F. Body wave — a traveling wave that now runs the FULL subdivided torso
-  // pelvis→spine→spine2→chest→upperChest→neck→head, each link phase-delayed
-  // (overlapping action). Per the rigging research the bend is NOT uniform: it
-  // concentrates at the two real hinges (lumbar base = spine, and the neck),
-  // with the rib-cage bones (chest/upperChest) staying comparatively stiff — a
-  // flat per-segment split reads robotic. Segment amplitudes below follow that
-  // ~30/20/10/10/20/10 distribution; the ~0.34-beat lag per link (≈π/9 phase)
-  // is the travelling-wave delay. On the 13-bone Armadrillo, spine2/upperChest
-  // are free no-ops and the wave collapses to the original spine→chest→neck→head.
-  function bodyWave(c) {
-    const { b, tgt, set, A, elapsedBeats } = c;
-    const w = (delay) => Math.sin(((elapsedBeats - delay) / 4) * Math.PI * 2);
-    const wP = w(0), wS = w(0.34), wS2 = w(0.68), wC = w(1.02), wU = w(1.36), wN = w(1.70), wH = w(2.04);
-
-    set(b.pelvis.position, 'x', 0); set(b.pelvis.position, 'y', 0.12 + Math.abs(wP) * 0.05 * A);
-    tgt(b.pelvis.rotation, 'z', wP * 0.10 * A); tgt(b.pelvis.rotation, 'y', 0);
-    tgt(b.spine.rotation, 'x', 0.08); tgt(b.spine.rotation, 'z', wS * 0.15 * A);          // lumbar hinge — biggest share
-    tgt(b.spine2.rotation, 'x', REST_SPINE2_X); tgt(b.spine2.rotation, 'z', wS2 * 0.11 * A); tgt(b.spine2.rotation, 'y', 0);
-    tgt(b.chest.rotation, 'z', wC * 0.06 * A); tgt(b.chest.rotation, 'y', 0);              // rib cage — stiff
-    tgt(b.upperChest.rotation, 'x', REST_UCHEST_X); tgt(b.upperChest.rotation, 'z', wU * 0.06 * A); tgt(b.upperChest.rotation, 'y', 0);
-
-    // shoulders/arms ride the wave loosely; wrists + fingers relax
-    tgt(b.shoulderL.rotation, 'z', wU * 0.06 * A); tgt(b.shoulderL.rotation, 'x', 0); tgt(b.shoulderL.rotation, 'y', 0);
-    tgt(b.shoulderR.rotation, 'z', wU * 0.06 * A); tgt(b.shoulderR.rotation, 'x', 0); tgt(b.shoulderR.rotation, 'y', 0);
-    tgt(b.upperArmL.rotation, 'z', 0.10 + wC * 0.15 * A); tgt(b.upperArmL.rotation, 'x', REST_ARM_X + Math.max(0, wS) * 0.3 * A);
-    tgt(b.upperArmR.rotation, 'z', -(0.10 + wC * 0.15 * A)); tgt(b.upperArmR.rotation, 'x', REST_ARM_X + Math.max(0, -wS) * 0.3 * A);
-    tgt(b.forearmL.rotation, 'x', REST_FORE_X); tgt(b.forearmR.rotation, 'x', REST_FORE_X);
-    tgt(b.handL.rotation, 'z', wN * 0.14 * A); tgt(b.handL.rotation, 'x', 0); tgt(b.handR.rotation, 'z', wN * 0.14 * A); tgt(b.handR.rotation, 'x', 0);
-    tgt(b.fingersL.rotation, 'x', 0); tgt(b.fingersR.rotation, 'x', 0);
-
-    tgt(b.thighL.rotation, 'x', REST_LEG_X); tgt(b.thighR.rotation, 'x', REST_LEG_X);
-    tgt(b.shinL.rotation, 'x', REST_LEG_X); tgt(b.shinR.rotation, 'x', REST_LEG_X);
-
-    tgt(b.neck.rotation, 'x', 0.03); tgt(b.neck.rotation, 'z', wN * 0.12 * A); tgt(b.neck.rotation, 'y', 0);   // second hinge
-    tgt(b.head.rotation, 'x', -0.10); tgt(b.head.rotation, 'z', wH * 0.08 * A); tgt(b.head.rotation, 'y', 0);  // tip follow-through
-  }
-
-  // G. Reach and open — one-armed reach, mirrored L/R at selection time
-  // (doubles perceived variety for free). The featured arm opens/extends
-  // rather than bending to the face, so it reads distinct from handsFace.
-  function reachOpen(c) {
-    const { b, tgt, set, A, elapsedBeats, mirror } = c;
-    const eb = elapsedBeats % 8;
-    const env = (e) => e < 4 ? smoothstep(e / 4) : 1 - smoothstep(Math.min(1, (e - 4) / 4));
-    const amt = env(eb);
-    const lead = env(eb + 0.35);                         // featured clavicle anticipates the reach
-    const shrug = Math.max(0, lead - 0.15) * 0.34 * A;
-    const L = mirror > 0, featUp = L ? b.upperArmR : b.upperArmL, featFore = L ? b.forearmR : b.forearmL;
-    const restUp = L ? b.upperArmL : b.upperArmR, restFore = L ? b.forearmL : b.forearmR;
-    const featSh = L ? b.shoulderR : b.shoulderL, restSh = L ? b.shoulderL : b.shoulderR;
-    const featHand = L ? b.handR : b.handL, restHand = L ? b.handL : b.handR;
-    const featFing = L ? b.fingersR : b.fingersL, restFing = L ? b.fingersL : b.fingersR;
-    // featured side is +z for R (mirror>0), -z for L → the clavicle protracts on
-    // the SAME sign so it leads the arm out into the reach.
-    const shSign = L ? -1 : 1;
-
-    set(b.pelvis.position, 'x', 0); set(b.pelvis.position, 'y', 0.11 + amt * 0.03 * A);
-    tgt(b.pelvis.rotation, 'z', 0); tgt(b.pelvis.rotation, 'y', mirror * amt * 0.12 * A);
-    tgt(b.spine.rotation, 'x', 0.08); tgt(b.spine.rotation, 'z', 0);
-    tgt(b.spine2.rotation, 'x', REST_SPINE2_X); tgt(b.spine2.rotation, 'z', 0); tgt(b.spine2.rotation, 'y', mirror * amt * 0.08 * A);
-    tgt(b.chest.rotation, 'z', 0); tgt(b.chest.rotation, 'y', mirror * amt * 0.22 * A);
-    tgt(b.upperChest.rotation, 'x', REST_UCHEST_X); tgt(b.upperChest.rotation, 'z', 0); tgt(b.upperChest.rotation, 'y', mirror * amt * 0.10 * A);
-
-    tgt(featSh.rotation, 'z', shSign * shrug); tgt(featSh.rotation, 'x', 0); tgt(featSh.rotation, 'y', 0);
-    tgt(restSh.rotation, 'z', 0); tgt(restSh.rotation, 'x', 0); tgt(restSh.rotation, 'y', 0);
-    tgt(featUp.rotation, 'x', 0.25 + amt * 1.4 * A); tgt(featUp.rotation, 'z', mirror * (0.12 + amt * 0.55 * A));
-    tgt(featFore.rotation, 'x', REST_FORE_X - 0.2 * amt);
-    tgt(restUp.rotation, 'x', REST_ARM_X); tgt(restUp.rotation, 'z', 0.10 * -mirror);
-    tgt(restFore.rotation, 'x', REST_FORE_X);
-    // the reaching hand OPENS as it extends (fingers relax toward flat, wrist
-    // leads back); the resting hand stays neutral.
-    tgt(featHand.rotation, 'x', -amt * 0.28 * A); tgt(featHand.rotation, 'z', 0);
-    tgt(featFing.rotation, 'x', -amt * 0.35 * A);
-    tgt(restHand.rotation, 'x', 0); tgt(restHand.rotation, 'z', 0); tgt(restFing.rotation, 'x', 0);
-
-    tgt(b.thighL.rotation, 'x', REST_LEG_X); tgt(b.thighR.rotation, 'x', REST_LEG_X);
-    tgt(b.shinL.rotation, 'x', REST_LEG_X); tgt(b.shinR.rotation, 'x', REST_LEG_X);
-
-    tgt(b.neck.rotation, 'x', 0.03); tgt(b.neck.rotation, 'z', 0); tgt(b.neck.rotation, 'y', -mirror * amt * 0.14 * A);
-    tgt(b.head.rotation, 'x', -0.14 - amt * 0.10 * A); tgt(b.head.rotation, 'z', 0); tgt(b.head.rotation, 'y', -mirror * amt * 0.20 * A);
   }
 
   // H. Tribal stomp — grounded percussive stomping, alternating legs. A sharp
@@ -1219,96 +1109,6 @@ export function initKineticDancer() {
     tgt(b.head.rotation, 'x', -0.06 - impact * 0.08 * A); tgt(b.head.rotation, 'z', 0); tgt(b.head.rotation, 'y', 0);
   }
 
-  // I. Invocation — a ceremonial arms-raised offering: both arms rise wide
-  // together and HOLD (symmetric, not a hands-to-face gesture), chest opens,
-  // head tilts back. Reads at quiet contemplative moments as a ritual pose,
-  // and doubles as the "arms in the air" gesture at a peak.
-  function invocation(c) {
-    const { b, tgt, set, A, elapsedBeats } = c;
-    const eb = elapsedBeats % 12;
-    const env = (e) => e < 4 ? smoothstep(e / 4) : e < 8 ? 1 : 1 - smoothstep(Math.min(1, (e - 8) / 4));
-    const amt = env(eb);
-    const lead = env(eb + 0.4);                          // girdle anticipates the raise
-    const shrug = Math.max(0, lead - 0.15) * 0.32 * A;   // both clavicles elevate as the arms rise
-    const breathe = Math.sin(eb * 1.1) * 0.025;
-
-    set(b.pelvis.position, 'x', 0); set(b.pelvis.position, 'y', 0.12 + amt * 0.04 * A + breathe);
-    tgt(b.pelvis.rotation, 'z', 0); tgt(b.pelvis.rotation, 'y', 0);
-    tgt(b.spine.rotation, 'x', 0.08 - amt * 0.10 * A); tgt(b.spine.rotation, 'z', 0);
-    tgt(b.spine2.rotation, 'x', REST_SPINE2_X - amt * 0.06 * A); tgt(b.spine2.rotation, 'z', 0); tgt(b.spine2.rotation, 'y', 0);
-    tgt(b.chest.rotation, 'z', 0); tgt(b.chest.rotation, 'y', 0);
-    tgt(b.upperChest.rotation, 'x', REST_UCHEST_X - amt * 0.05 * A); tgt(b.upperChest.rotation, 'z', 0); tgt(b.upperChest.rotation, 'y', 0);   // chest opens skyward
-
-    tgt(b.shoulderL.rotation, 'z', shrug); tgt(b.shoulderL.rotation, 'x', 0); tgt(b.shoulderL.rotation, 'y', 0);
-    tgt(b.shoulderR.rotation, 'z', -shrug); tgt(b.shoulderR.rotation, 'x', 0); tgt(b.shoulderR.rotation, 'y', 0);
-    tgt(b.upperArmL.rotation, 'z', 0.14 + amt * 0.9 * A); tgt(b.upperArmL.rotation, 'x', 0.25 + amt * 1.5 * A);
-    tgt(b.upperArmR.rotation, 'z', -(0.14 + amt * 0.9 * A)); tgt(b.upperArmR.rotation, 'x', 0.25 + amt * 1.5 * A);
-    tgt(b.forearmL.rotation, 'x', REST_FORE_X - amt * 0.05); tgt(b.forearmR.rotation, 'x', REST_FORE_X - amt * 0.05);
-    // open, upturned palms at the ceremonial peak: wrists extend back, fingers
-    // spread OPEN (negative curl relaxes past the resting fingerRest toward flat).
-    tgt(b.handL.rotation, 'x', -amt * 0.30 * A); tgt(b.handL.rotation, 'z', 0);
-    tgt(b.handR.rotation, 'x', -amt * 0.30 * A); tgt(b.handR.rotation, 'z', 0);
-    tgt(b.fingersL.rotation, 'x', -amt * 0.35 * A); tgt(b.fingersR.rotation, 'x', -amt * 0.35 * A);
-
-    tgt(b.thighL.rotation, 'x', REST_LEG_X); tgt(b.thighR.rotation, 'x', REST_LEG_X);
-    tgt(b.shinL.rotation, 'x', REST_LEG_X); tgt(b.shinR.rotation, 'x', REST_LEG_X);
-
-    tgt(b.neck.rotation, 'x', 0.02 - amt * 0.10 * A); tgt(b.neck.rotation, 'z', 0); tgt(b.neck.rotation, 'y', 0);
-    tgt(b.head.rotation, 'x', -0.12 - amt * 0.22 * A); tgt(b.head.rotation, 'z', 0); tgt(b.head.rotation, 'y', 0);
-  }
-
-  // J. Grounded isolation — a taxeem/maya-style torso figure-eight (chest and
-  // hips counter-rotating in a serpentine wave) over a low, bent-knee stance.
-  // Per tribal-fusion vocabulary the isolation reads in the torso; the arms
-  // counter-sway with it (curation fix — a fixed arm pose read as barely
-  // distinct from grooveSway/tribalStomp from the front camera).
-  function groundedIsolation(c) {
-    const { b, tgt, set, A, elapsedBeats } = c;
-    const q = (elapsedBeats / 1.6) * Math.PI * 2;
-    const iso = Math.sin(q), iso2 = Math.sin(q * 2) * 0.5;
-
-    set(b.pelvis.position, 'x', -iso * 0.13 * A); set(b.pelvis.position, 'y', 0.06 + Math.abs(iso2) * 0.04 * A);
-    tgt(b.pelvis.rotation, 'z', -iso * 0.18 * A); tgt(b.pelvis.rotation, 'y', iso2 * 0.14 * A);
-    tgt(b.spine.rotation, 'x', 0.10); tgt(b.spine.rotation, 'z', iso * 0.14 * A);
-    tgt(b.chest.rotation, 'z', iso * 0.30 * A); tgt(b.chest.rotation, 'y', -iso2 * 0.22 * A);
-
-    tgt(b.upperArmL.rotation, 'z', 0.14 + iso * 0.20 * A); tgt(b.upperArmL.rotation, 'x', REST_ARM_X + 0.05 + Math.max(0, -iso) * 0.30 * A);
-    tgt(b.upperArmR.rotation, 'z', -(0.14 + iso * 0.20 * A)); tgt(b.upperArmR.rotation, 'x', REST_ARM_X + 0.05 + Math.max(0, iso) * 0.30 * A);
-    tgt(b.forearmL.rotation, 'x', REST_FORE_X + Math.max(0, -iso) * 0.25); tgt(b.forearmR.rotation, 'x', REST_FORE_X + Math.max(0, iso) * 0.25);
-
-    tgt(b.thighL.rotation, 'x', REST_LEG_X + 0.14); tgt(b.thighR.rotation, 'x', REST_LEG_X + 0.14);
-    tgt(b.shinL.rotation, 'x', REST_LEG_X + 0.10); tgt(b.shinR.rotation, 'x', REST_LEG_X + 0.10);
-
-    tgt(b.neck.rotation, 'x', 0.03); tgt(b.neck.rotation, 'z', -iso * 0.08 * A); tgt(b.neck.rotation, 'y', iso2 * 0.06 * A);
-    tgt(b.head.rotation, 'x', -0.08); tgt(b.head.rotation, 'z', -iso * 0.09 * A); tgt(b.head.rotation, 'y', iso2 * 0.08 * A);
-  }
-
-  // K. Crouch-prowl — a low, martial crouch stalking side to side: deep bent
-  // knees, hunched spine, head low and forward. Grounded/predatory rather
-  // than upright — tribal-fusion's "almost martial posture" read.
-  function crouchProwl(c) {
-    const { b, tgt, set, A, elapsedBeats } = c;
-    const eb = elapsedBeats % 8;
-    const shift = Math.sin((eb / 8) * Math.PI * 2);
-    const settle = smoothstep(Math.min(1, elapsedBeats / 2));   // ease INTO the crouch on entry
-
-    set(b.pelvis.position, 'x', shift * 0.12 * A); set(b.pelvis.position, 'y', 0.12 - settle * 0.10 * A);
-    tgt(b.pelvis.rotation, 'z', shift * 0.08 * A); tgt(b.pelvis.rotation, 'y', shift * 0.10 * A);
-    tgt(b.spine.rotation, 'x', 0.08 + settle * 0.24 * A); tgt(b.spine.rotation, 'z', -shift * 0.06 * A);
-    tgt(b.chest.rotation, 'z', shift * 0.08 * A); tgt(b.chest.rotation, 'y', shift * 0.10 * A);
-
-    tgt(b.upperArmL.rotation, 'z', 0.16); tgt(b.upperArmL.rotation, 'x', REST_ARM_X + settle * 0.12 * A);
-    tgt(b.upperArmR.rotation, 'z', -0.16); tgt(b.upperArmR.rotation, 'x', REST_ARM_X + settle * 0.12 * A);
-    tgt(b.forearmL.rotation, 'x', REST_FORE_X + settle * 0.15); tgt(b.forearmR.rotation, 'x', REST_FORE_X + settle * 0.15);
-
-    tgt(b.thighL.rotation, 'x', REST_LEG_X + settle * 0.30 * A + Math.max(0, shift) * 0.08 * A);
-    tgt(b.thighR.rotation, 'x', REST_LEG_X + settle * 0.30 * A + Math.max(0, -shift) * 0.08 * A);
-    tgt(b.shinL.rotation, 'x', REST_LEG_X + settle * 0.34 * A); tgt(b.shinR.rotation, 'x', REST_LEG_X + settle * 0.34 * A);
-
-    tgt(b.neck.rotation, 'x', 0.05 + settle * 0.14 * A); tgt(b.neck.rotation, 'z', 0); tgt(b.neck.rotation, 'y', shift * 0.08 * A);
-    tgt(b.head.rotation, 'x', -0.05 + settle * 0.18 * A); tgt(b.head.rotation, 'z', 0); tgt(b.head.rotation, 'y', shift * 0.14 * A);
-  }
-
   // L. Poly-step — a syncopated stepping pattern against a 6-beat cycle (a
   // polyrhythm across the underlying 4/4 grid, per tribal house's blend of
   // four-on-the-floor with polyrhythmic percussion): a heavier accent every
@@ -1341,6 +1141,367 @@ export function initKineticDancer() {
     tgt(b.head.rotation, 'x', -0.08); tgt(b.head.rotation, 'z', 0); tgt(b.head.rotation, 'y', -mirror * accent * 0.16 * A);
   }
 
+  // ── techno floor moves (M–AF): 20 rave / hardstyle / shuffle phrases ─────
+  // Same contract as A–L, but authored through applyPose() so each move stays a
+  // compact pose object. CRITICAL: tgt()/set() INTEGRATE the spring on the call
+  // (not just store a target), so every core axis must be written EXACTLY ONCE
+  // per frame — applyPose enforces that: it drives the full core proxy set once,
+  // taking whatever the move supplies and easing everything omitted to its
+  // dance-neutral rest (so no axis a sibling move drives ever freezes). None of
+  // these use the EXTRA joints (subdivided spine/clavicles/wrists/fingers), so
+  // restExtras() relaxes those for them on the fairy-punk rig (free no-op on the
+  // Armadrillo). Sign map (matches A–L): thigh.x + = knee drives forward/up,
+  // shin.x + = knee folds; upperArm.x + = raise forward, upperArm.z +L/−R =
+  // abduct out to the side, forearm.x − = elbow flexes (hand up); pelvis.y down
+  // = squat, pelvis.position.x = lateral travel, pelvis.rotation.y = yaw pivot.
+  // The always-on weight bounce + on-beat knee give (dance()) ride underneath
+  // all of them, so each move only paints its own limb signature.
+  //   px/py  pelvis.position x/y        prz/pry pelvis.rotation z/y
+  //   spx/spz spine x/z                  chz/chy chest z/y
+  //   uaLz/uaLx/uaRz/uaRx upperArm z/x   foLx/foRx forearm x
+  //   thL/thR thigh x                    shL/shR  shin x
+  //   nx/nz/ny neck x/z/y                hx/hz/hy head x/z/y
+  function applyPose(c, o) {
+    const { b, tgt, set } = c;
+    set(b.pelvis.position, 'x', o.px != null ? o.px : 0);
+    set(b.pelvis.position, 'y', o.py != null ? o.py : 0.11);
+    tgt(b.pelvis.rotation, 'z', o.prz || 0);
+    tgt(b.pelvis.rotation, 'y', o.pry || 0);
+    tgt(b.spine.rotation, 'x', o.spx != null ? o.spx : 0.08);
+    tgt(b.spine.rotation, 'z', o.spz || 0);
+    tgt(b.chest.rotation, 'z', o.chz || 0);
+    tgt(b.chest.rotation, 'y', o.chy || 0);
+    tgt(b.upperArmL.rotation, 'z', o.uaLz != null ? o.uaLz : 0.12);
+    tgt(b.upperArmL.rotation, 'x', o.uaLx != null ? o.uaLx : REST_ARM_X);
+    tgt(b.forearmL.rotation, 'x', o.foLx != null ? o.foLx : REST_FORE_X);
+    tgt(b.upperArmR.rotation, 'z', o.uaRz != null ? o.uaRz : -0.12);
+    tgt(b.upperArmR.rotation, 'x', o.uaRx != null ? o.uaRx : REST_ARM_X);
+    tgt(b.forearmR.rotation, 'x', o.foRx != null ? o.foRx : REST_FORE_X);
+    tgt(b.thighL.rotation, 'x', o.thL != null ? o.thL : REST_LEG_X);
+    tgt(b.thighR.rotation, 'x', o.thR != null ? o.thR : REST_LEG_X);
+    tgt(b.shinL.rotation, 'x', o.shL != null ? o.shL : REST_LEG_X);
+    tgt(b.shinR.rotation, 'x', o.shR != null ? o.shR : REST_LEG_X);
+    tgt(b.neck.rotation, 'x', o.nx != null ? o.nx : 0.03);
+    tgt(b.neck.rotation, 'z', o.nz || 0);
+    tgt(b.neck.rotation, 'y', o.ny || 0);
+    tgt(b.head.rotation, 'x', o.hx != null ? o.hx : -0.10);
+    tgt(b.head.rotation, 'z', o.hz || 0);
+    tgt(b.head.rotation, 'y', o.hy || 0);
+  }
+
+  // M. Italian stomp — high knee lifts driving forcefully into the floor,
+  // alternating legs; the opposite arm marches to counterbalance.
+  function italianStomp(c) {
+    const { A, elapsedBeats: eb } = c;
+    const legL = Math.floor(eb) % 2 === 0;             // which knee drives up this beat
+    const bf = eb - Math.floor(eb);
+    const lift = Math.sin(bf * Math.PI);               // peak mid-beat, slammed home by beat end
+    const up = 0.10 + lift * 1.25 * A, knee = REST_LEG_X + lift * 0.95 * A;
+    const swing = lift * 0.6 * A;                      // opposite-arm march
+    applyPose(c, {
+      py: 0.11 - lift * 0.02 * A, prz: (legL ? 1 : -1) * 0.05 * A, spx: 0.10, chy: (legL ? 1 : -1) * 0.06 * A,
+      thL: legL ? up : REST_LEG_X, thR: legL ? REST_LEG_X : up,
+      shL: legL ? knee : REST_LEG_X + 0.06, shR: legL ? REST_LEG_X + 0.06 : knee,
+      uaLz: 0.14, uaRz: -0.14, uaLx: 0.30 + (legL ? 0 : swing), uaRx: 0.30 + (legL ? swing : 0),
+      foLx: REST_FORE_X - (legL ? 0 : 0.5), foRx: REST_FORE_X - (legL ? 0.5 : 0),
+      hx: -0.06, hz: (legL ? 1 : -1) * 0.05 * A,
+    });
+  }
+
+  // N. Melbourne shuffle — rapid heel-toe gliding, feet flicking twice a beat
+  // while the whole figure drifts laterally across the floor.
+  function melbourneShuffle(c) {
+    const { A, elapsedBeats: eb } = c;
+    const fast = Math.sin(eb * Math.PI * 4);           // 2 shuffles per beat
+    const glide = Math.sin(eb * Math.PI * 0.5);        // slow lateral drift over 4 beats
+    applyPose(c, {
+      py: 0.10, px: glide * 0.14 * A, prz: glide * 0.06 * A, pry: fast * 0.05 * A,
+      thL: REST_LEG_X + Math.max(0, fast) * 0.30 * A, thR: REST_LEG_X + Math.max(0, -fast) * 0.30 * A,
+      shL: REST_LEG_X + Math.max(0, fast) * 0.22 * A, shR: REST_LEG_X + Math.max(0, -fast) * 0.22 * A,
+      spz: glide * 0.05 * A, chz: -glide * 0.06 * A,
+      uaLz: 0.20, uaRz: -0.20, uaLx: REST_ARM_X + 0.05, uaRx: REST_ARM_X + 0.05, foLx: -0.4, foRx: -0.4,
+      hy: glide * 0.10 * A, hz: -glide * 0.05 * A,
+    });
+  }
+
+  // O. Running man — the continuous illusion of running in one spot: one knee
+  // drives up while the other leg slides back straight; arms pump opposite.
+  function runningMan(c) {
+    const { A, elapsedBeats: eb } = c;
+    const s1 = Math.sin(eb * Math.PI);                 // one stride cycle per 2 beats
+    applyPose(c, {
+      spx: 0.14, py: 0.11,
+      thL: REST_LEG_X + s1 * 0.55 * A, thR: REST_LEG_X - s1 * 0.55 * A,
+      shL: REST_LEG_X + Math.max(0, s1) * 0.5, shR: REST_LEG_X + Math.max(0, -s1) * 0.5,
+      uaRx: 0.35 + Math.max(0, s1) * 0.7 * A, uaLx: 0.35 + Math.max(0, -s1) * 0.7 * A,
+      uaLz: 0.10, uaRz: -0.10, foLx: -0.9, foRx: -0.9,
+      chy: s1 * 0.08 * A, hx: -0.06, hy: -s1 * 0.06 * A,
+    });
+  }
+
+  // P. T-step — sideways shuffle on sharp heel-and-toe pivots: a snappy yaw
+  // twist at each lateral step, weight punched onto the leading foot.
+  function tStep(c) {
+    const { A, elapsedBeats: eb } = c;
+    const legIdx = Math.floor(eb) % 2, dir = legIdx ? -1 : 1;
+    const bf = eb - Math.floor(eb);
+    const snap = smoothstep(Math.min(1, bf / 0.15)) * (1 - smoothstep(Math.max(0, (bf - 0.15) / 0.4)));
+    applyPose(c, {
+      px: dir * 0.13 * A, pry: dir * 0.22 * A * (0.4 + snap), prz: dir * 0.06 * A, spx: 0.08,
+      thL: REST_LEG_X + (dir > 0 ? snap * 0.35 * A : 0.02), thR: REST_LEG_X + (dir < 0 ? snap * 0.35 * A : 0.02),
+      shL: REST_LEG_X + (dir > 0 ? snap * 0.25 : 0.04), shR: REST_LEG_X + (dir < 0 ? snap * 0.25 : 0.04),
+      uaLz: 0.26, uaRz: -0.26, uaLx: REST_ARM_X, uaRx: REST_ARM_X, foLx: -0.5, foRx: -0.5,
+      chy: dir * 0.10 * A, hy: dir * 0.18 * A, hx: -0.06,
+    });
+  }
+
+  // Q. Hakken — the lightning-fast repetitive gabber step: tight, rapid
+  // alternating stomps with small hops, torso upright, elbows tucked and pumping.
+  function hakken(c) {
+    const { A, elapsedBeats: eb } = c;
+    const fast = Math.sin(eb * Math.PI * 4);           // 2 steps per beat
+    applyPose(c, {
+      py: 0.10 + Math.abs(fast) * 0.03 * A, spx: 0.06,
+      thL: REST_LEG_X + Math.max(0, fast) * 0.5 * A, thR: REST_LEG_X + Math.max(0, -fast) * 0.5 * A,
+      shL: REST_LEG_X + Math.max(0, fast) * 0.3, shR: REST_LEG_X + Math.max(0, -fast) * 0.3,
+      uaLz: 0.12, uaRz: -0.12, uaLx: 0.40 + Math.max(0, -fast) * 0.3 * A, uaRx: 0.40 + Math.max(0, fast) * 0.3 * A,
+      foLx: -0.8, foRx: -0.8, prz: fast * 0.04 * A, hx: -0.04,
+    });
+  }
+
+  // R. Jumpstyle — explosive forward-and-back leg kicks in mid-air: a hop, both
+  // legs scissoring hard front/back while airborne, arms flung out for balance.
+  function jumpstyle(c) {
+    const { A, elapsedBeats: eb } = c;
+    const hop = Math.max(0, Math.sin(eb * Math.PI));   // airtime per beat
+    const kick = Math.sin(eb * Math.PI * 2) * hop;     // legs kick only while airborne
+    applyPose(c, {
+      py: 0.11 + hop * 0.10 * A, spx: 0.08, chy: kick * 0.08 * A,
+      thL: REST_LEG_X + kick * 0.6 * A, thR: REST_LEG_X - kick * 0.6 * A,
+      shL: REST_LEG_X + Math.abs(kick) * 0.2, shR: REST_LEG_X + Math.abs(kick) * 0.2,
+      uaLz: 0.30 + hop * 0.15 * A, uaRz: -(0.30 + hop * 0.15 * A), uaLx: REST_ARM_X + 0.1, uaRx: REST_ARM_X + 0.1,
+      foLx: -0.5, foRx: -0.5, hx: -0.10 - hop * 0.06 * A,
+    });
+  }
+
+  // S. Industrial stomp — aggressive heavy marching paired with stiff, robotic
+  // arm swings locked at the elbow, thighs punching up alternately.
+  function industrialStomp(c) {
+    const { A, elapsedBeats: eb } = c;
+    const legL = Math.floor(eb) % 2 === 0;
+    const bf = eb - Math.floor(eb);
+    const march = Math.sin(bf * Math.PI);
+    applyPose(c, {
+      py: 0.11 - march * 0.02 * A, prz: (legL ? 1 : -1) * 0.06 * A, spx: 0.10,
+      thL: REST_LEG_X + (legL ? march * 0.7 * A : 0.02), thR: REST_LEG_X + (legL ? 0.02 : march * 0.7 * A),
+      shL: REST_LEG_X + (legL ? march * 0.45 : 0.04), shR: REST_LEG_X + (legL ? 0.04 : march * 0.45),
+      uaLz: 0.10, uaRz: -0.10, uaLx: 0.40 + (legL ? march * 0.8 * A : 0), uaRx: 0.40 + (legL ? 0 : march * 0.8 * A),
+      foLx: -1.3, foRx: -1.3, hx: -0.04, hz: (legL ? 1 : -1) * 0.04 * A,   // 90° locked elbows
+    });
+  }
+
+  // T. Turbo arms — rapid, chaotic spinning of both arms in front of the chest,
+  // forearms bent, each on a de-phased fast circle so they never mirror cleanly.
+  function turboArms(c) {
+    const { A, elapsedBeats: eb } = c;
+    const w = eb * Math.PI * 4;                         // fast
+    applyPose(c, {
+      py: 0.11, spx: 0.08, chy: Math.sin(w * 0.5) * 0.06 * A,
+      uaLx: 0.90 + Math.sin(w) * 0.5 * A, uaLz: 0.40 + Math.cos(w) * 0.4 * A,
+      uaRx: 0.90 + Math.sin(w + 2.1) * 0.5 * A, uaRz: -(0.40 + Math.cos(w + 2.1) * 0.4 * A),
+      foLx: -1.4 + Math.sin(w * 1.3) * 0.3, foRx: -1.4 + Math.sin(w * 1.3 + 1) * 0.3,
+      thL: REST_LEG_X + 0.04, thR: REST_LEG_X + 0.04, hz: Math.sin(w * 0.5) * 0.05 * A, hx: -0.08,
+    });
+  }
+
+  // U. Double-time bounce — the entire body pulsing (squat dip) twice as fast
+  // as the main beat, knees absorbing each pulse.
+  function doubleTimeBounce(c) {
+    const { A, elapsedBeats: eb } = c;
+    const b2 = Math.abs(Math.sin(eb * Math.PI * 2));   // 2 dips per beat
+    applyPose(c, {
+      py: 0.11 - b2 * 0.06 * A, spx: 0.08 + b2 * 0.05 * A,
+      thL: REST_LEG_X + b2 * 0.30 * A, thR: REST_LEG_X + b2 * 0.30 * A,
+      shL: REST_LEG_X + b2 * 0.35 * A, shR: REST_LEG_X + b2 * 0.35 * A,
+      uaLz: 0.16, uaRz: -0.16, uaLx: REST_ARM_X + b2 * 0.15 * A, uaRx: REST_ARM_X + b2 * 0.15 * A,
+      foLx: -0.5, foRx: -0.5, hx: -0.08 - b2 * 0.05 * A,
+    });
+  }
+
+  // V. Bass drop jump — a wind-up crouch then an explosion straight up into a
+  // high leap, arms thrown overhead, timed to the drop.
+  function bassDropJump(c) {
+    const { A, elapsedBeats: eb } = c;
+    const cyc = eb % 2;
+    const wind = cyc < 0.5 ? smoothstep(cyc / 0.5) : 0;              // crouch
+    const leap = cyc >= 0.5 ? Math.sin((cyc - 0.5) / 1.5 * Math.PI) : 0;  // airborne arc
+    applyPose(c, {
+      py: 0.11 - wind * 0.10 * A + leap * 0.16 * A, spx: 0.08 + wind * 0.15 * A - leap * 0.1,
+      thL: REST_LEG_X + wind * 0.4 * A - leap * 0.1, thR: REST_LEG_X + wind * 0.4 * A - leap * 0.1,
+      shL: REST_LEG_X + wind * 0.5 * A, shR: REST_LEG_X + wind * 0.5 * A,
+      uaLx: 0.30 + leap * 1.4 * A, uaRx: 0.30 + leap * 1.4 * A,
+      uaLz: 0.15 + leap * 0.5 * A, uaRz: -(0.15 + leap * 0.5 * A), foLx: REST_FORE_X, foRx: REST_FORE_X,
+      hx: -0.10 - leap * 0.15 * A,
+    });
+  }
+
+  // W. Floor slap — bending deep to physically strike the ground on the heavy
+  // kick (mirrored: the striking arm reaches down in front), then recover.
+  function floorSlap(c) {
+    const { A, elapsedBeats: eb, mirror } = c;
+    const bf = eb - Math.floor(eb);
+    const down = bf < 0.5 ? smoothstep(bf / 0.5) : 1 - smoothstep((bf - 0.5) / 0.5);
+    const L = mirror > 0;                              // L → strike with the right arm
+    // deep committed fold: hips pitch well forward, both knees buckle, and the
+    // striking arm drives DOWN in front (upperArm.x negative = swinging down
+    // from the raise, forearm straightening toward the floor) so the reach to
+    // the ground reads unambiguously rather than sitting near arm-rest.
+    applyPose(c, {
+      py: 0.11 - down * 0.09 * A, spx: 0.08 + down * 0.85 * A,
+      thL: REST_LEG_X + down * 0.4 * A, thR: REST_LEG_X + down * 0.4 * A,
+      shL: REST_LEG_X + down * 0.6 * A, shR: REST_LEG_X + down * 0.6 * A,
+      uaLx: L ? REST_ARM_X + down * 0.15 : REST_ARM_X - down * 0.7 * A, uaRx: L ? REST_ARM_X - down * 0.7 * A : REST_ARM_X + down * 0.15,
+      uaLz: 0.12, uaRz: -0.12, foLx: L ? REST_FORE_X : REST_FORE_X - down * 0.5, foRx: L ? REST_FORE_X - down * 0.5 : REST_FORE_X,
+      hx: -0.10 - down * 0.25 * A,
+    });
+  }
+
+  // X. Mosher chop — rhythmic overhead downward arm chops synced to the heavy
+  // percussion: arms overhead on the beat, crunching down between.
+  function mosherChop(c) {
+    const { A, elapsedBeats: eb } = c;
+    const up = 0.5 + 0.5 * Math.cos(eb * Math.PI * 2); // 1 = overhead on the beat, 0 = chopped low
+    applyPose(c, {
+      py: 0.11 - (1 - up) * 0.04 * A, spx: 0.08 + (1 - up) * 0.15 * A,
+      uaLx: 0.30 + up * 1.3 * A, uaRx: 0.30 + up * 1.3 * A, uaLz: 0.10, uaRz: -0.10,
+      foLx: REST_FORE_X, foRx: REST_FORE_X,
+      thL: REST_LEG_X + 0.04, thR: REST_LEG_X + 0.04, hx: -0.10 - (1 - up) * 0.12 * A,
+    });
+  }
+
+  // Y. Windmill — large upright ARM windmills (both arms, opposite phase, big
+  // vertical circles kept in front of / above the body) mirroring fast synth
+  // arpeggios. Torso stays upright — arm.x is biased positive so an arm never
+  // swings behind the back into a collapsed/faceplant silhouette (front camera).
+  function windmill(c) {
+    const { A, elapsedBeats: eb } = c;
+    const w = eb * Math.PI;                            // one revolution per 2 beats
+    applyPose(c, {
+      py: 0.11, spx: 0.06, chz: Math.sin(w) * 0.06 * A,
+      uaLx: 0.75 + Math.sin(w) * 0.75 * A, uaLz: 0.30 + Math.cos(w) * 0.5 * A,
+      uaRx: 0.75 + Math.sin(w + Math.PI) * 0.75 * A, uaRz: -(0.30 + Math.cos(w + Math.PI) * 0.5 * A),
+      foLx: REST_FORE_X, foRx: REST_FORE_X, prz: Math.sin(w) * 0.04 * A,
+      hz: Math.sin(w) * 0.06 * A, hy: Math.cos(w) * 0.05 * A, hx: -0.06,
+    });
+  }
+
+  // Z. Kick-step — flicking one foot forward, then snapping it back into a
+  // stomp (mirrored). Sharp, syncopated leg accent.
+  function kickStep(c) {
+    const { A, elapsedBeats: eb, mirror } = c;
+    const bf = eb - Math.floor(eb);
+    const flick = bf < 0.4 ? smoothstep(bf / 0.4) : 1 - smoothstep(Math.min(1, (bf - 0.4) / 0.2));
+    const stomp = bf >= 0.5 ? smoothstep(Math.min(1, (bf - 0.5) / 0.2)) * (1 - smoothstep(Math.max(0, (bf - 0.7) / 0.3))) : 0;
+    const L = mirror > 0;                              // L → kick the right leg
+    const kThigh = REST_LEG_X + flick * 0.6 * A, kShin = REST_LEG_X + stomp * 0.25 * A;
+    applyPose(c, {
+      py: 0.11 - stomp * 0.05 * A, spx: 0.08, prz: (L ? -1 : 1) * 0.05 * A,
+      thL: L ? REST_LEG_X : kThigh, thR: L ? kThigh : REST_LEG_X,
+      shL: L ? REST_LEG_X + 0.04 : kShin, shR: L ? kShin : REST_LEG_X + 0.04,
+      uaLz: 0.12, uaRz: -0.12, uaLx: 0.30 + (L ? flick * 0.4 * A : 0), uaRx: 0.30 + (L ? 0 : flick * 0.4 * A),
+      foLx: -0.5, foRx: -0.5, hx: -0.06,
+    });
+  }
+
+  // AA. Side-to-side sprint — a sprinting motion (fast opposite arm/leg drive,
+  // forward lean) while shifting horizontally across the floor.
+  function sideToSideSprint(c) {
+    const { A, elapsedBeats: eb } = c;
+    const s1 = Math.sin(eb * Math.PI * 1.5);           // quick stride
+    const glide = Math.sin(eb * Math.PI * 0.5);        // lateral travel over 4 beats
+    applyPose(c, {
+      px: glide * 0.14 * A, spx: 0.14, py: 0.11,
+      thL: REST_LEG_X + s1 * 0.6 * A, thR: REST_LEG_X - s1 * 0.6 * A,
+      shL: REST_LEG_X + Math.max(0, s1) * 0.5, shR: REST_LEG_X + Math.max(0, -s1) * 0.5,
+      uaRx: 0.35 + Math.max(0, s1) * 0.7 * A, uaLx: 0.35 + Math.max(0, -s1) * 0.7 * A,
+      uaLz: 0.10, uaRz: -0.10, foLx: -0.9, foRx: -0.9,
+      pry: glide * 0.08 * A, chy: -glide * 0.06 * A, hx: -0.06, hy: glide * 0.10 * A,
+    });
+  }
+
+  // AB. Shoulder jacks — fast, violent up-and-down shaking of the upper frame:
+  // torso jerks, shoulders alternately jacking, at triple time.
+  function shoulderJacks(c) {
+    const { A, elapsedBeats: eb } = c;
+    const shake = Math.sin(eb * Math.PI * 6);          // very fast shudder
+    applyPose(c, {
+      py: 0.11 + shake * 0.02 * A, spx: 0.08 + shake * 0.10 * A, chz: shake * 0.10 * A,
+      uaLz: 0.20 + shake * 0.12 * A, uaRz: -(0.20 - shake * 0.12 * A), uaLx: REST_ARM_X + 0.1, uaRx: REST_ARM_X + 0.1,
+      foLx: -0.6, foRx: -0.6, shL: REST_LEG_X + Math.abs(shake) * 0.1, shR: REST_LEG_X + Math.abs(shake) * 0.1,
+      hx: -0.08 + shake * 0.06 * A, hz: shake * 0.05 * A,
+    });
+  }
+
+  // AC. Fist pump sprint — pounding the air (right fist driving up on the beat)
+  // while rapidly jogging on the spot.
+  function fistPumpSprint(c) {
+    const { A, elapsedBeats: eb } = c;
+    const jog = Math.sin(eb * Math.PI * 4);            // 2 jog steps per beat
+    const pump = Math.abs(Math.sin(eb * Math.PI * 2)); // fist up once per beat
+    applyPose(c, {
+      py: 0.11 + Math.abs(jog) * 0.02 * A, spx: 0.08,
+      thL: REST_LEG_X + Math.max(0, jog) * 0.35 * A, thR: REST_LEG_X + Math.max(0, -jog) * 0.35 * A,
+      shL: REST_LEG_X + Math.max(0, jog) * 0.25, shR: REST_LEG_X + Math.max(0, -jog) * 0.25,
+      uaRx: 0.30 + pump * 1.2 * A, uaRz: -0.05, foRx: -1.3 + pump * 0.5,
+      uaLx: 0.40, uaLz: 0.12, foLx: -1.0, hx: -0.06, hy: pump * 0.06 * A,
+    });
+  }
+
+  // AD. Ceili step — high-energy, springy Irish-style skips adapted for fast
+  // electronic beats: proud upright carriage, legs doing the light hop work.
+  function ceiliStep(c) {
+    const { A, elapsedBeats: eb } = c;
+    const bf = eb - Math.floor(eb);
+    const hop = Math.max(0, Math.sin(bf * Math.PI));   // spring per beat
+    const legL = Math.floor(eb) % 2 === 0;
+    applyPose(c, {
+      py: 0.11 + hop * 0.07 * A, spx: 0.04, prz: (legL ? 1 : -1) * 0.03 * A,
+      thL: REST_LEG_X + (legL ? hop * 0.5 * A : hop * 0.15 * A), thR: REST_LEG_X + (legL ? hop * 0.15 * A : hop * 0.5 * A),
+      shL: REST_LEG_X + (legL ? hop * 0.4 : 0.05), shR: REST_LEG_X + (legL ? 0.05 : hop * 0.4),
+      uaLz: 0.08, uaRz: -0.08, uaLx: REST_ARM_X, uaRx: REST_ARM_X, foLx: -0.2, foRx: -0.2, hx: -0.10,
+    });
+  }
+
+  // AE. Rave low-ride — a deep, sustained squat held low while the feet keep a
+  // rapid bounce and the torso sways.
+  function raveLowRide(c) {
+    const { A, elapsedBeats: eb } = c;
+    const b2 = Math.abs(Math.sin(eb * Math.PI * 2));   // fast foot bounce
+    const settle = smoothstep(Math.min(1, eb / 2));    // ease into the squat on entry
+    const sway = Math.sin(eb * Math.PI);
+    applyPose(c, {
+      py: 0.11 - settle * 0.10 * A - b2 * 0.03 * A, spx: 0.12, prz: sway * 0.06 * A, chz: sway * 0.06 * A,
+      thL: REST_LEG_X + settle * 0.4 * A + b2 * 0.1 * A, thR: REST_LEG_X + settle * 0.4 * A + b2 * 0.1 * A,
+      shL: REST_LEG_X + settle * 0.45 * A + b2 * 0.12 * A, shR: REST_LEG_X + settle * 0.45 * A + b2 * 0.12 * A,
+      uaLz: 0.25, uaRz: -0.25, uaLx: REST_ARM_X + 0.15, uaRx: REST_ARM_X + 0.15, foLx: -0.8, foRx: -0.8,
+      hx: -0.06, hz: sway * 0.05 * A,
+    });
+  }
+
+  // AF. Body roll snap — whipping the torso back and forth (a fast forward
+  // crunch, head following) to mimic sharp hi-hats.
+  function bodyRollSnap(c) {
+    const { A, elapsedBeats: eb } = c;
+    const snap = Math.sin(eb * Math.PI * 4);           // fast
+    applyPose(c, {
+      py: 0.11 - Math.abs(snap) * 0.02 * A, spx: 0.10 + Math.max(0, snap) * 0.25 * A, chz: snap * 0.06 * A, prz: snap * 0.05 * A,
+      thL: REST_LEG_X + Math.abs(snap) * 0.08 * A, thR: REST_LEG_X + Math.abs(snap) * 0.08 * A,
+      shL: REST_LEG_X + Math.abs(snap) * 0.1, shR: REST_LEG_X + Math.abs(snap) * 0.1,
+      uaLz: 0.18, uaRz: -0.18, uaLx: REST_ARM_X + 0.1, uaRx: REST_ARM_X + 0.1, foLx: -0.7, foRx: -0.7,
+      hx: -0.10 - Math.max(0, snap) * 0.25 * A,
+    });
+  }
+
   // `affinity` tags which instrument register a move's vocabulary suits —
   // used to WEIGHT (not gate) the pick below, so each dancer leans into moves
   // that fit what's actually playing right now: LOW (bass/kick) → grounded/
@@ -1351,17 +1512,31 @@ export function initKineticDancer() {
   // instrument-matched moves — it leans, it doesn't lock.
   const MOVE_TABLE = {
     grooveSway: { beats: 8, pool: ['idle', 'low', 'high'], run: grooveSway },
-    handsFace: { beats: 8, pool: ['idle', 'low'], affinity: 'mid', extras: true, run: handsFace },
     strike: { beats: 8, pool: ['high'], run: strike },
-    breakdown: { beats: 8, pool: ['idle', 'low'], run: breakdown },
     stepTouch: { beats: 4, pool: ['high'], affinity: 'low', run: stepTouch },
-    bodyWave: { beats: 4, pool: ['idle', 'low', 'high'], affinity: 'mid', extras: true, run: bodyWave },
-    reachOpen: { beats: 8, pool: ['low', 'high'], mirrored: true, affinity: 'mid', extras: true, run: reachOpen },
     tribalStomp: { beats: 4, pool: ['idle', 'low', 'high'], affinity: 'low', run: tribalStomp },
-    invocation: { beats: 12, pool: ['idle', 'low', 'high'], affinity: 'mid', extras: true, run: invocation },
-    groundedIsolation: { beats: 8, pool: ['idle', 'low', 'high'], affinity: 'high', run: groundedIsolation },
-    crouchProwl: { beats: 8, pool: ['low', 'high'], affinity: 'low', run: crouchProwl },
     polyStep: { beats: 6, pool: ['low', 'high'], mirrored: true, affinity: 'high', run: polyStep },
+    // ── techno floor moves (M–AF) ──
+    italianStomp: { beats: 4, pool: ['low', 'high'], affinity: 'low', run: italianStomp },
+    melbourneShuffle: { beats: 4, pool: ['low', 'high'], affinity: 'high', run: melbourneShuffle },
+    runningMan: { beats: 4, pool: ['idle', 'low', 'high'], affinity: 'low', run: runningMan },
+    tStep: { beats: 4, pool: ['low', 'high'], affinity: 'high', run: tStep },
+    hakken: { beats: 4, pool: ['low', 'high'], affinity: 'low', run: hakken },
+    jumpstyle: { beats: 4, pool: ['low', 'high'], affinity: 'low', run: jumpstyle },
+    industrialStomp: { beats: 4, pool: ['low', 'high'], affinity: 'low', run: industrialStomp },
+    turboArms: { beats: 2, pool: ['low', 'high'], affinity: 'high', run: turboArms },
+    doubleTimeBounce: { beats: 2, pool: ['idle', 'low', 'high'], affinity: 'low', run: doubleTimeBounce },
+    bassDropJump: { beats: 4, pool: ['high'], affinity: 'low', run: bassDropJump },
+    floorSlap: { beats: 4, pool: ['low', 'high'], mirrored: true, affinity: 'low', run: floorSlap },
+    mosherChop: { beats: 2, pool: ['low', 'high'], affinity: 'high', run: mosherChop },
+    windmill: { beats: 4, pool: ['low', 'high'], affinity: 'mid', run: windmill },
+    kickStep: { beats: 4, pool: ['low', 'high'], mirrored: true, affinity: 'low', run: kickStep },
+    sideToSideSprint: { beats: 4, pool: ['low', 'high'], affinity: 'low', run: sideToSideSprint },
+    shoulderJacks: { beats: 2, pool: ['high'], affinity: 'high', run: shoulderJacks },
+    fistPumpSprint: { beats: 2, pool: ['low', 'high'], affinity: 'high', run: fistPumpSprint },
+    ceiliStep: { beats: 4, pool: ['idle', 'low', 'high'], affinity: 'mid', run: ceiliStep },
+    raveLowRide: { beats: 2, pool: ['low', 'high'], affinity: 'low', run: raveLowRide },
+    bodyRollSnap: { beats: 2, pool: ['low', 'high'], affinity: 'high', run: bodyRollSnap },
   };
 
   // Weighted pick: `weights[i]` is the relative chance of `names[i]`. Used so
@@ -1415,9 +1590,9 @@ export function initKineticDancer() {
     // Re-select when the CURRENT move has run its full DECLARED length, measured
     // in the move's own tempo-scaled beat clock (the same `elapsedBeats` basis
     // dance() feeds the move), floored to 8 beats. The old fixed 8-beat window
-    // both CHOPPED the long deliberate moves (breakdown @16, invocation @12 —
-    // stillness is choreography, and it was being cut in half) and, at high BPM
-    // (tempoScale=2), cut every move at half its internal cycle. Keying off the
+    // both CHOPPED the longer moves (a 12/16-beat phrase was cut in half) and,
+    // at high BPM (tempoScale=2), cut every move at half its internal cycle.
+    // Keying off the
     // move's own `beats` fixes both; the 8-beat floor keeps the short loopers
     // (stepTouch/tribalStomp @4, polyStep @6) repeating at least once instead of
     // flickering move-to-move.
@@ -1637,7 +1812,13 @@ export function initKineticDancer() {
     const beatFrac = clk.beatPos - Math.floor(clk.beatPos);
     const onBeat = 0.5 + 0.5 * Math.cos(beatFrac * Math.PI * 2);   // 1 on the beat → 0 mid-beat
     const grv = 0.7 + 0.4 * energy + 0.35 * (Number.isFinite(clk.strength) ? clk.strength : 0.6);   // high floor so the weight bounce is always felt (energetic brief)
-    rigState.rigGroup.position.y = rigState.baseY - BOUNCE_MAX * onBeat * grv;
+    // BOUNCE_MAX is a WORLD-space drop tuned to the full-size duet figure; the
+    // ambient crowd is scaled down (~0.34×), so scale the bounce by the figure's
+    // size relative to its own fit (scale.y / baseScale) — otherwise a small
+    // spawn's fixed-world drop reads proportionally 3× bigger and it HOPS. For
+    // the duet this ratio is just the panel slotScaleMul (≈1), so it's unchanged.
+    const figRatio = (rigState.rigGroup.scale.y || 1) / (rigState.baseScale || 1);
+    rigState.rigGroup.position.y = rigState.baseY - BOUNCE_MAX * figRatio * onBeat * grv;
 
     add(b.pelvis.position, 'y', -hit * 0.06);
     add(b.thighL.rotation, 'x', hit * 0.16 * grv);
@@ -1669,6 +1850,272 @@ export function initKineticDancer() {
   function applyRig(rigState) {
     applyAdapters(rigState.adapters, _retargetScratch);
     applyPelvisSway(rigState.pelvisBone, rigState.pelvisBind, rigState.proxies.pelvis.position, rigState.cfg.posScale);
+  }
+
+  // ── ambient armadrillo crowd (own renderer/scene/camera) ─────────────────
+  // Everything below is additive and self-contained: it clones the ALREADY
+  // loaded armadrillo (rigA.model) into a pool, drives each pooled clone with
+  // the SAME dance()/applyRig/MOVE_TABLE + shared music clock the duet uses,
+  // and renders it on the full-viewport #k-ambient-dancers canvas. The duet's
+  // renderer/scene/camera/canvas and its CSS are never touched.
+
+  // Lazily create the ambient renderer the first time the viewport is wide
+  // enough (so phones never even allocate a second GL context).
+  function initAmbient() {
+    if (ambientInited || !ambientCanvas || !window.THREE || !THREE.SkeletonUtils || dead) return;
+    ambientInited = true;
+    try {
+      ambientRenderer = new THREE.WebGLRenderer({ canvas: ambientCanvas, alpha: true, antialias: true, powerPreference: 'high-performance' });
+      ambientRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      // A lost ambient context tears down only the crowd — the duet keeps running.
+      ambientCanvas.addEventListener('webglcontextlost', (ev) => { ev.preventDefault(); disposeAmbient(); }, false);
+      ambientScene = new THREE.Scene();
+      // Same lens as the duet camera (fov 38, z 8.4) but full-viewport aspect,
+      // so a given world scale reads at the same on-screen HEIGHT as the duet.
+      ambientCamera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+      ambientCamera.position.set(0, 0.05, 8.4);
+      ambientCamera.lookAt(0, -0.05, 0);
+      sizeAmbient();
+      ambientCamera.updateMatrixWorld(true);   // unproject() (placeAtNDC) needs a current world matrix
+    } catch (_) { ambientRenderer = null; }
+  }
+
+  // Size the ambient renderer/camera to the FULL viewport (its canvas is fixed
+  // inset:0). Separate from the duet's sizeToCanvas (which tracks the strip).
+  function sizeAmbient() {
+    if (!ambientRenderer || !ambientCamera) return;
+    const w = window.innerWidth || 1280, h = window.innerHeight || 720;
+    ambientRenderer.setSize(w, h, false);
+    ambientCamera.aspect = w / h;
+    ambientCamera.updateProjectionMatrix();
+  }
+
+  // Device gate: enable on tablet + desktop (≥768px) only; re-evaluated on
+  // resize. Dropping below the threshold despawns everyone and stops spawning.
+  function evalAmbientGate() {
+    if (dead) return;
+    const allow = (window.innerWidth || 0) >= AMBIENT_MIN_WIDTH;
+    if (allow) {
+      initAmbient();
+      if (ambientRenderer && !ambientEnabled) { ambientEnabled = true; ambientSpawnTimer = 0.6; }
+    } else if (ambientEnabled) {
+      ambientEnabled = false;
+      despawnAllAmbient();
+      ambientNeedsClear = true;   // one final render to clear the canvas to transparent
+    }
+  }
+
+  // Build ONE pooled armadrillo clone (expensive: skinned-mesh + skeleton
+  // clone + fresh adapters + per-instance material clones). Returns an
+  // inactive, hidden instance already added to the ambient scene, or null.
+  function buildAmbientInstance() {
+    const src = rigA.model;
+    if (!src || !ambientScene || !THREE.SkeletonUtils) return null;
+    let clone;
+    // THREE.SkeletonUtils.clone (r128 examples) — Object3D.clone(true) does NOT
+    // rebind a skinned skeleton; this deep-clones the graph AND rebinds each
+    // SkinnedMesh to a freshly cloned skeleton, so the clone deforms on its own.
+    try { clone = THREE.SkeletonUtils.clone(src); } catch (_) { return null; }
+
+    const rigGroup = new THREE.Group();
+    const turnGroup = new THREE.Group();   // b.root — dance()'s slow 3/4 turn pivot
+    rigGroup.add(turnGroup);
+    turnGroup.add(clone);
+    rigGroup.visible = false;
+
+    // SkeletonUtils shares materials by reference, so the clone still points at
+    // the duet's SHARED chrome/wire materials. Give this instance its OWN clones
+    // so its opacity fade is independent (and disposable on teardown). The
+    // matcap/map textures inside stay shared refs (cheap, disposed with the duet).
+    const chromeMats = [], wireMats = [], skinnedMeshes = [];
+    clone.traverse((o) => {
+      if (!(o.isMesh || o.isSkinnedMesh)) return;
+      o.frustumCulled = false;
+      if (o.material === wireMat) {
+        const w = wireMat.clone(); w.transparent = true; w.opacity = 0;
+        o.material = w; wireMats.push(w); ambientDisposables.push(w);
+      } else if (o.material) {
+        const c = o.material.clone(); c.transparent = true; c.opacity = 0;
+        o.material = c; chromeMats.push(c); ambientDisposables.push(c);
+      }
+      // base + wireframe-overlay skinned meshes get SEPARATE cloned skeletons
+      // here (unlike the duet, where the overlay shares the base's skeleton), so
+      // every skinned mesh must have ITS OWN skeleton.update() each frame.
+      if (o.isSkinnedMesh) skinnedMeshes.push(o);
+    });
+
+    // Own proxy + adapter set (armadrillo drives the core roles only; RIG_A has
+    // no extraRoles). Bit-identical explicit hints to the duet's armadrillo.
+    const proxies = createProxyRig(THREE);
+    const rig = buildRig(THREE, {
+      model: clone, nameOf: RIG_A.nameOf, driveRoles: CORE_ROLES,
+      hints: makeExplicitHints(RIG_A), proxies,
+    });
+    const bones = { root: turnGroup };
+    for (const role in proxies) bones[role] = proxies[role];
+
+    const inst = {
+      cfg: RIG_A,
+      rigGroup, turnGroup, model: clone, skinnedMeshes,
+      proxies, adapters: rig.adapters, pelvisBone: rig.pelvisBone, pelvisBind: rig.pelvisBind,
+      bones, chromeMats, wireMats,
+      // lifecycle
+      active: false, life: 'in', age: 0, opacity: 0, seq: 0,
+      fadeIn: 0.4, fadeOut: 0.6, lifeDur: 6,
+      // dance state (mirrors createRigState's animated fields)
+      currentMove: MOVE_TABLE.grooveSway, currentMoveName: 'grooveSway',
+      moveStartBeat: 0, moveMirror: 1, prevDrop: false, moveAmp: 1, movePhaseOfs: 0,
+      headTrail: 0, idlePhase: 0, leanSign: 1,
+      baseX: 0, baseY: 0, baseZ: 0, baseScale: 1,
+    };
+    ambientScene.add(rigGroup);
+    ambientPool.push(inst);
+    return inst;
+  }
+
+  // Screen(NDC)→world at a chosen distance from the camera: unproject the NDC
+  // point to a ray, then walk `dist` along it. Varying `dist` gives parallax.
+  function placeAtNDC(inst, ndcX, ndcY, dist) {
+    _ndc.set(ndcX, ndcY, 0.5).unproject(ambientCamera);
+    _ndc.sub(ambientCamera.position).normalize();
+    const px = ambientCamera.position.x + _ndc.x * dist;
+    const py = ambientCamera.position.y + _ndc.y * dist;
+    const pz = ambientCamera.position.z + _ndc.z * dist;
+    inst.rigGroup.position.set(px, py, pz);
+    inst.baseX = px; inst.baseY = py; inst.baseZ = pz;   // dance() writes .y each frame from baseY
+  }
+
+  // (Re)activate a pooled instance at a fresh random spot / facing / scale with
+  // its own move-selection state, so the crowd never moves in lockstep.
+  function activateInstance(inst) {
+    const ndcX = (Math.random() * 2 - 1) * 0.85;
+    const ndcY = (Math.random() * 2 - 1) * 0.85;
+    const dist = 6.6 + Math.random() * 3.0;                 // slight depth variance → parallax
+    placeAtNDC(inst, ndcX, ndcY, dist);
+    inst.rigGroup.rotation.x = 0; inst.rigGroup.rotation.z = 0;
+    inst.rigGroup.rotation.y = (Math.random() * 2 - 1) * 1.2;   // scattered facing (mostly toward camera)
+    // scattered-crowd size: a fraction of the armadrillo's duet fit, with WIDE
+    // per-spawn variation (~0.55×–1.75×) so the crowd reads as a mix of near/far
+    // bodies of clearly different sizes, not uniform clones. Paired with the
+    // varied spawn depth, this sells scattered depth across the whole scene.
+    const scl = (rigA.baseScale || 1) * AMBIENT_SCALE_BASE * (0.55 + Math.random() * 1.2);
+    inst.rigGroup.scale.setScalar(scl);
+    // baseScale = the armadrillo's OWN duet fit (not 1), so dance()'s weight
+    // bounce (figRatio = scale.y / baseScale) scales with the shrunk crowd
+    // figure instead of applying the full-size world drop and making it hop.
+    inst.baseScale = rigA.baseScale || 1;
+    // fresh, independent dance state
+    inst.currentMove = MOVE_TABLE.grooveSway; inst.currentMoveName = 'grooveSway';
+    inst.moveStartBeat = 0; inst.moveMirror = Math.random() < 0.5 ? -1 : 1; inst.prevDrop = false;
+    inst.moveAmp = 1; inst.movePhaseOfs = 0; inst.headTrail = 0;
+    inst.idlePhase = Math.random() * Math.PI * 2; inst.leanSign = Math.random() < 0.5 ? -1 : 1;
+    // fresh lifecycle
+    inst.life = 'in'; inst.age = 0; inst.opacity = 0;
+    inst.lifeDur = 4 + Math.random() * 4;                   // live ~4–8s
+    inst.active = true; inst.seq = ++spawnSeq;
+    inst.rigGroup.visible = true;
+  }
+
+  function deactivate(inst) {
+    inst.active = false; inst.opacity = 0;
+    if (inst.rigGroup) inst.rigGroup.visible = false;
+  }
+  function despawnAllAmbient() { for (let i = 0; i < ambientPool.length; i++) if (ambientPool[i].active) deactivate(ambientPool[i]); }
+
+  // One spawn request from the scheduler: reuse an idle pooled instance, else
+  // build a new one under the cap, else recycle the OLDEST active one.
+  function requestSpawn() {
+    if (!rigA.modelReady || !ambientRenderer || dead) return;
+    let inst = null;
+    for (let i = 0; i < ambientPool.length; i++) if (!ambientPool[i].active) { inst = ambientPool[i]; break; }
+    if (!inst) {
+      if (ambientPool.length < AMBIENT_MAX) inst = buildAmbientInstance();
+      else {
+        // recycle the oldest active (lowest seq) — reactivateInstance resets it
+        let oldest = null;
+        for (let i = 0; i < ambientPool.length; i++) { const p = ambientPool[i]; if (p.active && (!oldest || p.seq < oldest.seq)) oldest = p; }
+        inst = oldest;
+      }
+    }
+    if (inst) activateInstance(inst);
+  }
+
+  // Per-frame ambient update: run the spawn scheduler, then advance each active
+  // instance's fade + dance + retarget + skeleton. Each instance is wrapped in
+  // try/catch so a single bad spawn can never kill the duet's RAF.
+  function updateAmbient(dt, now, clk) {
+    // Crowd size TRACKS energy: hold the MIN floor when calm, climb toward MAX as
+    // the section builds into a high upbeat. Only energy above ~0.3 pushes past
+    // the floor, so quiet stretches stay at 5 and the drop fills the room to 20.
+    const drive = Math.max(0, Math.min(1, (energy - 0.3) / 0.7));
+    const target = Math.round(AMBIENT_MIN + (AMBIENT_MAX - AMBIENT_MIN) * drive);
+    let activeCount = 0;
+    for (let i = 0; i < ambientPool.length; i++) if (ambientPool[i].active) activeCount++;
+    // Staggered controller (never all at once): fill FAST to reach the MIN floor
+    // so a fresh scene populates quickly, then trickle so the climb into the drop
+    // reads as a gathering crowd; when energy falls (over target) retire the
+    // oldest live one early so the crowd eases back down. Natural lifetime expiry
+    // keeps individuals cycling in/out; the floor is refilled as they leave.
+    ambientSpawnTimer -= dt;
+    if (ambientSpawnTimer <= 0) {
+      if (activeCount < target) {
+        requestSpawn();
+        ambientSpawnTimer = activeCount < AMBIENT_MIN ? 0.12 : 0.45;
+      } else if (activeCount > target) {
+        let oldest = null;
+        for (let i = 0; i < ambientPool.length; i++) { const p = ambientPool[i]; if (p.active && p.life !== 'out' && (!oldest || p.seq < oldest.seq)) oldest = p; }
+        if (oldest) { oldest.life = 'out'; oldest.age = 0; }
+        ambientSpawnTimer = 0.6;
+      } else {
+        ambientSpawnTimer = 0.5;   // at target — idle re-check
+      }
+    }
+    // shared beat illumination (same formula as the duet's frame()) so spawns
+    // glow on the beat too — computed once, applied to each instance's mats.
+    const glow = Math.min(1, 0.15 + energy * 0.3 + beatAccent * 0.4);
+    const wireOp = Math.min(0.5, 0.06 + glow * 0.28);
+    const chromeCol = Math.min(1, 0.62 + glow * 0.38);
+
+    for (let i = 0; i < ambientPool.length; i++) {
+      const inst = ambientPool[i];
+      if (!inst.active) continue;
+      inst.age += dt;
+      if (inst.life === 'in') {
+        inst.opacity = inst.fadeIn > 0 ? Math.min(1, inst.age / inst.fadeIn) : 1;
+        if (inst.age >= inst.fadeIn) { inst.life = 'live'; inst.age = 0; }
+      } else if (inst.life === 'live') {
+        inst.opacity = 1;
+        if (inst.age >= inst.lifeDur) { inst.life = 'out'; inst.age = 0; }
+      } else {   // 'out'
+        inst.opacity = inst.fadeOut > 0 ? Math.max(0, 1 - inst.age / inst.fadeOut) : 0;
+        if (inst.age >= inst.fadeOut) { deactivate(inst); continue; }
+      }
+      try {
+        for (let j = 0; j < inst.chromeMats.length; j++) { inst.chromeMats[j].opacity = inst.opacity; inst.chromeMats[j].color.setScalar(chromeCol); }
+        for (let j = 0; j < inst.wireMats.length; j++) inst.wireMats[j].opacity = wireOp * inst.opacity;
+        dance(inst, dt, now, clk);   // same engine, own rigState → own move/phase
+        applyRig(inst);              // proxy joints → real bones (retarget)
+        inst.rigGroup.updateMatrixWorld(true);
+        for (let j = 0; j < inst.skinnedMeshes.length; j++) { const sk = inst.skinnedMeshes[j].skeleton; if (sk) sk.update(); }
+      } catch (_) { /* a bad spawn must never take down the duet */ }
+    }
+  }
+
+  // Dispose every pooled instance's cloned materials + the ambient renderer.
+  // Geometry is SHARED with the duet's armadrillo (SkeletonUtils doesn't clone
+  // it) so it is deliberately NOT disposed here. Called on ambient/duet context
+  // loss and on the build-failure teardown.
+  function disposeAmbient() {
+    for (let i = 0; i < ambientPool.length; i++) {
+      const inst = ambientPool[i];
+      if (inst.rigGroup && ambientScene) { try { ambientScene.remove(inst.rigGroup); } catch (_) {} }
+    }
+    for (let i = 0; i < ambientDisposables.length; i++) { try { ambientDisposables[i].dispose(); } catch (_) {} }
+    ambientDisposables.length = 0;
+    ambientPool.length = 0;
+    ambientEnabled = false;
+    try { ambientRenderer && ambientRenderer.dispose(); } catch (_) {}
+    ambientRenderer = null;
   }
 
   // ── main loop ──────────────────────────────────────────────────────────
@@ -1735,6 +2182,18 @@ export function initKineticDancer() {
 
     renderer.render(scene, camera);
 
+    // ── ambient armadrillo crowd (tablet/desktop, own renderer/scene/camera) ──
+    // Only runs once the armadrillo template has loaded (we clone from it). The
+    // scheduler pauses for free when the tab hides, since frame() itself stops.
+    if (ambientRenderer && rigA.modelReady) {
+      if (ambientEnabled) updateAmbient(dt, now, clk);
+      if (ambientEnabled || ambientNeedsClear) {
+        ambientRenderer.render(ambientScene, ambientCamera);
+        ambientNeedsClear = false;
+        if (!ambientLive) { ambientLive = true; ambientCanvas.classList.add('is-live'); }
+      }
+    }
+
     if (!live) { live = true; canvas.classList.add('is-live'); }  // CSS fades it in
     raf = requestAnimationFrame(frame);
   }
@@ -1752,6 +2211,7 @@ export function initKineticDancer() {
   } catch (e) {
     // teardown anything half-built and bail (no context left running)
     try { for (const g of disposables) g.dispose(); } catch (_) {}
+    try { disposeAmbient(); } catch (_) {}
     try { renderer && renderer.dispose(); } catch (_) {}
     dead = true;
     return;

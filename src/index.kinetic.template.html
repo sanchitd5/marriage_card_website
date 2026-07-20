@@ -243,6 +243,12 @@
   <!-- Film-grain overlay (saifullah): a static noise texture over everything.
        Pure CSS (kinetic.css), above the canvas, below content. -->
   <div class="k-grain" aria-hidden="true"></div>
+  <!-- Ambient armadrillo crowd: lone dancers fade in at random spots across the
+       WHOLE viewport at random intervals, then fade out. Tablet + desktop only
+       (kinetic.css hides it below 768px + under reduced-motion). Full-viewport
+       canvas, BEHIND the duet + panels, pointer-events:none. Driven by the same
+       kinetic-dancer.js (own renderer/scene/camera so the duet is untouched). -->
+  <canvas id="k-ambient-dancers" aria-hidden="true"></canvas>
   <!-- Persistent side wireframe dancer (procedural humanoid, music-reactive).
        Own low-DPR canvas, fixed and OUTSIDE #smooth-wrapper. Hidden on mobile +
        reduced-motion (kinetic.css). Driven by kinetic-dancer.js. -->
@@ -429,6 +435,9 @@
   <script src="https://cdn.jsdelivr.net/npm/butterchurn-presets@2.4.7/lib/butterchurnPresets.min.js" defer></script>
   <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/GLTFLoader.js" defer></script>
   <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/DRACOLoader.js" defer></script>
+  <!-- SkeletonUtils.clone: rebinds a cloned skinned skeleton (Object3D.clone
+       does not) — used to pool the ambient armadrillo crowd. Guarded in JS. -->
+  <script src="https://unpkg.com/three@0.128.0/examples/js/utils/SkeletonUtils.js" defer></script>
   <script type="module" src="js/main.kinetic.js"></script>
 </body>
 </html>
