@@ -58,7 +58,18 @@ function scramble(el, { duration = 1.1, delay = 0 } = {}) {
   const run = () => {
     el.classList.add('is-scrambling');
     const start = performance.now();
+    let settled = false;
+    // A stalled/backgrounded rAF chain must never leave factual copy (the
+    // wedding date/venue) stuck on random glyphs — force-resolve on a plain
+    // timer regardless of whether the rAF loop ever completes.
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      nodes.forEach((n, i) => { n.nodeValue = finals[i]; });
+      el.classList.remove('is-scrambling');
+    };
     const step = now => {
+      if (settled) return;
       const p = Math.min(1, (now - start) / (duration * 1000));
       nodes.forEach((n, i) => {
         const s = finals[i];
@@ -71,10 +82,10 @@ function scramble(el, { duration = 1.1, delay = 0 } = {}) {
         n.nodeValue = out;
       });
       if (p < 1) { requestAnimationFrame(step); return; }
-      nodes.forEach((n, i) => { n.nodeValue = finals[i]; });
-      el.classList.remove('is-scrambling');
+      settle();
     };
     requestAnimationFrame(step);
+    setTimeout(settle, duration * 1000 + 800);
   };
   if (delay > 0) setTimeout(run, delay * 1000); else run();
 }
@@ -341,8 +352,15 @@ export function initKinetic() {
   prevBtn.type = 'button'; prevBtn.id = 'k-prev'; prevBtn.className = 'k-wz-btn';
   prevBtn.textContent = '◀ Back';
   prevBtn.addEventListener('click', () => { if (entered) go(idx - 1); });
-  const stepEl = document.createElement('span');
-  stepEl.id = 'k-step'; stepEl.className = 'k-step'; stepEl.setAttribute('aria-live', 'polite');
+  // On mobile the labelled side menu is hidden for space; the step readout
+  // doubles as its jump control — tapping it opens a bottom sheet listing every
+  // panel (the same menu buttons above, repositioned by CSS at narrow widths).
+  const stepEl = document.createElement('button');
+  stepEl.type = 'button'; stepEl.id = 'k-step'; stepEl.className = 'k-step';
+  stepEl.setAttribute('aria-haspopup', 'listbox');
+  stepEl.setAttribute('aria-expanded', 'false');
+  stepEl.setAttribute('aria-controls', 'k-panel-menu');
+  stepEl.innerHTML = '<span class="k-step-label"></span><span class="k-step-count" aria-live="polite"></span>';
   const nextBtn = document.createElement('button');
   nextBtn.type = 'button'; nextBtn.id = 'k-next'; nextBtn.className = 'k-wz-btn';
   nextBtn.textContent = 'Next ▶';
@@ -350,18 +368,59 @@ export function initKinetic() {
   controls.append(prevBtn, stepEl, nextBtn);
   document.body.appendChild(controls);
 
+  const sheetBackdrop = document.createElement('div');
+  sheetBackdrop.id = 'k-sheet-backdrop';
+  document.body.appendChild(sheetBackdrop);
+  function closeSheet() {
+    menu.classList.remove('k-sheet-open');
+    sheetBackdrop.classList.remove('k-sheet-open');
+    stepEl.setAttribute('aria-expanded', 'false');
+  }
+  function openSheet() {
+    menu.classList.add('k-sheet-open');
+    sheetBackdrop.classList.add('k-sheet-open');
+    stepEl.setAttribute('aria-expanded', 'true');
+  }
+  stepEl.addEventListener('click', () => {
+    if (menu.classList.contains('k-sheet-open')) closeSheet(); else openSheet();
+  });
+  sheetBackdrop.addEventListener('click', closeSheet);
+  menuBtns.forEach(b => b.addEventListener('click', closeSheet));
+
   const pad2 = n => String(n).padStart(2, '0');
+  const stepLabelEl = stepEl.querySelector('.k-step-label');
+  const stepCountEl = stepEl.querySelector('.k-step-count');
   function updateChrome() {
     menuBtns.forEach((b, i) => b.classList.toggle('is-current', i === idx));
-    stepEl.textContent = `${pad2(idx + 1)} / ${pad2(acts.length)}`;
+    if (stepLabelEl) stepLabelEl.textContent = labelFor(acts[idx], idx);
+    if (stepCountEl) stepCountEl.textContent = `${pad2(idx + 1)} / ${pad2(acts.length)}`;
     prevBtn.disabled = idx === 0;
     nextBtn.disabled = idx === acts.length - 1;
   }
   updateChrome();
 
-  // NOTE: no wheel / touch-swipe / arrow-key handlers by design — navigation is
-  // buttons/clicks only. A panel taller than the viewport still scrolls its own
-  // overflow natively (CSS overflow-y:auto), which never changes the panel.
+  // NOTE: navigation is buttons/menu-sheet/clicks — no wheel / arrow-key
+  // handlers. Horizontal swipe is an additional, SECONDARY path on touch (the
+  // owner's explicit call): Back/Next/menu stay the primary, discoverable
+  // controls. A panel taller than the viewport still scrolls its own overflow
+  // natively (CSS overflow-y:auto), which never changes the panel — the
+  // horizontal-dominance check below keeps swipe from fighting that scroll.
+  (function initSwipe() {
+    let sx = 0, sy = 0, tracking = false;
+    const IGNORE = '#k-panel-controls, #k-panel-menu, #k-sheet-backdrop, button, a';
+    window.addEventListener('touchstart', e => {
+      if (!entered || (e.target.closest && e.target.closest(IGNORE))) { tracking = false; return; }
+      const t = e.touches[0];
+      sx = t.clientX; sy = t.clientY; tracking = true;
+    }, { passive: true });
+    window.addEventListener('touchend', e => {
+      if (!tracking) return;
+      tracking = false;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - sx, dy = t.clientY - sy;
+      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.3) go(idx + (dx < 0 ? 1 : -1));
+    }, { passive: true });
+  })();
 
   // ── Hero entrance (fired by the gate on open) ──
   const heroNames = $$('#hero [data-scramble-name]');

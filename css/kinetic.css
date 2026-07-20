@@ -371,8 +371,6 @@ html[data-variant="kinetic"] .gate-hint .k-click { display: none; }
   transition: opacity 1.1s var(--k-ease);
 }
 #k-dancer-canvas.is-live { opacity: 1; }
-/* no room for a side companion on a phone; the light show carries mobile */
-@media (max-width: 900px) { #k-dancer-canvas { display: none; } }
 @media (prefers-reduced-motion: reduce) { #k-dancer-canvas { display: none; } }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -472,7 +470,11 @@ html:not(.k-deck) #k-panel-controls { display: none; }
 .k-step {
   font-size: .6rem; letter-spacing: .22em; color: var(--muted);
   font-variant-numeric: tabular-nums;
+  background: none; border: 0; padding: 0; cursor: default;
 }
+/* the jump-sheet label is a mobile-only affordance (the desktop rail is
+   already visible) — hidden here, revealed at ≤720px below */
+.k-step-label { display: none; }
 
 /* mobile: the labelled rail crowds a narrow frame — hide it and give a compact
    bottom control bar (Back / Next + counter). The panel's own heading + HUD
@@ -593,15 +595,6 @@ html.k-deck .gframe--veiled {
   -webkit-backdrop-filter: none; backdrop-filter: none;
 }
 
-/* ── Mobile: fixed bottom controls bar overlapped panel content + the music
-      FAB. Give panels bottom clearance and lift the dock above the bar. ── */
-@media (max-width: 720px) {
-  html.k-deck .hero,
-  html.k-deck .band,
-  html.k-deck .footer { padding-bottom: 5.5rem; }
-  html.k-deck #right-dock { bottom: 5.4rem; }
-}
-
 /* ── Consistency: left-anchor the panels that techno centres (hero/footer/
       gallery) so the whole deck reads as one left-column system ── */
 @media (min-width: 900px) {
@@ -657,12 +650,6 @@ html.k-deck[data-panel="rsvp"]       #k-dancer-canvas { transform: translateX(24
 html.k-deck .k-menu-item { color: #98a2b1; }
 html.k-deck .event-when,
 html.k-deck .event-venue { color: var(--body); }
-/* mobile: uniform obsidian floor (dancer hidden there) so text contrast is even
-   across panels rather than riding a variable backdrop */
-@media (max-width: 899px) {
-  #k-dancer-scrim { display: block; background: linear-gradient(180deg, rgba(6,7,10,.5), rgba(6,7,10,.72)); }
-}
-
 /* P2 — countdown digits: crisp cyan glow (not the beat-driven greenish bloom) */
 html.k-deck .count-num { color: var(--text); text-shadow: 0 0 10px rgba(var(--accent-rgb), .4); }
 
@@ -714,16 +701,6 @@ html.k-deck .gframe--veiled::after {
   html.k-deck[data-panel="rsvp"] .footer { justify-content: safe center; }
   html.k-deck .footer-line { font-size: clamp(1.1rem, 1.7vw, 1.45rem); max-width: 34rem; line-height: 1.35; }
   html.k-deck .footer-sign span { font-size: clamp(1.3rem, 2.2vw, 1.8rem); }
-}
-
-/* B1/B7 — mobile RUN OF SHOW: single-column rows, full-width stacked actions,
-   and real bottom clearance so Track 03 never collides with the nav bar */
-@media (max-width: 720px) {
-  html.k-deck[data-panel="run-of-show"] .events { padding-bottom: 7rem; }
-  html.k-deck[data-panel="run-of-show"] .event-card { grid-template-columns: 1fr; gap: 0; }
-  html.k-deck[data-panel="run-of-show"] .event-no { grid-row: auto; margin-bottom: .3rem; }
-  html.k-deck[data-panel="run-of-show"] .event-actions { display: flex; flex-direction: column; gap: .5rem; align-items: stretch; }
-  html.k-deck[data-panel="run-of-show"] .btn-quiet { width: 100%; text-align: center; }
 }
 
 /* B2 (root cause) — panel backgrounds were veiling the dancer inconsistently
@@ -963,33 +940,150 @@ html.k-deck .gframe--veiled { border: 1px solid rgba(var(--accent-rgb), .22); }
 html[data-variant="kinetic"] #hero { overflow: hidden; }
 
 /* ═══════════════════════════════════════════════════════════════════
-   MOBILE DANCER — no room for a side companion on a phone, so the dancer
-   becomes a full-width AMBIENT BACKGROUND hologram behind the panel
-   content (dimmed + scrimmed for legibility). Overrides the earlier
-   `display:none` and the desktop right-side placement.
+   MOBILE MAKEOVER (whole-UI review pass — Fable + Sonnet + Opus panel).
+   Supersedes the punch-list rounds above for mobile: the dancer gets a
+   RESERVED stage that content never enters (instead of sharing a band and
+   occasionally crossing buttons/text); Back/Next + event actions grow to
+   real touch targets; body copy clears the dark-UI legibility floor; the
+   hidden side menu comes back as a tappable bottom sheet; panels regain
+   internal scroll so short phones never clip content.
    ═══════════════════════════════════════════════════════════════════ */
 @media (max-width: 900px) {
-  /* Anchor the figure to the LOWER band of the screen (where panels have empty
-     space) instead of dead-centre where the centred headline masks it. It rises
-     from the bottom behind the content — clearly visible, more present. */
+  /* ── Dancer: reserved stage, never shared with content ── */
   html.k-deck #k-dancer-canvas {
     display: block;
     left: 0; right: 0; top: auto;
-    /* stand it on a "floor" just ABOVE the bottom Back/Next bar (its feet rest
-       at the canvas bottom edge, lifted clear of the controls). */
-    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
-    width: 100%; height: 52svh;
-    transform: none;                 /* drop the desktop right-shift */
-    z-index: 1;                      /* behind the panel content (z2) */
+    bottom: calc(4.85rem + env(safe-area-inset-bottom, 0px));
+    width: 100%; height: 38svh;
+    transform: none;
+    z-index: 1;
   }
   html.k-deck #k-dancer-canvas.is-live,
   html.k-deck[data-panel="interlude"] #k-dancer-canvas.is-live,
-  html.k-deck[data-panel="archive"]   #k-dancer-canvas.is-live,
-  html.k-deck[data-panel="rsvp"]       #k-dancer-canvas.is-live { opacity: 0.6; }
-  html.k-deck[data-panel="interlude"] #k-dancer-canvas { transform: none; }
-  /* scrim only the TOP (behind the headline) so the lower figure stays visible */
+  html.k-deck[data-panel="rsvp"]       #k-dancer-canvas.is-live { opacity: .58; }
+  html.k-deck[data-panel="interlude"] #k-dancer-canvas,
+  html.k-deck[data-panel="rsvp"]      #k-dancer-canvas { transform: none; }
+
+  /* Dense panels (tracklist / archive) get a faint header watermark instead of
+     a bottom stage, so it never sits behind buttons or the tracklist rows. */
+  html.k-deck[data-panel="run-of-show"] #k-dancer-canvas,
+  html.k-deck[data-panel="archive"]     #k-dancer-canvas {
+    top: 0; bottom: auto; height: 28svh;
+  }
+  html.k-deck[data-panel="run-of-show"] #k-dancer-canvas.is-live,
+  html.k-deck[data-panel="archive"]     #k-dancer-canvas.is-live { opacity: .15; }
+
+  /* Reserve the stage: panel content padding stops at its edge, so text/buttons
+     can never render inside the dancer's band. */
+  html.k-deck .hero, html.k-deck .band, html.k-deck .footer {
+    padding-bottom: calc(38svh + 4.85rem + env(safe-area-inset-bottom, 0px));
+  }
+  html.k-deck[data-panel="run-of-show"] .band,
+  html.k-deck[data-panel="archive"]     .band {
+    padding-bottom: calc(4.85rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Scrim: display panels feather the TOP (behind the headline); dense panels
+     feather the top watermark down to fully opaque before the first content row. */
   html.k-deck #k-dancer-scrim {
     display: block; z-index: 1;
-    background: linear-gradient(180deg, rgba(6,7,10,.78) 0%, rgba(6,7,10,.5) 38%, rgba(6,7,10,0) 62%);
+    background: linear-gradient(180deg, rgba(6,7,10,.8) 0%, rgba(6,7,10,.45) 34%, rgba(6,7,10,0) 55%);
   }
+  html.k-deck[data-panel="run-of-show"] #k-dancer-scrim,
+  html.k-deck[data-panel="archive"]     #k-dancer-scrim {
+    background: linear-gradient(180deg, rgba(6,7,10,.15) 0%, rgba(6,7,10,.9) 24%, rgba(6,7,10,.96) 38%, rgba(6,7,10,.96) 100%);
+  }
+
+  /* ── Music FAB: out of the Next / iOS home-indicator collision zone ── */
+  html.k-deck #right-dock {
+    top: calc(env(safe-area-inset-top, 0px) + .75rem);
+    bottom: auto; right: .75rem; left: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  /* ── Back/Next + step readout: real 48px touch targets (WCAG 2.5.5) ── */
+  #k-panel-controls {
+    box-sizing: border-box;
+    min-height: calc(4.85rem + env(safe-area-inset-bottom, 0px));
+    padding: .7rem 1rem calc(.7rem + env(safe-area-inset-bottom, 0px));
+    background: rgba(6, 7, 10, .92);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    border-top: 1px solid var(--hairline);
+  }
+  .k-wz-btn {
+    min-height: 48px; min-width: 44px;
+    font-size: .72rem; padding: .7rem 1.15rem;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .k-wz-btn:disabled { opacity: .45; }   /* was .28 — stays legible against obsidian */
+
+  /* the step counter is now a tappable jump control (opens the sheet below) */
+  .k-step {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: .1rem; min-height: 48px; padding: 0 .6rem;
+    background: none; border: 0; cursor: pointer;
+  }
+  .k-step-label {
+    display: block; font-size: .66rem; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--accent);
+    max-width: 30vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .k-step-count { font-size: .58rem; letter-spacing: .08em; }
+
+  /* ── Jump sheet: the hidden side menu, repurposed as a bottom sheet ── */
+  #k-panel-menu {
+    display: flex; position: fixed; left: 0; right: 0; top: auto; bottom: 0;
+    flex-direction: column; gap: 0; transform: translateY(100%); pointer-events: none;
+    background: rgba(6, 7, 10, .97);
+    border-top: 1px solid rgba(var(--accent-rgb), .28);
+    border-radius: 16px 16px 0 0;
+    padding: .5rem 0 calc(.5rem + env(safe-area-inset-bottom, 0px));
+    max-height: 70svh; overflow-y: auto;
+    z-index: 59;                                 /* above the sheet backdrop + dock */
+    transition: transform .35s var(--k-ease);
+  }
+  #k-panel-menu.k-sheet-open { transform: translateY(0); pointer-events: auto; }
+  .k-menu-item {
+    padding: .95rem 1.4rem; font-size: .78rem; letter-spacing: .1em;
+    border-bottom: 1px solid var(--hairline); min-height: 48px;
+  }
+  .k-menu-item:last-child { border-bottom: 0; }
+  .k-menu-item::before { display: none; }        /* the active row's own colour reads fine here */
+  #k-sheet-backdrop {
+    position: fixed; inset: 0; z-index: 58; background: rgba(6, 7, 10, .6);
+    opacity: 0; pointer-events: none; transition: opacity .35s var(--k-ease);
+  }
+  #k-sheet-backdrop.k-sheet-open { opacity: 1; pointer-events: auto; }
+
+  /* ── Typography floor: Run of Show is the highest-value copy on the site ── */
+  html.k-deck[data-panel="run-of-show"] .event-no { font-size: .68rem; font-weight: 700; }
+  html.k-deck[data-panel="run-of-show"] .event-name { font-size: 1.2rem; }
+  html.k-deck[data-panel="run-of-show"] .event-when,
+  html.k-deck[data-panel="run-of-show"] .event-venue,
+  html.k-deck[data-panel="run-of-show"] .event-dress { font-size: .94rem; }
+  html.k-deck[data-panel="run-of-show"] .event-dress span { font-size: .66rem; letter-spacing: .08em; }
+  html.k-deck[data-panel="run-of-show"] .events .kicker { font-size: .72rem; }
+
+  /* ── Event action buttons: real touch targets + a visible resting boundary
+     (the hairline border only strengthened on :hover, meaningless on touch) ── */
+  html.k-deck[data-panel="run-of-show"] .btn-quiet {
+    min-height: 46px; font-size: .74rem; padding: .55rem .5rem; letter-spacing: .06em;
+    border-color: rgba(var(--accent-rgb), .55);
+    background: rgba(var(--accent-rgb), .05);
+  }
+
+  /* ── Restore internal scroll on tall panels (hero stays fixed/short by
+     design — see the explicit #hero overflow:hidden rule below). Short phones
+     and enlarged system fonts can now reach content instead of clipping it. ── */
+  html.k-deck .band,
+  html.k-deck .footer {
+    overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+  }
+  html.k-deck .band::-webkit-scrollbar,
+  html.k-deck .footer::-webkit-scrollbar { width: 0; height: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #k-panel-menu, #k-sheet-backdrop { transition: none; }
 }
