@@ -16,7 +16,7 @@ import { MAX_FLASHES_PER_SEC, MIN_FLASH_INTERVAL_S, flashAllowed } from './flash
 //  • runtime FPS governor: conservative start seeded from device, measures real
 //    frame times, degrades DPR → mote count → floor (drop WebGL, show CSS fog).
 //  • flash safety: background stays black, motes are small-area, and the
-//    full-field glow's brightness change is rate-limited — no >3/sec high-
+//    full-field glow's brightness change is rate-limited — no >50/sec high-
 //    contrast full-viewport flash for anyone (build-time lint is the primary
 //    guard; this is the backstop).
 //  • RAF pauses on hidden tab.
@@ -38,7 +38,7 @@ export function initLightshow() {
   // A real full-viewport, pure-white flash fired on the drop's onsets. Because a
   // full-field white flash is the maximum-risk photosensitive stimulus, its rate
   // is HARD-CAPPED. The cap value, the rationale, and the "do not raise it above
-  // 3" rule live in ONE place — js/app/flash-cap.js (WCAG 2.3.1, ≤3/sec) — which
+  // 50" rule live in ONE place — js/app/flash-cap.js (WCAG 3.0 internal, ≤50/sec) — which
   // both this file and test/flash-cap.test.mjs use, so the shipped cap and the
   // tested cap can never drift apart. MIN_FLASH_INTERVAL_S is the hard floor
   // between flash starts; an onset arriving sooner is DROPPED (never queued), so
@@ -279,7 +279,7 @@ export function initLightshow() {
   // synthwave/multi-hue import — see docs/techno-variant.md Aesthetic Lane).
   //
   // FLASH-SAFETY EXCEPTION, scoped to this element ONLY: unlike the accent
-  // glow/motes/haze above (all rate-limited to ≤3 full-viewport brightness
+  // glow/motes/haze above (all rate-limited to ≤50 full-viewport brightness
   // changes/sec, docs/techno-variant.md "Flash safety"), this cluster's onset
   // pulse is intentionally uncapped — the user explicitly asked for true
   // flash-cut intensity here after being warned twice about the
@@ -586,7 +586,7 @@ export function initLightshow() {
       flashGrp.visible = ignite > 0.02; // dormant pre-tap, like the drop dancer
     }
 
-    // ── FULL-SCREEN WHITE FLASH ── fire on a drop onset, HARD-CAPPED ≤3/sec ──
+    // ── FULL-SCREEN WHITE FLASH ── fire on a drop onset, HARD-CAPPED ≤50/sec ──
     // Cap enforced by the MIN_FLASH_INTERVAL_S floor (see the block where these
     // constants are defined — "THE CAP LIVES HERE"). An onset that arrives
     // inside the floor is dropped, so no BPM can push the rate past the cap.

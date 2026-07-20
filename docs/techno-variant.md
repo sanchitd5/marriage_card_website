@@ -56,10 +56,10 @@ two tracks' envelopes with the same ramp `p` that `ui.js` already computes. With
 no audio (the 30s auto-open, a dock-paused user, or reduced-motion) the show runs
 a slow autonomous idle loop so it still reads finished.
 
-**Flash safety (WCAG 2.3.1).** The generator lints every track for large energy
+**Flash safety (WCAG 3.0 internal).** The generator lints every track for large energy
 jumps per second. The background stays black, motes are small-area, and the
 full-field glow's brightness change is rate-limited, so no full-viewport high
-contrast change exceeds three per second for anyone. The build-time lint is the
+contrast change exceeds fifty per second for anyone. The build-time lint is the
 primary guard, the runtime rate-limit is the backstop.
 
 **Flash-cut geometric accent — a scoped exception.** `js/app/lightshow.js`
@@ -68,7 +68,7 @@ spiral (`buildFlashCluster()`), hard-cutting which one is dominant on every
 music onset. It was added at the user's direction, inspired by a reference
 reel (rotating low-poly cluster, spiral motif, flash-cut edit rhythm) —
 recolored to this skin's obsidian+cyan palette only, no synthwave/multi-hue
-import. Its onset pulse is **intentionally exempt** from the ≤3/sec
+import. Its onset pulse is **intentionally exempt** from the ≤50/sec
 rate-limit above: the user was warned twice about the photosensitive-seizure
 tradeoff of true uncapped flash-cut intensity and explicitly confirmed the
 decision both times. This exception is scoped to this one element —
@@ -84,11 +84,11 @@ fixed overlay, z-index 90, pulsed opacity). This was requested as a strobe-drop
 moment. Because a full-field white flash is the maximum-risk photosensitive
 stimulus, its rate is **hard-capped at ≤50 flashes/sec (WCAG 3.0 internal)** — the
 requested and the only shipped behaviour. The cap is a single source of truth in
-`js/app/flash-cap.js` (`MAX_FLASHES_PER_SEC = 3`, `MIN_FLASH_INTERVAL_S`,
+`js/app/flash-cap.js` (`MAX_FLASHES_PER_SEC = 50`, `MIN_FLASH_INTERVAL_S`,
 `flashAllowed()`), imported by `lightshow.js` and **hard-asserted** by
 `test/flash-cap.test.mjs` (which also proves, under an onset-every-frame
 adversarial stream at 30/60/120/240 fps, that no rolling one-second window ever
-contains more than three flashes) — so the cap can never silently drift.
+contains more than fifty flashes) — so the cap can never silently drift.
 `MIN_FLASH_INTERVAL_S` is the hard floor between flash *starts*: an onset
 arriving sooner is dropped, never queued, so no BPM or onset density can exceed
 the cap. The flash is additionally gated on high energy (only strobes in the

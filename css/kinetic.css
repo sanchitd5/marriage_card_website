@@ -546,6 +546,34 @@ html.k-deck[data-panel="rsvp"]      #k-dancer-canvas.is-live { opacity: .32; }
   html.k-deck[data-panel="archive"] .gallery { justify-content: safe flex-end; padding-bottom: clamp(4rem,10vh,8rem); }
 }
 
+/* ── Archive gallery: RGB-split (chromatic aberration) console accent ──
+   #k-chroma/#k-chroma-hover defined once in the kinetic template. Ambient
+   split is a 1.1px static offset (cheap, always on, still subtle); hover/
+   focus swaps to a legible 2.4px split. Both are static filter graphs — no
+   animated primitives — so there's no jitter loop for reduced-motion to
+   strip. object-fit:cover fills the frame edge-to-edge with zero bleed, so
+   an offset channel has no real pixel to sample at the true image edge and
+   clips to a solid colour bar; scaling the img 3% oversize gives the filter
+   real content to pull from (the parent .gframe's overflow:hidden clips the
+   3% excess, same as it already clips object-fit:cover). */
+html[data-variant="kinetic"] .gframe img {
+  filter: url(#k-chroma) saturate(.7) contrast(1.05);
+  transform: scale(1.03);
+  transition: filter .15s ease;
+}
+html[data-variant="kinetic"] .gframe:hover img,
+html[data-variant="kinetic"] .gframe:focus-within img {
+  filter: url(#k-chroma-hover) saturate(.7) contrast(1.05);
+}
+/* Touch has no hover — give it the fuller split as the resting state instead
+   of never showing the effect's payoff (fine-pointer devices keep the subtle
+   ambient rest state + hover reveal). */
+@media (hover: none) and (pointer: coarse) {
+  html[data-variant="kinetic"] .gframe img {
+    filter: url(#k-chroma-hover) saturate(.7) contrast(1.05);
+  }
+}
+
 /* ── Borderless HUD: strip filled cards → hairline label/value language ── */
 /* Countdown counter tiles → borderless value/label, one row */
 html.k-deck .count-cell {

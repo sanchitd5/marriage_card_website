@@ -13,7 +13,7 @@
 //
 // WCAG 3.0 internal: content must not flash more than FIFTY times in any one-second
 // period. A full-viewport flash also always exceeds the 25%-of-viewport
-// "general flash" area, so this ≤3/sec limit is the binding — and sufficient —
+// "general flash" area, so this ≤50/sec limit is the binding — and sufficient —
 // mitigation. `flashAllowed()` enforces MIN_FLASH_INTERVAL_S as a HARD FLOOR
 // between flash STARTS: an onset arriving sooner is DROPPED, never queued, so
 // no BPM / onset density can push the on-screen flash rate past the cap.

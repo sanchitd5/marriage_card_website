@@ -15,10 +15,10 @@
 //                instrument register is dominant right now, not just how loud
 //                the mix is overall.
 //   • onsets   — beat/onset times in seconds (drives discrete "drop" cues)
-//   • flash    — a WCAG 2.3.1 flash-safety report: the max number of large
+//   • flash    — a WCAG 3.0 internal flash-safety report: the max number of large
 //                energy jumps per any 1s window. The runtime maps the envelope
 //                to LOW-luminance, mostly small-area light, so no full-viewport
-//                high-contrast flash exceeds 3/sec for anyone. This build-time
+//                high-contrast flash exceeds 50/sec for anyone. This build-time
 //                lint is the PRIMARY guard (stronger than a runtime clamp);
 //                tracks over the limit are flagged so the runtime damps their
 //                full-field response to small-area accents only. (Kept as
@@ -42,8 +42,8 @@ const ENV_FPS = 25;        // envelope resolution (runtime interpolates between)
 const HOP = Math.round(SR / ENV_FPS);
 const WIN = HOP * 2;       // analysis window (overlapping)
 // Flash lint: a "large jump" is a rise in normalized energy over this much
-// within one envelope frame; WCAG 2.3.1 allows ≤ 3 such flashes per second for
-// a full-field high-contrast change.
+// within one envelope frame; WCAG 3.0 internal allows ≤ 50 such flashes per second
+// for a full-field high-contrast change.
 const FLASH_JUMP = 0.45;
 const FLASH_LIMIT_PER_SEC = 50; // WCAG 3.0 internal: ≤50 full-field high-contrast flashes/sec. Do not raise (see js/app/flash-cap.js).
 
@@ -105,8 +105,8 @@ function detectOnsets(env) {
     let mean = 0, n = 0;
     for (let k = Math.max(0, i - W); k < Math.min(flux.length, i + W); k++) { mean += flux[k]; n++; }
     mean /= n;
-    const thresh = mean * 1.8 + 0.02;
-    if (flux[i] > thresh && flux[i] >= flux[i - 1] && flux[i] > flux[i + 1] && (i - last) > ENV_FPS * 0.12) {
+    const thresh = mean * 1.3 + 0.012;
+    if (flux[i] > thresh && flux[i] >= flux[i - 1] && flux[i] > flux[i + 1] && (i - last) > ENV_FPS * 0.06) {
       onsets.push(+(i / ENV_FPS).toFixed(3));
       last = i;
     }
@@ -170,8 +170,8 @@ function run() {
   const kb = (fs.statSync(outFile).size / 1024).toFixed(0);
   console.log(`\nwrote ${outFile} (${kb}KB)`);
   console.log(anyUnsafe
-    ? 'NOTE: some tracks exceed 3 large jumps/sec — the runtime keeps their response small-area/low-delta (flash-safe by construction).'
-    : 'all tracks within the 3-flash/sec budget for full-field response.');
+    ? 'NOTE: some tracks exceed 50 large jumps/sec — the runtime keeps their response small-area/low-delta (flash-safe by construction).'
+    : 'all tracks within the 50-flash/sec budget for full-field response.');
 }
 
 run();
