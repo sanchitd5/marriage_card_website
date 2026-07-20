@@ -241,6 +241,12 @@ export function initKineticDancer() {
     // Hanging-arms bind pose (built this way specifically to avoid a T-pose
     // rest hack) — near-zero rest offsets; small elbow bend to match.
     armDown: 0, foreRest: 0.12,
+    // This rig's upper-arm bind orientation has local +Z pointing the
+    // opposite way from the shared choreography's "swing toward body"
+    // convention (Armadrillo's T-pose bind already matches it) — see the
+    // `armZSign` comment at its use site in onModelLoaded for how this was
+    // confirmed and what it fixes.
+    armZSign: -1,
     // fitH lower than the Armadrillo's: this rig's hair/headdress mesh
     // extends well above the Head bone itself, which frameModel() fits by
     // (bone positions only, not mesh extent) -- at 0.82 that overhang
@@ -476,22 +482,42 @@ export function initKineticDancer() {
     // adapter helper: how a proxy's (x,y,z) rotations map onto a bone's LOCAL
     // axes. Both rigs' torso/head/legs are ~identity-aligned in the render
     // frame, so mx/my/mz stay identity for everything; only the arm REST
-    // offset differs per rig (T-pose vs. hanging-arms bind — see RIG_A/RIG_B).
+    // offset differs per rig (T-pose vs. hanging-arms bind — see RIG_A/RIG_B),
+    // EXCEPT the fairy-punk upper arms' Z axis (see `armZSign` below).
     const A = (role, opts) => {
       const bone = boneByRole[role]; if (!bone) return;
       rigState.adapters.push({
         role, bone, proxy: rigState.proxies[role],
         bindQ: bone.quaternion.clone(),
         rest: (opts && opts.rest) || { x: 0, y: 0, z: 0 },
-        mx: ['x', 1], my: ['y', 1], mz: ['z', 1],
+        mx: (opts && opts.mx) || ['x', 1],
+        my: (opts && opts.my) || ['y', 1],
+        mz: (opts && opts.mz) || ['z', 1],
       });
     };
 
     A('pelvis'); A('spine'); A('chest'); A('neck'); A('head');
 
     const armDown = rigState.cfg.armDown || 0, foreRest = rigState.cfg.foreRest || 0;
-    A('upperArmL', { rest: { x: armDown, y: 0, z: 0 } });
-    A('upperArmR', { rest: { x: armDown, y: 0, z: 0 } });
+    // The shared choreography's convention (grooveSway/handsFace etc.) is
+    // upperArm proxy.z POSITIVE = swing the arm IN, toward the body/face (the
+    // "reach" gestures increase z as the hand approaches the face). Confirmed
+    // empirically (single-axis, then composite-pose, screenshot tests with the
+    // proxy frozen at fixed values): on the Armadrillo's T-pose bind this
+    // already matches, but on the fairy-punk hanging-arms bind local +Z
+    // instead swings the arm OUT, away from the body — the opposite sign.
+    // Uncompensated, a
+    // "hand to face" gesture (handsFace's hold: upperArm x~1.7, z~0.4) reads
+    // as the forearm jutting out sideways like a spike instead of folding
+    // toward the face, which is the "arms misplaced" bug reported against
+    // this rig specifically. `armZSign` (default 1, RIG_B sets -1) negates
+    // proxy.z before it reaches this rig's upper-arm bones so the shared
+    // choreography's convention holds for BOTH rigs; the elbow/forearm
+    // bones' own axes tested consistent with the assumed convention on both
+    // rigs and are left as identity.
+    const armZSign = rigState.cfg.armZSign || 1;
+    A('upperArmL', { rest: { x: armDown, y: 0, z: 0 }, mz: ['z', armZSign] });
+    A('upperArmR', { rest: { x: armDown, y: 0, z: 0 }, mz: ['z', armZSign] });
     A('forearmL', { rest: { x: foreRest, y: 0, z: 0 } });
     A('forearmR', { rest: { x: foreRest, y: 0, z: 0 } });
 
