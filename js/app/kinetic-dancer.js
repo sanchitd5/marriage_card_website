@@ -273,11 +273,28 @@ export function initKineticDancer() {
     'run-of-show': 'dense', archive: 'dense',
   };
   const DEFAULT_LAYOUT_GROUP = 'display';
+  // The canvas is `width: min(38vw, 560px); height: 100svh` (kinetic.css) —
+  // width is capped/bounded but height tracks the full viewport, so on a
+  // TALLER browser window (1920x1080, 2560x1329, or just a maximized window
+  // on a tall monitor) camera.aspect (canvas w/h) drops well below the
+  // ~0.608 this layout was tuned against at 1440x900. A PERSPECTIVE camera's
+  // horizontal FOV scales with aspect at a FIXED vertical FOV, so a fixed
+  // WORLD-UNIT x offset maps to a LARGER fraction of the (narrower) canvas
+  // as aspect drops — both dancers drift toward, then past, the right edge
+  // and can vanish off-canvas entirely (confirmed: fairy-punk fully
+  // off-screen at 1920x1080, both dancers off-screen at 2000x1050). Scale
+  // the authored x offset by (currentAspect / CALIBRATED_ASPECT) so it holds
+  // its ON-SCREEN position — not its raw world distance — across window
+  // shapes. z (depth) is a separate perspective cue, not an aspect artifact,
+  // left unscaled.
+  const CALIBRATED_ASPECT = 0.608;   // canvas aspect at the 1440x900 window PANEL_LAYOUTS was tuned against
   function updateDuetSlot(rigState, key, dt) {
     const groupName = PANEL_GROUP[document.documentElement.dataset.panel] || DEFAULT_LAYOUT_GROUP;
     const target = PANEL_LAYOUTS[groupName][key];
+    const aspectScale = camera && camera.aspect > 0 ? camera.aspect / CALIBRATED_ASPECT : 1;
+    const targetX = target.x * aspectScale;
     const k = 1 - Math.pow(0.02, dt);   // graceful glide (~1s to settle), not a snap
-    rigState.slotX += (target.x - rigState.slotX) * k;
+    rigState.slotX += (targetX - rigState.slotX) * k;
     rigState.slotScaleMul += (target.scaleMul - rigState.slotScaleMul) * k;
     rigState.slotZ += (target.z - rigState.slotZ) * k;
     rigState.rigGroup.position.x = rigState.baseX + rigState.slotX;
