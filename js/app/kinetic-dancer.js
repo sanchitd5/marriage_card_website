@@ -8,9 +8,11 @@ import {
 // TWO loaded, rigged glTF humanoids share one canvas/renderer/camera, side
 // by side: the Sketchfab "Armadrillo" (CC-BY-4.0, kimni88, 50-bone, T-pose)
 // and "DP Techno Fairy Punk Set" (CC-BY-4.0, BilloXD) — the latter shipped
-// as a static unrigged character set and rigged for this project headlessly
-// in Blender with a 13-bone biped armature in a hanging-arms bind pose (see
-// assets/scene/fairy-punk/license.txt). Both dance to the background music
+// as a static unrigged character set and rigged for this project with an
+// EXPANDED 21-bone biped skeleton (subdivided spine + clavicles + wrists +
+// finger-curls, arms A-pose-matched so they actually deform; built by a
+// deterministic pure-Python re-rig, see assets/scene/fairy-punk/license.txt).
+// Both dance to the background music
 // across every panel: ambient decoration, no user interaction, no audio
 // node of its own — a wedding-invitation duet motif, not a literal
 // depiction of either half of the couple.
@@ -52,8 +54,9 @@ import {
 // bit-identical to the original inline applyRig and both dancers look and move
 // exactly as before - zero regression. The Armadrillo's arms rest in a T-pose
 // along ±X so its hint folds an ARM_DOWN offset + a small FORE_REST elbow bend;
-// the fairy-punk rig was built in a HANGING-ARMS bind pose so its offsets are
-// near-zero (only an upper-arm Z-sign flip). At load the engine ALSO measures,
+// the fairy-punk rig's bones are identity-rotation / world-aligned (arms follow
+// the mesh A-pose) so its offsets are near-zero — no Z-sign flip needed, the
+// A-pose IS a natural dance neutral. At load the engine ALSO measures,
 // for the record, how close a purely-analytic derivation (no hints) gets to
 // each hand-tuned bone (appState.dancer.retargetReport / console) - the honest
 // evidence for how much of the manual tuning the auto path now recovers.
@@ -255,29 +258,43 @@ export function initKineticDancer() {
   };
   const RIG_B = {
     url: 'assets/scene/fairy-punk/scene.gltf',
-    // Bone names as authored by the Blender rig (see assets/scene/fairy-punk/
+    // Bone names as authored by the Python re-rig (see assets/scene/fairy-punk/
     // license.txt) — GLTFLoader DROPS the dots on import ("UpperArm.L" →
     // "UpperArmL"), it does not underscore them like the Armadrillo's spaces;
     // the shared `norm()` below strips dots and underscores spaces to match.
+    // This rig has an EXPANDED 21-bone skeleton (vs the earlier 13): the torso
+    // is subdivided pelvis→spine→spine2→chest→upperChest→neck→head (a real
+    // travelling spine wave, not one rigid rotation), the arms lead from
+    // clavicle bones (Shoulder.L/R) and carry a wrist (Hand.L/R) + a combined
+    // finger-curl (Fingers.L/R). The arm bones follow the mesh's actual A-pose
+    // so the arms genuinely DEFORM (the previous rig had them dead-bound to
+    // Chest — an arm raise moved ~8% of the intended geometry). Every bone is
+    // identity-rotation / translation-only, so bindQ = identity and the
+    // choreography's canonical axes map straight through (no armZSign hunt).
     nameOf: {
-      pelvis: 'Pelvis', spine: 'Spine', chest: 'Chest', neck: 'Neck', head: 'Head',
-      upperArmL: 'UpperArm.L', forearmL: 'Forearm.L', upperArmR: 'UpperArm.R', forearmR: 'Forearm.R',
+      pelvis: 'Pelvis', spine: 'Spine', spine2: 'Spine2', chest: 'Chest',
+      upperChest: 'UpperChest', neck: 'Neck', head: 'Head',
+      shoulderL: 'Shoulder.L', upperArmL: 'UpperArm.L', forearmL: 'Forearm.L',
+      handL: 'Hand.L', fingersL: 'Fingers.L',
+      shoulderR: 'Shoulder.R', upperArmR: 'UpperArm.R', forearmR: 'Forearm.R',
+      handR: 'Hand.R', fingersR: 'Fingers.R',
       thighL: 'Thigh.L', shinL: 'Shin.L', thighR: 'Thigh.R', shinR: 'Shin.R',
     },
+    // Roles this rig DRIVES (beyond the core 13): the new torso subdivisions,
+    // clavicles, wrists and finger-curls. RIG_A stays core-only.
+    extraRoles: ['spine2', 'upperChest', 'shoulderL', 'shoulderR', 'handL', 'handR', 'fingersL', 'fingersR'],
     posScale: 0.55,
-    // Hanging-arms bind pose (built this way specifically to avoid a T-pose
-    // rest hack) — near-zero rest offsets; small elbow bend to match.
-    armDown: 0, foreRest: 0.12,
-    // This rig's upper-arm bind orientation has local +Z pointing the
-    // opposite way from the shared choreography's "swing toward body"
-    // convention (Armadrillo's T-pose bind already matches it) — see the
-    // `armZSign` comment at its use site in onModelLoaded for how this was
-    // confirmed and what it fixes.
-    armZSign: -1,
-    // The rebuilt rig (from the pristine, never-round-tripped source) faces
-    // the OPPOSITE way from the earlier Blender export — confirmed visually
-    // (hero screenshot showed the back of the head/hair, not the face).
-    // Flip this rig only; the Armadrillo's own facing is unaffected.
+    // A-pose bind: arms rest angled ~45° down-and-out (the character's own
+    // modelled pose). Near-zero rest offsets — the A-pose IS a natural dance
+    // neutral; a small elbow bend keeps forearms from reading ramrod-straight,
+    // and a light resting finger curl keeps hands from reading as flat paddles.
+    armDown: 0, foreRest: 0.12, fingerRest: 0.35,
+    // Identity-rotation bones + world-aligned local axes → no upper-arm Z-sign
+    // flip needed (the old mismatched hanging-bind rig required armZSign:-1).
+    armZSign: 1,
+    // Geometry orientation is unchanged from the prior asset (same POSITION
+    // data, only the skeleton + weights were rebuilt), so the rig still faces
+    // the opposite way from the camera at import and needs the same flip.
     faceSpin: Math.PI,
     // fitH lower than the Armadrillo's: this rig's hair/headdress mesh
     // extends well above the Head bone itself, which frameModel() fits by
@@ -489,8 +506,11 @@ export function initKineticDancer() {
     // engine from the role schema.
     rigState.proxies = createProxyRig(THREE);
     const hints = makeExplicitHints(rigState.cfg);
+    // Drive the core 13 plus any rig-specific extra roles (fairy-punk's
+    // subdivided spine, clavicles, wrists, finger-curls). RIG_A stays core-only.
+    const driveRoles = rigState.cfg.extraRoles ? CORE_ROLES.concat(rigState.cfg.extraRoles) : CORE_ROLES;
     const rig = buildRig(THREE, {
-      model, nameOf: rigState.cfg.nameOf, driveRoles: CORE_ROLES,
+      model, nameOf: rigState.cfg.nameOf, driveRoles,
       hints, proxies: rigState.proxies,
     });
     rigState.adapters = rig.adapters;
@@ -533,8 +553,9 @@ export function initKineticDancer() {
   // auto-derive (rest-pose normalization) - see RIG_A/RIG_B and dance-retarget.
   function makeExplicitHints(cfg) {
     const armDown = cfg.armDown || 0, foreRest = cfg.foreRest || 0, armZSign = cfg.armZSign || 1;
+    const fingerRest = cfg.fingerRest || 0;
     const id = () => ({ mx: ['x', 1], my: ['y', 1], mz: ['z', 1] });
-    return {
+    const hints = {
       pelvis: id(), spine: id(), chest: id(), neck: id(), head: id(),
       upperArmL: { rest: { x: armDown, y: 0, z: 0 }, mx: ['x', 1], my: ['y', 1], mz: ['z', armZSign] },
       upperArmR: { rest: { x: armDown, y: 0, z: 0 }, mx: ['x', 1], my: ['y', 1], mz: ['z', armZSign] },
@@ -542,6 +563,20 @@ export function initKineticDancer() {
       forearmR: { rest: { x: foreRest, y: 0, z: 0 }, ...id() },
       thighL: id(), shinL: id(), thighR: id(), shinR: id(),
     };
+    // Extra roles (fairy-punk's expanded skeleton): explicit identity maps too,
+    // so the whole rig stays on the predictable bit-identical explicit path.
+    // Its bones are identity-rotation / world-aligned, so an identity axis map
+    // is exactly right; only fingers carry a small resting curl.
+    if (cfg.extraRoles) {
+      const extra = {
+        spine2: id(), upperChest: id(),
+        shoulderL: id(), shoulderR: id(), handL: id(), handR: id(),
+        fingersL: { rest: { x: fingerRest, y: 0, z: 0 }, ...id() },
+        fingersR: { rest: { x: fingerRest, y: 0, z: 0 }, ...id() },
+      };
+      for (const r of cfg.extraRoles) if (extra[r]) hints[r] = extra[r];
+    }
+    return hints;
   }
 
   // Probe proxy rotations for the auto-vs-manual measurement: a spread across
@@ -837,6 +872,25 @@ export function initKineticDancer() {
   // back to rest, breaking the "moves crossfade for free through the shared
   // damping" property.
   const REST_ARM_X = 0.20, REST_FORE_X = 0.12, REST_LEG_X = 0.06;
+  // Rest targets for fairy-punk's EXTRA joints (subdivided spine, clavicles,
+  // wrists, finger-curls). These proxies exist on BOTH rigs (createProxyRig
+  // allocates every schema role), but only fairy-punk has adapters for them —
+  // on the Armadrillo the writes are free no-ops (the graceful-degradation
+  // contract), so moves drive them unconditionally. spine2/upperChest carry a
+  // slight forward lean matching the spine so the torso reads continuous.
+  const REST_SPINE2_X = 0.05, REST_UCHEST_X = 0.04;
+  // Ease every extra joint back to rest. Called for moves that don't drive the
+  // extras themselves, so a finger curl / shoulder shrug from the previous move
+  // relaxes instead of freezing (the same "every move writes every proxy" rule
+  // the core joints already follow). `t` is the move context's `tgt`.
+  function restExtras(b, t) {
+    t(b.spine2.rotation, 'x', REST_SPINE2_X); t(b.spine2.rotation, 'z', 0); t(b.spine2.rotation, 'y', 0);
+    t(b.upperChest.rotation, 'x', REST_UCHEST_X); t(b.upperChest.rotation, 'z', 0); t(b.upperChest.rotation, 'y', 0);
+    t(b.shoulderL.rotation, 'x', 0); t(b.shoulderL.rotation, 'z', 0); t(b.shoulderL.rotation, 'y', 0);
+    t(b.shoulderR.rotation, 'x', 0); t(b.shoulderR.rotation, 'z', 0); t(b.shoulderR.rotation, 'y', 0);
+    t(b.handL.rotation, 'x', 0); t(b.handL.rotation, 'z', 0); t(b.handR.rotation, 'x', 0); t(b.handR.rotation, 'z', 0);
+    t(b.fingersL.rotation, 'x', 0); t(b.fingersR.rotation, 'x', 0);
+  }
   // Ease-in-out for every move's draw/hold/release-style envelope (0..1 in,
   // 0 slope at both ends) instead of a raw linear ramp — a linear ramp has a
   // velocity CORNER where it meets a hold or another ramp, which the shared
@@ -892,21 +946,37 @@ export function initKineticDancer() {
   function handsFace(c) {
     const { b, tgt, set, A, elapsedBeats } = c;
     const eb = elapsedBeats % 8;
-    const drawAmt = eb < 3 ? smoothstep(eb / 3) : eb < 6 ? 1 : 1 - smoothstep(Math.min(1, (eb - 6) / 2));
+    const draw = (e) => e < 3 ? smoothstep(e / 3) : e < 6 ? 1 : 1 - smoothstep(Math.min(1, (e - 6) / 2));
+    const drawAmt = draw(eb);
+    // Clavicle LEADS the arm (scapulohumeral rhythm): the girdle initiates a
+    // few frames ahead and carries ~a third of the raise. It stays near-zero
+    // for the first slice of the raise (the first ~30° of elevation is almost
+    // pure glenohumeral) then ramps in — hence the max(0, lead-0.15).
+    const lead = draw(eb + 0.3);                       // ~0.3-beat anticipation
+    const shrug = Math.max(0, lead - 0.15) * 0.30 * A; // ≤~0.26rad girdle elevation
     const breathe = Math.sin(eb * 1.3) * 0.03;
 
     set(b.pelvis.position, 'x', 0);
     set(b.pelvis.position, 'y', 0.11 + breathe * A);
     tgt(b.pelvis.rotation, 'z', 0); tgt(b.pelvis.rotation, 'y', 0);
     tgt(b.spine.rotation, 'x', 0.08 + drawAmt * 0.12 * A); tgt(b.spine.rotation, 'z', 0);
+    tgt(b.spine2.rotation, 'x', REST_SPINE2_X + drawAmt * 0.06 * A); tgt(b.spine2.rotation, 'z', 0); tgt(b.spine2.rotation, 'y', 0);
     tgt(b.chest.rotation, 'z', 0); tgt(b.chest.rotation, 'y', drawAmt * 0.08 * A);
+    tgt(b.upperChest.rotation, 'x', REST_UCHEST_X); tgt(b.upperChest.rotation, 'z', 0); tgt(b.upperChest.rotation, 'y', 0);
 
+    tgt(b.shoulderL.rotation, 'z', shrug); tgt(b.shoulderL.rotation, 'x', 0); tgt(b.shoulderL.rotation, 'y', 0);
+    tgt(b.shoulderR.rotation, 'z', -shrug); tgt(b.shoulderR.rotation, 'x', 0); tgt(b.shoulderR.rotation, 'y', 0);
     tgt(b.upperArmL.rotation, 'z', 0.10 + drawAmt * 0.30 * A);
     tgt(b.upperArmL.rotation, 'x', 0.25 + drawAmt * 1.35 * A);
     tgt(b.forearmL.rotation, 'x', -0.6 - drawAmt * 1.6 * A);
     tgt(b.upperArmR.rotation, 'z', -(0.10 + drawAmt * 0.30 * A));
     tgt(b.upperArmR.rotation, 'x', 0.25 + drawAmt * 1.35 * A);
     tgt(b.forearmR.rotation, 'x', -0.6 - drawAmt * 1.6 * A);
+    // wrists break slightly toward the face; fingers CURL into a soft cradle as
+    // the hands settle (peaks on the hold, relaxes on the release).
+    tgt(b.handL.rotation, 'x', drawAmt * 0.25 * A); tgt(b.handL.rotation, 'z', 0);
+    tgt(b.handR.rotation, 'x', drawAmt * 0.25 * A); tgt(b.handR.rotation, 'z', 0);
+    tgt(b.fingersL.rotation, 'x', drawAmt * 0.55 * A); tgt(b.fingersR.rotation, 'x', drawAmt * 0.55 * A);
 
     tgt(b.thighL.rotation, 'x', REST_LEG_X); tgt(b.thighR.rotation, 'x', REST_LEG_X);
     tgt(b.shinL.rotation, 'x', REST_LEG_X); tgt(b.shinR.rotation, 'x', REST_LEG_X);
@@ -1004,27 +1074,41 @@ export function initKineticDancer() {
     tgt(b.head.rotation, 'x', -0.08); tgt(b.head.rotation, 'z', dir * 0.06); tgt(b.head.rotation, 'y', 0);
   }
 
-  // F. Body wave — a traveling wave up the pelvis→spine→chest→neck→head
-  // chain (each link phase-delayed). Cheap, reads as skilled/fluid.
+  // F. Body wave — a traveling wave that now runs the FULL subdivided torso
+  // pelvis→spine→spine2→chest→upperChest→neck→head, each link phase-delayed
+  // (overlapping action). Per the rigging research the bend is NOT uniform: it
+  // concentrates at the two real hinges (lumbar base = spine, and the neck),
+  // with the rib-cage bones (chest/upperChest) staying comparatively stiff — a
+  // flat per-segment split reads robotic. Segment amplitudes below follow that
+  // ~30/20/10/10/20/10 distribution; the ~0.34-beat lag per link (≈π/9 phase)
+  // is the travelling-wave delay. On the 13-bone Armadrillo, spine2/upperChest
+  // are free no-ops and the wave collapses to the original spine→chest→neck→head.
   function bodyWave(c) {
     const { b, tgt, set, A, elapsedBeats } = c;
     const w = (delay) => Math.sin(((elapsedBeats - delay) / 4) * Math.PI * 2);
-    const w0 = w(0), w1 = w(0.4), w2 = w(0.8), w3 = w(1.2), w4 = w(1.6);
+    const wP = w(0), wS = w(0.34), wS2 = w(0.68), wC = w(1.02), wU = w(1.36), wN = w(1.70), wH = w(2.04);
 
-    set(b.pelvis.position, 'x', 0); set(b.pelvis.position, 'y', 0.12 + Math.abs(w0) * 0.05 * A);
-    tgt(b.pelvis.rotation, 'z', w0 * 0.12 * A); tgt(b.pelvis.rotation, 'y', 0);
-    tgt(b.spine.rotation, 'x', 0.08); tgt(b.spine.rotation, 'z', w1 * 0.14 * A);
-    tgt(b.chest.rotation, 'z', w2 * 0.16 * A); tgt(b.chest.rotation, 'y', 0);
+    set(b.pelvis.position, 'x', 0); set(b.pelvis.position, 'y', 0.12 + Math.abs(wP) * 0.05 * A);
+    tgt(b.pelvis.rotation, 'z', wP * 0.10 * A); tgt(b.pelvis.rotation, 'y', 0);
+    tgt(b.spine.rotation, 'x', 0.08); tgt(b.spine.rotation, 'z', wS * 0.15 * A);          // lumbar hinge — biggest share
+    tgt(b.spine2.rotation, 'x', REST_SPINE2_X); tgt(b.spine2.rotation, 'z', wS2 * 0.11 * A); tgt(b.spine2.rotation, 'y', 0);
+    tgt(b.chest.rotation, 'z', wC * 0.06 * A); tgt(b.chest.rotation, 'y', 0);              // rib cage — stiff
+    tgt(b.upperChest.rotation, 'x', REST_UCHEST_X); tgt(b.upperChest.rotation, 'z', wU * 0.06 * A); tgt(b.upperChest.rotation, 'y', 0);
 
-    tgt(b.upperArmL.rotation, 'z', 0.10 + w2 * 0.15 * A); tgt(b.upperArmL.rotation, 'x', REST_ARM_X + Math.max(0, w1) * 0.3 * A);
-    tgt(b.upperArmR.rotation, 'z', -(0.10 + w2 * 0.15 * A)); tgt(b.upperArmR.rotation, 'x', REST_ARM_X + Math.max(0, -w1) * 0.3 * A);
+    // shoulders/arms ride the wave loosely; wrists + fingers relax
+    tgt(b.shoulderL.rotation, 'z', wU * 0.06 * A); tgt(b.shoulderL.rotation, 'x', 0); tgt(b.shoulderL.rotation, 'y', 0);
+    tgt(b.shoulderR.rotation, 'z', wU * 0.06 * A); tgt(b.shoulderR.rotation, 'x', 0); tgt(b.shoulderR.rotation, 'y', 0);
+    tgt(b.upperArmL.rotation, 'z', 0.10 + wC * 0.15 * A); tgt(b.upperArmL.rotation, 'x', REST_ARM_X + Math.max(0, wS) * 0.3 * A);
+    tgt(b.upperArmR.rotation, 'z', -(0.10 + wC * 0.15 * A)); tgt(b.upperArmR.rotation, 'x', REST_ARM_X + Math.max(0, -wS) * 0.3 * A);
     tgt(b.forearmL.rotation, 'x', REST_FORE_X); tgt(b.forearmR.rotation, 'x', REST_FORE_X);
+    tgt(b.handL.rotation, 'z', wN * 0.14 * A); tgt(b.handL.rotation, 'x', 0); tgt(b.handR.rotation, 'z', wN * 0.14 * A); tgt(b.handR.rotation, 'x', 0);
+    tgt(b.fingersL.rotation, 'x', 0); tgt(b.fingersR.rotation, 'x', 0);
 
     tgt(b.thighL.rotation, 'x', REST_LEG_X); tgt(b.thighR.rotation, 'x', REST_LEG_X);
     tgt(b.shinL.rotation, 'x', REST_LEG_X); tgt(b.shinR.rotation, 'x', REST_LEG_X);
 
-    tgt(b.neck.rotation, 'x', 0.03); tgt(b.neck.rotation, 'z', w3 * 0.12 * A); tgt(b.neck.rotation, 'y', 0);
-    tgt(b.head.rotation, 'x', -0.10); tgt(b.head.rotation, 'z', w4 * 0.10 * A); tgt(b.head.rotation, 'y', 0);
+    tgt(b.neck.rotation, 'x', 0.03); tgt(b.neck.rotation, 'z', wN * 0.12 * A); tgt(b.neck.rotation, 'y', 0);   // second hinge
+    tgt(b.head.rotation, 'x', -0.10); tgt(b.head.rotation, 'z', wH * 0.08 * A); tgt(b.head.rotation, 'y', 0);  // tip follow-through
   }
 
   // G. Reach and open — one-armed reach, mirrored L/R at selection time
@@ -1033,19 +1117,37 @@ export function initKineticDancer() {
   function reachOpen(c) {
     const { b, tgt, set, A, elapsedBeats, mirror } = c;
     const eb = elapsedBeats % 8;
-    const amt = eb < 4 ? smoothstep(eb / 4) : 1 - smoothstep(Math.min(1, (eb - 4) / 4));
+    const env = (e) => e < 4 ? smoothstep(e / 4) : 1 - smoothstep(Math.min(1, (e - 4) / 4));
+    const amt = env(eb);
+    const lead = env(eb + 0.35);                         // featured clavicle anticipates the reach
+    const shrug = Math.max(0, lead - 0.15) * 0.34 * A;
     const L = mirror > 0, featUp = L ? b.upperArmR : b.upperArmL, featFore = L ? b.forearmR : b.forearmL;
     const restUp = L ? b.upperArmL : b.upperArmR, restFore = L ? b.forearmL : b.forearmR;
+    const featSh = L ? b.shoulderR : b.shoulderL, restSh = L ? b.shoulderL : b.shoulderR;
+    const featHand = L ? b.handR : b.handL, restHand = L ? b.handL : b.handR;
+    const featFing = L ? b.fingersR : b.fingersL, restFing = L ? b.fingersL : b.fingersR;
+    // featured side is +z for R (mirror>0), -z for L → the clavicle protracts on
+    // the SAME sign so it leads the arm out into the reach.
+    const shSign = L ? -1 : 1;
 
     set(b.pelvis.position, 'x', 0); set(b.pelvis.position, 'y', 0.11 + amt * 0.03 * A);
     tgt(b.pelvis.rotation, 'z', 0); tgt(b.pelvis.rotation, 'y', mirror * amt * 0.12 * A);
     tgt(b.spine.rotation, 'x', 0.08); tgt(b.spine.rotation, 'z', 0);
+    tgt(b.spine2.rotation, 'x', REST_SPINE2_X); tgt(b.spine2.rotation, 'z', 0); tgt(b.spine2.rotation, 'y', mirror * amt * 0.08 * A);
     tgt(b.chest.rotation, 'z', 0); tgt(b.chest.rotation, 'y', mirror * amt * 0.22 * A);
+    tgt(b.upperChest.rotation, 'x', REST_UCHEST_X); tgt(b.upperChest.rotation, 'z', 0); tgt(b.upperChest.rotation, 'y', mirror * amt * 0.10 * A);
 
+    tgt(featSh.rotation, 'z', shSign * shrug); tgt(featSh.rotation, 'x', 0); tgt(featSh.rotation, 'y', 0);
+    tgt(restSh.rotation, 'z', 0); tgt(restSh.rotation, 'x', 0); tgt(restSh.rotation, 'y', 0);
     tgt(featUp.rotation, 'x', 0.25 + amt * 1.4 * A); tgt(featUp.rotation, 'z', mirror * (0.12 + amt * 0.55 * A));
     tgt(featFore.rotation, 'x', REST_FORE_X - 0.2 * amt);
     tgt(restUp.rotation, 'x', REST_ARM_X); tgt(restUp.rotation, 'z', 0.10 * -mirror);
     tgt(restFore.rotation, 'x', REST_FORE_X);
+    // the reaching hand OPENS as it extends (fingers relax toward flat, wrist
+    // leads back); the resting hand stays neutral.
+    tgt(featHand.rotation, 'x', -amt * 0.28 * A); tgt(featHand.rotation, 'z', 0);
+    tgt(featFing.rotation, 'x', -amt * 0.35 * A);
+    tgt(restHand.rotation, 'x', 0); tgt(restHand.rotation, 'z', 0); tgt(restFing.rotation, 'x', 0);
 
     tgt(b.thighL.rotation, 'x', REST_LEG_X); tgt(b.thighR.rotation, 'x', REST_LEG_X);
     tgt(b.shinL.rotation, 'x', REST_LEG_X); tgt(b.shinR.rotation, 'x', REST_LEG_X);
@@ -1094,17 +1196,29 @@ export function initKineticDancer() {
   function invocation(c) {
     const { b, tgt, set, A, elapsedBeats } = c;
     const eb = elapsedBeats % 12;
-    const amt = eb < 4 ? smoothstep(eb / 4) : eb < 8 ? 1 : 1 - smoothstep(Math.min(1, (eb - 8) / 4));
+    const env = (e) => e < 4 ? smoothstep(e / 4) : e < 8 ? 1 : 1 - smoothstep(Math.min(1, (e - 8) / 4));
+    const amt = env(eb);
+    const lead = env(eb + 0.4);                          // girdle anticipates the raise
+    const shrug = Math.max(0, lead - 0.15) * 0.32 * A;   // both clavicles elevate as the arms rise
     const breathe = Math.sin(eb * 1.1) * 0.025;
 
     set(b.pelvis.position, 'x', 0); set(b.pelvis.position, 'y', 0.12 + amt * 0.04 * A + breathe);
     tgt(b.pelvis.rotation, 'z', 0); tgt(b.pelvis.rotation, 'y', 0);
     tgt(b.spine.rotation, 'x', 0.08 - amt * 0.10 * A); tgt(b.spine.rotation, 'z', 0);
+    tgt(b.spine2.rotation, 'x', REST_SPINE2_X - amt * 0.06 * A); tgt(b.spine2.rotation, 'z', 0); tgt(b.spine2.rotation, 'y', 0);
     tgt(b.chest.rotation, 'z', 0); tgt(b.chest.rotation, 'y', 0);
+    tgt(b.upperChest.rotation, 'x', REST_UCHEST_X - amt * 0.05 * A); tgt(b.upperChest.rotation, 'z', 0); tgt(b.upperChest.rotation, 'y', 0);   // chest opens skyward
 
+    tgt(b.shoulderL.rotation, 'z', shrug); tgt(b.shoulderL.rotation, 'x', 0); tgt(b.shoulderL.rotation, 'y', 0);
+    tgt(b.shoulderR.rotation, 'z', -shrug); tgt(b.shoulderR.rotation, 'x', 0); tgt(b.shoulderR.rotation, 'y', 0);
     tgt(b.upperArmL.rotation, 'z', 0.14 + amt * 0.9 * A); tgt(b.upperArmL.rotation, 'x', 0.25 + amt * 1.5 * A);
     tgt(b.upperArmR.rotation, 'z', -(0.14 + amt * 0.9 * A)); tgt(b.upperArmR.rotation, 'x', 0.25 + amt * 1.5 * A);
     tgt(b.forearmL.rotation, 'x', REST_FORE_X - amt * 0.05); tgt(b.forearmR.rotation, 'x', REST_FORE_X - amt * 0.05);
+    // open, upturned palms at the ceremonial peak: wrists extend back, fingers
+    // spread OPEN (negative curl relaxes past the resting fingerRest toward flat).
+    tgt(b.handL.rotation, 'x', -amt * 0.30 * A); tgt(b.handL.rotation, 'z', 0);
+    tgt(b.handR.rotation, 'x', -amt * 0.30 * A); tgt(b.handR.rotation, 'z', 0);
+    tgt(b.fingersL.rotation, 'x', -amt * 0.35 * A); tgt(b.fingersR.rotation, 'x', -amt * 0.35 * A);
 
     tgt(b.thighL.rotation, 'x', REST_LEG_X); tgt(b.thighR.rotation, 'x', REST_LEG_X);
     tgt(b.shinL.rotation, 'x', REST_LEG_X); tgt(b.shinR.rotation, 'x', REST_LEG_X);
@@ -1207,14 +1321,14 @@ export function initKineticDancer() {
   // instrument-matched moves — it leans, it doesn't lock.
   const MOVE_TABLE = {
     grooveSway: { beats: 8, pool: ['idle', 'low', 'high'], run: grooveSway },
-    handsFace: { beats: 8, pool: ['idle', 'low'], affinity: 'mid', run: handsFace },
+    handsFace: { beats: 8, pool: ['idle', 'low'], affinity: 'mid', extras: true, run: handsFace },
     strike: { beats: 8, pool: ['high'], run: strike },
     breakdown: { beats: 16, pool: ['idle', 'low'], run: breakdown },
     stepTouch: { beats: 4, pool: ['high'], affinity: 'low', run: stepTouch },
-    bodyWave: { beats: 4, pool: ['idle', 'low', 'high'], affinity: 'mid', run: bodyWave },
-    reachOpen: { beats: 8, pool: ['low', 'high'], mirrored: true, affinity: 'mid', run: reachOpen },
+    bodyWave: { beats: 4, pool: ['idle', 'low', 'high'], affinity: 'mid', extras: true, run: bodyWave },
+    reachOpen: { beats: 8, pool: ['low', 'high'], mirrored: true, affinity: 'mid', extras: true, run: reachOpen },
     tribalStomp: { beats: 4, pool: ['idle', 'low', 'high'], affinity: 'low', run: tribalStomp },
-    invocation: { beats: 12, pool: ['idle', 'low', 'high'], affinity: 'mid', run: invocation },
+    invocation: { beats: 12, pool: ['idle', 'low', 'high'], affinity: 'mid', extras: true, run: invocation },
     groundedIsolation: { beats: 8, pool: ['idle', 'low', 'high'], affinity: 'high', run: groundedIsolation },
     crouchProwl: { beats: 8, pool: ['low', 'high'], affinity: 'low', run: crouchProwl },
     polyStep: { beats: 6, pool: ['low', 'high'], mirrored: true, affinity: 'high', run: polyStep },
@@ -1395,6 +1509,11 @@ export function initKineticDancer() {
     let elapsedBeats = Math.max(0, (clk.beatPos - rigState.moveStartBeat) / (clk.tempoScale || 1));
     elapsedBeats = Math.max(0, elapsedBeats + (rigState.movePhaseOfs || 0));
     rigState.currentMove.run({ b, tgt, set, add, A: A_j, hit, p, s, dt, elapsedBeats, mirror: rigState.moveMirror, rig: rigState });
+    // Moves that don't drive the extra joints (subdivided spine / clavicles /
+    // wrists / finger-curls) ease them back to rest so a curl or shrug from the
+    // previous move relaxes instead of freezing. The four `extras` moves own
+    // those joints themselves. On the 13-bone Armadrillo these are free no-ops.
+    if (!rigState.currentMove.extras) restExtras(b, tgt);
 
     // shared, always-on accents regardless of the active move: the on-beat
     // knee/body dip so the tempo is always physically felt, and the slow 3/4
