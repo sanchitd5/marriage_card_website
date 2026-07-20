@@ -1,7 +1,7 @@
 import { REDUCED, $ } from './dom.js';
 import { appState } from './state.js';
 
-// ── Kinetic dancers (a persistent wireframe DUET) ────────────────────────
+// ── Kinetic dancers (a persistent chrome DUET, cyan wireframe accent) ────
 // TWO loaded, rigged glTF humanoids share one canvas/renderer/camera, side
 // by side: the Sketchfab "Armadrillo" (CC-BY-4.0, kimni88, 50-bone, T-pose)
 // and "DP Techno Fairy Punk Set" (CC-BY-4.0, BilloXD) — the latter shipped
@@ -45,7 +45,16 @@ import { appState } from './state.js';
 //
 // Safety & performance:
 //  • reduced-motion → never runs (no WebGL init at all); CSS hides the canvas.
-//  • BEAT ILLUMINATION: brightness (opacity) pulses on the beat via the same
+//  • RENDER STYLE: each mesh gets a SHADED chrome pass (MeshMatcapMaterial,
+//    a procedurally generated matcap — no HDRI/network texture fetch, no
+//    scene lights needed, matcap shading is a pure view-space normal lookup)
+//    so sculpted form — including facial features — actually reads, plus a
+//    thin additive cyan WIREFRAME pass on top as a "circuitry" accent (a
+//    `.clone()` of the same mesh sharing the SAME Skeleton instance, so it
+//    deforms for free with zero extra per-frame skinning cost). Wireframe
+//    used to be the ONLY material; it's now an accent over sculpted chrome.
+//  • BEAT ILLUMINATION: brightness (the wireframe accent's opacity + the
+//    chrome pass's colour multiplier) pulses on the beat via the same
 //    smooth, decaying `beatAccent` curve that drives the motion accent (not a
 //    hard on/off flash). Checked against WCAG 2.3.1 (owner's call to proceed
 //    regardless): this project's tracks run 125-150 BPM = 2.08-2.5 beats/sec,
@@ -67,14 +76,57 @@ export function initKineticDancer() {
   const THREE = window.THREE;
   if (!THREE.GLTFLoader) return;       // loader not present → nothing to draw (fail safe)
 
-  // ── shared wireframe material (both rigs) ────────────────────────────
-  // The theme cyan additive wireframe applied to every loaded mesh on BOTH
-  // rigs. `skinning` is REQUIRED in r128 for the material to inject the
-  // skinning shader chunks so the wireframe DEFORMS with each skeleton.
-  // Low-ish opacity, driven by the slow (flash-safe-by-rate) energy +
-  // beat-locked accent in frame(); additive + no depth-write for glow.
-  const coreMat = new THREE.MeshBasicMaterial({ color: 0x66f0ff, wireframe: true, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, skinning: true });
-  const disposables = [coreMat];   // materials/geometries to dispose on teardown
+  // ── procedural chrome matcap (no network fetch) ──────────────────────
+  // MeshMatcapMaterial shades purely from a view-space-normal → texture
+  // lookup — no scene lights required, so this stays a self-contained static
+  // asset (drawn once to an offscreen canvas at load time) rather than an
+  // HDRI/environment-map fetch. Dark obsidian rim, a cyan-white hot spot
+  // offset toward a "key light" corner, cool blue-grey midtones, plus a
+  // dim secondary rim-light in the opposite corner for a bit of wraparound —
+  // reads as glossy chrome in the theme's own obsidian + electric-cyan palette.
+  function makeChromeMatcap() {
+    const size = 256;
+    const c = document.createElement('canvas');
+    c.width = size; c.height = size;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#0d1620';
+    ctx.fillRect(0, 0, size, size);
+    // WIDER lit zone than a typical specular hotspot — most of the surface
+    // should read some tonal gradient (that's what makes sculpted form/
+    // facial features visible), not just a small bright dot on a mostly-dark
+    // field with the rest reading flat/black.
+    const hlX = size * 0.36, hlY = size * 0.32;
+    const key = ctx.createRadialGradient(hlX, hlY, 0, hlX, hlY, size * 0.85);
+    key.addColorStop(0, '#f4feff');
+    key.addColorStop(0.16, '#cdf5ff');
+    key.addColorStop(0.36, '#7fe2f5');
+    key.addColorStop(0.58, '#3a8fa3');
+    key.addColorStop(0.8, '#1c4855');
+    key.addColorStop(1, '#0d1620');
+    ctx.fillStyle = key;
+    ctx.fillRect(0, 0, size, size);
+    const rim = ctx.createRadialGradient(size * 0.75, size * 0.82, 0, size * 0.75, size * 0.82, size * 0.45);
+    rim.addColorStop(0, 'rgba(120,220,255,0.45)');
+    rim.addColorStop(1, 'rgba(120,220,255,0)');
+    ctx.fillStyle = rim;
+    ctx.fillRect(0, 0, size, size);
+    const tex = new THREE.CanvasTexture(c);
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  // ── shared materials (both rigs): chrome body + wireframe accent ─────
+  // `chromeMat` is the BASE pass on every mesh — sculpted form (incl. facial
+  // features) reads via matcap shading. `wireMat` is a SECOND, additive
+  // no-depth-write pass rendered on a `.clone()` of each mesh (see
+  // onModelLoaded) — a thin glowing "circuitry" accent over the chrome body,
+  // not the only material anymore. Both need `skinning: true` in r128 so the
+  // skinning shader chunks are injected and each pass deforms with its rig's
+  // skeleton. `chromeMat.color` and `wireMat.opacity` are the two brightness
+  // knobs driven per-frame for beat illumination (see frame()).
+  const chromeMat = new THREE.MeshMatcapMaterial({ matcap: makeChromeMatcap(), color: 0xffffff, transparent: true, opacity: 1, skinning: true });
+  const wireMat = new THREE.MeshBasicMaterial({ color: 0x66f0ff, wireframe: true, transparent: true, opacity: 0.14, blending: THREE.AdditiveBlending, depthWrite: false, skinning: true });
+  const disposables = [chromeMat, wireMat, chromeMat.matcap];   // materials/geometries to dispose on teardown
 
   // ── shared renderer/scene/camera + lifecycle ─────────────────────────
   let renderer, scene, camera;
@@ -212,19 +264,31 @@ export function initKineticDancer() {
     const model = gltf.scene;
     rigState.model = model;
 
-    // theme wireframe on every mesh; collect skinned meshes for skeleton.update
-    model.traverse((o) => {
-      if (o.isMesh || o.isSkinnedMesh) {
-        o.material = coreMat;
-        o.frustumCulled = false;   // skinned bounds move; don't let it cull out
-        if (o.isSkinnedMesh) rigState.skinnedMeshes.push(o);
-        const g = o.geometry;
-        if (g && g.attributes && g.attributes.position) {
-          rigState.vertCount += g.attributes.position.count;
-          rigState.triCount += (g.index ? g.index.count : g.attributes.position.count) / 3;
-        }
+    // chrome base pass on every mesh (facial/body sculpt reads via matcap
+    // shading) + a thin wireframe ACCENT pass on a clone of the same mesh.
+    // Collect the mesh list first, THEN clone+append — mutating the scene
+    // graph mid-traversal is unsafe (the new siblings could get re-visited).
+    const meshList = [];
+    model.traverse((o) => { if (o.isMesh || o.isSkinnedMesh) meshList.push(o); });
+    for (const o of meshList) {
+      o.material = chromeMat;
+      o.frustumCulled = false;   // skinned bounds move; don't let it cull out
+      if (o.isSkinnedMesh) rigState.skinnedMeshes.push(o);
+      const g = o.geometry;
+      if (g && g.attributes && g.attributes.position) {
+        rigState.vertCount += g.attributes.position.count;
+        rigState.triCount += (g.index ? g.index.count : g.attributes.position.count) / 3;
       }
-    });
+      // `.clone()` on a SkinnedMesh rebinds to the SAME Skeleton instance
+      // (THREE's SkinnedMesh.copy() calls bind() with the source skeleton),
+      // so this overlay deforms identically with zero extra per-frame
+      // skeleton work — the original's skeleton.update() already covers it.
+      const wireOverlay = o.clone();
+      wireOverlay.material = wireMat;
+      wireOverlay.frustumCulled = false;
+      wireOverlay.renderOrder = (o.renderOrder || 0) + 1;
+      if (o.parent) o.parent.add(wireOverlay);
+    }
 
     // find the mapped bones by exact name
     // GLTFLoader SANITIZES node names (spaces + dots → underscores), so match
@@ -1052,11 +1116,16 @@ export function initKineticDancer() {
       }
     }
 
-    // Beat illumination (shared material, both rigs): energy sets the floor,
-    // beatAccent's smooth decay curve blooms it on each beat (bar-weighted,
-    // so the downbeat reads brightest). See the WCAG 2.3.1 note in the
-    // header comment.
-    coreMat.opacity = Math.min(0.95, 0.5 + energy * 0.3 + beatAccent * 0.4);
+    // Beat illumination (shared materials, both rigs): energy sets the
+    // floor, beatAccent's smooth decay curve blooms it on each beat
+    // (bar-weighted, so the downbeat reads brightest). Two knobs now carry
+    // this instead of one wireframe-only opacity: the wireframe accent's
+    // opacity (the glowing "circuitry" pulse) and the chrome pass's colour
+    // multiplier (a subtler whole-body brightening on hard beats). See the
+    // WCAG 2.3.1 note in the header comment.
+    const glow = Math.min(1, 0.5 + energy * 0.3 + beatAccent * 0.4);
+    wireMat.opacity = Math.min(0.5, 0.06 + glow * 0.28);
+    chromeMat.color.setScalar(0.72 + glow * 0.5);
 
     renderer.render(scene, camera);
 
