@@ -72,9 +72,11 @@ fake bloom, on its own low-DPR WebGL canvas (`#k-dancer-canvas`, fixed, behind
 panel content). The dance is a continuous groove (phase accumulator whose
 speed/amplitude scale with the music) + beat accents, all damped toward targets;
 it reads the repo's existing offline-envelope energy via `appState.lightshow.energy`
-(no new AnalyserNode) and idle-grooves when silent. Flash-safe (WCAG 2.3.1):
-brightness is driven only by slow-smoothed energy, never by beats. Hidden on
-mobile (≤900px) and under reduced-motion. Replaces the earlier interactive
+(no new AnalyserNode) and idle-grooves when silent. Brightness pulses on the
+beat (bar-weighted, smooth decay curve — not a hard flash); checked against
+WCAG 2.3.1: this project's 125-150 BPM tracks are 2.08-2.5 beats/sec, under
+the 3-flashes/sec G19 ceiling regardless of amplitude. Hidden on mobile
+(≤900px) and under reduced-motion. Replaces the earlier interactive
 rings. `lightshow.js` suppresses its own solid mecha when `data-variant="kinetic"`
 so the two figures don't clash.
 

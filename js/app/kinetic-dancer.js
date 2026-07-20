@@ -51,9 +51,13 @@ import { appState } from './state.js';
 //
 // Safety & performance:
 //  • reduced-motion → never runs (no WebGL init at all); CSS hides the canvas.
-//  • FLASH SAFETY (WCAG 2.3.1): element BRIGHTNESS (opacity) is driven only by
-//    SLOW-smoothed energy, rate-limited — never pulsed from `beat`. Beats drive
-//    MOTION (a small side element moving is not a flash), never a light pulse.
+//  • BEAT ILLUMINATION: brightness (opacity) pulses on the beat via the same
+//    smooth, decaying `beatAccent` curve that drives the motion accent (not a
+//    hard on/off flash). Checked against WCAG 2.3.1 (owner's call to proceed
+//    regardless): this project's tracks run 125-150 BPM = 2.08-2.5 beats/sec,
+//    under the 3-flashes/sec G19 ceiling at every tempo used here, independent
+//    of amplitude — so a beat-locked glow is compliant by the simplest
+//    sufficient technique, not just a stylistic risk.
 //  • RAF pauses on hidden tab; dt clamped so a long pause can't lurch the pose.
 //  • Async load: renderer/scene/camera/RAF start immediately (empty scene);
 //    dance()/frame() no-op safely until the model + bones arrive. A failed load
@@ -800,10 +804,10 @@ export function initKineticDancer() {
         if (sk) sk.update();
       }
 
-      // FLASH SAFETY: brightness (opacity) tracks SLOW energy only, eased at a
-      // capped rate. NEVER pulse opacity from `beat` — beats move the body, they
-      // do not flash the light.
-      coreMat.opacity = 0.5 + energy * 0.3;
+      // Beat illumination: energy sets the floor, beatAccent's smooth decay
+      // curve blooms it on each beat (bar-weighted, so the downbeat reads
+      // brightest). See the WCAG 2.3.1 note in the header comment.
+      coreMat.opacity = Math.min(0.95, 0.5 + energy * 0.3 + beatAccent * 0.4);
     }
 
     renderer.render(scene, camera);
