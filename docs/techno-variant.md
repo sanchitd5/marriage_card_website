@@ -62,6 +62,22 @@ full-field glow's brightness change is rate-limited, so no full-viewport high
 contrast change exceeds three per second for anyone. The build-time lint is the
 primary guard, the runtime rate-limit is the backstop.
 
+**Flash-cut geometric accent — a scoped exception.** `js/app/lightshow.js`
+also draws a rotating cyan wireframe polyhedron cluster + a logarithmic
+spiral (`buildFlashCluster()`), hard-cutting which one is dominant on every
+music onset. It was added at the user's direction, inspired by a reference
+reel (rotating low-poly cluster, spiral motif, flash-cut edit rhythm) —
+recolored to this skin's obsidian+cyan palette only, no synthwave/multi-hue
+import. Its onset pulse is **intentionally exempt** from the ≤3/sec
+rate-limit above: the user was warned twice about the photosensitive-seizure
+tradeoff of true uncapped flash-cut intensity and explicitly confirmed the
+decision both times. This exception is scoped to this one element —
+everything else in the file (haze motes, accent glow, mecha dancer) keeps
+the existing rate-limited behaviour unchanged. `prefers-reduced-motion`
+still fully disables it (it lives inside `initLightshow()`, which returns
+before any WebGL/module state exists when `REDUCED` is true) — that
+protection was not touched or weakened.
+
 **Performance governor.** The initial GPU tier is seeded from `deviceMemory` and
 `hardwareConcurrency` (not `net.js`, which measures the network). The governor
 measures real frame times for the first two seconds of a scene and degrades live

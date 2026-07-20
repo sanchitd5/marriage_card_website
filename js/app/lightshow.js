@@ -161,6 +161,8 @@ export function initLightshow() {
     glowCore.position.set(0, 0, -70);
     scene.add(glowCore);
 
+    buildFlashCluster();
+
     // The drop dancer (mecha glTF) is instanced once loaded; on a governor
     // rebuild its lights/env and instances are recreated for the new scene.
     dancers = [];
@@ -237,6 +239,58 @@ export function initLightshow() {
     rg.addColorStop(1, 'rgba(0,0,0,0)');
     g.fillStyle = rg; g.fillRect(0, 0, 64, 64);
     const t = new THREE.CanvasTexture(c); t.needsUpdate = true; sceneTextures.push(t); return t;
+  }
+
+  // ── Flash-cut geometric accent (user-directed reference-reel inspiration) ──
+  // A rotating cyan wireframe polyhedron cluster + a logarithmic spiral, hard-
+  // cutting which one is dominant on every music onset — inspired by a reel
+  // the user shared (rotating low-poly cluster, spiral motif, flash-cut edit
+  // rhythm), recolored to this skin's obsidian+cyan palette only (no
+  // synthwave/multi-hue import — see docs/techno-variant.md Aesthetic Lane).
+  //
+  // FLASH-SAFETY EXCEPTION, scoped to this element ONLY: unlike the accent
+  // glow/motes/haze above (all rate-limited to ≤3 full-viewport brightness
+  // changes/sec, docs/techno-variant.md "Flash safety"), this cluster's onset
+  // pulse is intentionally uncapped — the user explicitly asked for true
+  // flash-cut intensity here after being warned twice about the
+  // photosensitive-seizure tradeoff, and confirmed the decision. Nothing else
+  // in this file's rate-limiting changed. reduced-motion still fully disables
+  // this (initLightshow returns before any of this module state is created).
+  let flashGrp = null, flashPolys = [], flashSpiral = null, flashSpiralMat = null;
+  let flashPulse = 0, flashDominant = 0;
+  function buildFlashCluster() {
+    if (tier === 0) return; // perf ladder: skip entirely on the lowest device tier
+    flashGrp = new THREE.Group();
+    flashGrp.position.set(0, 0, -30); // close enough to camera to read as a real focal shape,
+    // not just haze — the accent glow already owns -70..-74, so this sits well in front of it
+    const RADII = tier === 2 ? [4.6, 3.4, 2.4] : [3.9, 2.7];
+    flashPolys = RADII.map((r, i) => {
+      const geo = new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(r, 1)); // detail 1: more edges read as a "cluster", not a single diamond
+      const mat = new THREE.LineBasicMaterial({
+        color: 0x8fe9ff, transparent: true, opacity: 0.16,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      });
+      const mesh = new THREE.LineSegments(geo, mat);
+      mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
+      mesh.userData.spin = 0.15 + i * 0.07;
+      flashGrp.add(mesh);
+      return mesh;
+    });
+    // logarithmic spiral, a single open polyline, cyan, additive
+    const SPIRAL_PTS = 160, TURNS = 3.2;
+    const spts = [];
+    for (let i = 0; i <= SPIRAL_PTS; i++) {
+      const t = i / SPIRAL_PTS, ang = t * TURNS * Math.PI * 2, rad = 0.4 + t * 4.6;
+      spts.push(new THREE.Vector3(Math.cos(ang) * rad, Math.sin(ang) * rad, 0));
+    }
+    const sgeo = new THREE.BufferGeometry().setFromPoints(spts);
+    flashSpiralMat = new THREE.LineBasicMaterial({
+      color: 0x8fe9ff, transparent: true, opacity: 0.85,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    flashSpiral = new THREE.Line(sgeo, flashSpiralMat);
+    flashGrp.add(flashSpiral);
+    scene.add(flashGrp);
   }
 
   // ── The cyber mecha dancer (glTF/Draco) ─────────────────────────────
@@ -376,6 +430,9 @@ export function initLightshow() {
     if (bokeh) { bokeh.geometry.dispose(); bokeh.material.dispose(); }
     if (glow) glow.material.dispose();
     if (glowCore) glowCore.material.dispose();
+    for (const mesh of flashPolys) { mesh.geometry.dispose(); mesh.material.dispose(); }
+    if (flashSpiral) { flashSpiral.geometry.dispose(); flashSpiralMat.dispose(); }
+    flashGrp = null; flashPolys = []; flashSpiral = null; flashSpiralMat = null;
     // dancers share the template's GEOMETRY (clone(true) copies geometry by
     // reference) — dispose only the per-instance cloned materials, never the
     // shared geometry (that would break the template on the next rebuild).
@@ -474,6 +531,27 @@ export function initLightshow() {
     glowCore.material.opacity = (0.3 + glowBright * 0.5) * (0.3 + 0.7 * ignite);
     glow.position.z = glowCore.position.z = -72 + Math.sin(now * 0.2) * 6;
     glow.material.rotation += 0.002;
+
+    // flash-cut cluster: continuous rotation, hard-cut dominance swap on onset
+    // (uncapped pulse — see the flash-safety exception at buildFlashCluster).
+    if (flashGrp) {
+      for (const mesh of flashPolys) {
+        mesh.rotation.x += mesh.userData.spin * dt * (0.6 + e);
+        mesh.rotation.y += mesh.userData.spin * 0.7 * dt * (0.6 + e);
+      }
+      flashSpiral.rotation.z += 0.12 * dt * (0.6 + e);
+      if (burst && appState.ignited) {
+        flashDominant = 1 - flashDominant;         // HARD CUT, no ease
+        flashPulse = 1;
+        for (const mesh of flashPolys) mesh.rotation.x += (Math.random() - 0.5) * 2.4; // jump, not a tween
+      }
+      flashPulse *= 0.80; // fast, uncapped decay (flash-safety exception)
+      const polyOp = (flashDominant === 0 ? 0.85 : 0.12) + flashPulse * 0.6;
+      const spiralOp = (flashDominant === 1 ? 0.85 : 0.12) + flashPulse * 0.5;
+      for (const mesh of flashPolys) mesh.material.opacity = Math.min(1, polyOp);
+      flashSpiralMat.opacity = Math.min(1, spiralOp);
+      flashGrp.visible = ignite > 0.02; // dormant pre-tap, like the drop dancer
+    }
 
     // subtle camera parallax + fog breathing
     camera.position.x = Math.sin(now * 0.13) * 0.7;
