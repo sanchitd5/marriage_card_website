@@ -1,13 +1,16 @@
 import { REDUCED, $ } from './dom.js';
 import { appState } from './state.js';
 
-// ── Kinetic dancer (persistent side wireframe humanoid) ─────────────────
-// A LOADED, rigged glTF humanoid — the Sketchfab "Armadrillo" (CC-BY-4.0,
-// kimni88) — rendered as a cyan ADDITIVE WIREFRAME on its own small WebGL
-// canvas (#k-dancer-canvas, fixed on the right, CSS-positioned/sized) and
-// driven by the SAME beat-locked choreography as before (dance() below).
-// It DANCES to the background music across every panel: ambient decoration,
-// no user interaction, no audio node of its own.
+// ── Kinetic dancers (a persistent wireframe DUET) ────────────────────────
+// TWO loaded, rigged glTF humanoids share one canvas/renderer/camera, side
+// by side: the Sketchfab "Armadrillo" (CC-BY-4.0, kimni88, 50-bone, T-pose)
+// and "DP Techno Fairy Punk Set" (CC-BY-4.0, BilloXD) — the latter shipped
+// as a static unrigged character set and rigged for this project headlessly
+// in Blender with a 13-bone biped armature in a hanging-arms bind pose (see
+// assets/scene/fairy-punk/license.txt). Both dance to the background music
+// across every panel: ambient decoration, no user interaction, no audio
+// node of its own — a wedding-invitation duet motif, not a literal
+// depiction of either half of the couple.
 //
 // This is a sibling to lightshow.js (same renderer posture, same
 // context-loss / resize / visibility handling) but a completely separate,
@@ -15,39 +18,30 @@ import { appState } from './state.js';
 // computes (appState.lightshow.energy) rather than opening a new AnalyserNode,
 // so the two stay in lockstep and there is no extra audio cost.
 //
-// ── LOADED MODEL, not procedural geometry (this rewrite) ────────────────
-// Earlier this file built a procedural skinned "Anyma alien" from merged
-// tapered tubes. It now LOADS assets/scene/armadrillo/scene.gltf (a 50-bone
-// humanoid SkinnedMesh, no clips, bind pose = T-pose). The beat-locked
-// choreography in dance()/musicClock()/analyzeEnv() is UNCHANGED — only how
-// its per-bone targets are APPLIED to this rig changed (see "retargeting").
+// ── Two independent RIGS, one shared choreography engine ─────────────────
+// Each rig gets its own Group (`rigGroup` → `turnGroup` → model), its own
+// proxy/adapter set, and its own move-selection state (currentMove/
+// moveStartBeat/moveMirror/lastBar8/prevDrop/headTrail) — see `createRigState`.
+// Both rigs run the SAME `MOVE_TABLE`/move functions and the SAME beat/
+// instrument-aware `updateMoveSelection`, driven by ONE shared music clock
+// (energy/phase/beatAccent/ENV), so they read as two performers responding
+// to the same track rather than one figure duplicated: each independently
+// re-rolls its own weighted-random move pick on the same 8-beat grid (so
+// they often lean toward the same move FAMILY when one instrument band
+// dominates, but rarely land on the identical move/phase), and both
+// independently trigger the `strike` accent on the same drop edge — the
+// one moment they always hit together, like a rehearsed duet accent.
 //
-// ── Retargeting the dance to a different rig (the important part) ────────
-// dance() was authored for a procedural rig whose bones sat at IDENTITY bind
-// (arms hanging down, +Z = front, +Y = up, +X = left). This model is
-// DIFFERENT: it RENDERS upright Y-up (mesh space: +Y up, +X = the figure's
-// left/arm-span, +Z ≈ front — the same convention the dance assumes), its
-// arms rest in a T-pose along ±X, and each bone's LOCAL axes are its own.
-// (Note: the bone FORWARD-KINEMATIC frame is authored Z-up, but the skin's
-// inverse-bind matrices decouple that from the rendered mesh, so the figure
-// renders Y-up and NO uprighting rotation is applied.) The per-bone axis maps
-// below were derived from each bone's bind orientation IN RENDER SPACE
-// (= inverse of its inverseBindMatrix). Two layers bridge proc → model:
-//   1. A static rig wrapper (a Group) that scales the model to fit the tall/
-//      narrow canvas by HEIGHT, centres it, and spins it to face the camera.
-//   2. A per-bone ADAPTER. dance() keeps writing to lightweight PROXY joints
-//      (Euler + Vector3, identical API) whose values START at 0 and DAMP
-//      across frames exactly as the old rig did — so the gesture math and its
-//      smoothing are byte-identical. Each frame, after dance(), the adapter
-//      converts every proxy into a real bone transform:
-//         bone.quaternion = bindQuat · Δ    (Δ = a small local-axis rotation)
-//      where Δ is built from the proxy's rotations with a per-bone AXIS REMAP
-//      + SIGN + a static REST offset (e.g. arms brought DOWN/IN out of the
-//      T-pose so the "hands drawn up to the face" vocabulary reads). The
-//      torso/head/legs are ~identity-aligned in the render frame so they map
-//      1:1; the arm bones point along their local +Y, so their proxy axes are
-//      remapped. Because Δ multiplies the captured bind quaternion, the rest
-//      pose is preserved and the dance eases away from it.
+// ── Retargeting: per-rig bind pose differs, so per-rig REST OFFSETS differ ──
+// The Armadrillo's arms rest in a T-pose along ±X, so its adapter folds a
+// static ARM_DOWN offset (arms brought toward hanging) + a small FORE_REST
+// elbow bend before the dance's delta is applied. The fairy-punk rig was
+// deliberately built in a HANGING-ARMS bind pose (not T-pose) specifically so
+// its rest offsets are near-zero — see each rig's `cfg` below. Both rigs'
+// torso/head/legs are ~identity-aligned in the render frame (proxy axes map
+// 1:1, no remap needed); only the arm rest offset differs per rig. As with
+// the Armadrillo, GLTFLoader SANITIZES node names (spaces + dots →
+// underscores), so bone lookup normalizes both sides — see `norm()` below.
 //
 // Safety & performance:
 //  • reduced-motion → never runs (no WebGL init at all); CSS hides the canvas.
@@ -60,8 +54,9 @@ import { appState } from './state.js';
 //    sufficient technique, not just a stylistic risk.
 //  • RAF pauses on hidden tab; dt clamped so a long pause can't lurch the pose.
 //  • Async load: renderer/scene/camera/RAF start immediately (empty scene);
-//    dance()/frame() no-op safely until the model + bones arrive. A failed load
-//    fails safe (transparent canvas, no throw).
+//    each rig's dance/adapter no-ops safely until ITS model arrives, so one
+//    rig loading slower than the other never blocks the other's animation.
+//    A failed load on either rig fails safe (that rig stays absent, no throw).
 
 export function initKineticDancer() {
   if (REDUCED) return;                 // static path — CSS keeps the canvas hidden
@@ -72,75 +67,102 @@ export function initKineticDancer() {
   const THREE = window.THREE;
   if (!THREE.GLTFLoader) return;       // loader not present → nothing to draw (fail safe)
 
-  const MODEL_URL = 'assets/scene/armadrillo/scene.gltf';
-
-  // ── shared wireframe material ────────────────────────────────────────
-  // The theme cyan additive wireframe applied to every loaded mesh. `skinning`
-  // is REQUIRED in r128 for the material to inject the skinning shader chunks
-  // so the wireframe DEFORMS with the skeleton. Low-ish opacity, driven by the
-  // slow (flash-safe) energy in frame(); additive + no depth-write for glow.
+  // ── shared wireframe material (both rigs) ────────────────────────────
+  // The theme cyan additive wireframe applied to every loaded mesh on BOTH
+  // rigs. `skinning` is REQUIRED in r128 for the material to inject the
+  // skinning shader chunks so the wireframe DEFORMS with each skeleton.
+  // Low-ish opacity, driven by the slow (flash-safe-by-rate) energy +
+  // beat-locked accent in frame(); additive + no depth-write for glow.
   const coreMat = new THREE.MeshBasicMaterial({ color: 0x66f0ff, wireframe: true, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, skinning: true });
   const disposables = [coreMat];   // materials/geometries to dispose on teardown
 
-  // ── runtime state ────────────────────────────────────────────────────
-  let renderer, scene, camera, rig, turnGroup, model;
-  let skinnedMeshes = [];                   // for per-frame skeleton.update()
-  let bones = null;                         // dance-facing rig: role → proxy (or turnGroup for root)
-  const proxies = {};                       // role → { rotation:Euler, position:Vector3 } (persist across frames → damping works)
-  const adapters = [];                      // role → { bone, proxy, bindQ, rest, mx/my/mz } (proxy → real bone each frame)
-  let pelvisBone = null, pelvisBind = null; // for the pelvis TRANSLATION sway
-  let modelReady = false;
-  let triCount = 0, vertCount = 0;
+  // ── shared renderer/scene/camera + lifecycle ─────────────────────────
+  let renderer, scene, camera;
   let running = true, raf = 0, live = false, dead = false;
 
-  // dance/energy state (reused across frames; nothing allocated in the loop)
+  // ── shared music-driven state (both rigs read the same beat/energy) ──
   // Idle-energy baseline lifted to ~0.28 so the groove amplitude reads even
-  // without music (the figure still visibly dances when silent).
+  // without music (both figures still visibly dance when silent).
   let energy = 0.28, phase = 0;
   let beatAccent = 0;                 // on-beat pulse (0..1), music-locked
   let ENV = null;                     // the offline envelope JSON (fetched once)
   const trackInfo = {};               // per-track { beatPeriod, bpm, t0 } (cached)
   const N_BEATS = 2;                  // grooveSway's master sway spans this many beats
-  let headTrail = 0; // secondary-motion memory for the head (grooveSway only)
-
-  // ── move-selection clock state ────────────────────────────────────────
-  // A separate BAR-GRID clock (beats elapsed, not radians) drives WHICH move
-  // is active — independent of `phase` (grooveSway's own sine oscillator).
   const BAR_WEIGHT = [1.0, 0.35, 0.6, 0.35];   // beat-in-bar accent weighting (downbeat strongest)
   const IDLE_BEAT_PERIOD = 0.6;                // synthetic ~100bpm grid while no track is locked
   let idleBeatAccum = 0;
-  let currentMoveName = 'grooveSway', currentMove = null, moveStartBeat = 0, moveMirror = 1;
-  let lastBar8 = -1, prevDrop = false;
 
-  // ── glTF bone name → our rig role ────────────────────────────────────
-  // Exact node names in scene.gltf. Only the joints dance() actually drives get
-  // a proxy + adapter; the rest (shoulders, hands, feet, fingers, drills, tail)
-  // stay at their bind pose. `pelvis` (Hips) is the skeleton root — it also
-  // carries the whole-figure sway (translation + tilt).
-  const NAME_OF = {
-    pelvis: 'Hips_01', spine: 'Spine_08', chest: 'Chest_09',
-    neck: 'Armadrillo Neck_010', head: 'Armadrillo Head_00',
-    shoulderL: 'Left shoulder_028', upperArmL: 'Left arm_029', forearmL: 'Left elbow_030', handL: 'Left wrist_031',
-    shoulderR: 'Right shoulder_011', upperArmR: 'Right arm_012', forearmR: 'Right elbow_013', handR: 'Right wrist_014',
-    thighL: 'Left leg_02', shinL: 'Left_ShortKnee_03', footL: 'Left_ShortAnkle_04',
-    thighR: 'Right leg_05', shinR: 'Right_ShortKnee_06', footR: 'Right_ShortAnkle_07',
-  };
-
-  // ── tuning constants (kept together so screenshot-iteration is one place) ──
-  const POS_SCALE = 0.55;   // proxy pelvis translation (procedural units ~4.8 tall) → model units (~1.07 tall)
-  const ARM_DOWN = -1.15;   // static rest offset that lowers the T-pose arms toward "hanging" (rad, about the frontal axis)
-  const FORE_REST = 0.15;   // slight resting elbow bend so forearms aren't ramrod-straight
   const FACE_SPIN = 0;      // rotation about the (Z-up) vertical to face the camera (flip to Math.PI if it faces away)
 
   // reusable scratch (no per-frame allocation)
   const _e = new THREE.Euler(0, 0, 0, 'XYZ');
   const _q = new THREE.Quaternion();
 
-  // ── build (synchronous scaffold + async model load) ──────────────────────
-  // Create renderer/scene/camera/rig/turnGroup NOW and start the RAF (it renders
-  // an empty transparent scene until the model arrives). Then kick off the glTF
-  // load; on success, add the model, populate proxies/adapters/bones, frame it,
-  // and flip modelReady so dance()/adapter/skeleton.update run.
+  // ── per-rig config: model URL, bone-name map, rest offsets, framing ──
+  const RIG_A = {
+    url: 'assets/scene/armadrillo/scene.gltf',
+    // Exact node names in scene.gltf. Only the joints dance() actually drives
+    // get a proxy + adapter; the rest (shoulders, hands, feet, fingers,
+    // drills, tail) stay at their bind pose. `pelvis` (Hips) is the skeleton
+    // root — it also carries the whole-figure sway (translation + tilt).
+    nameOf: {
+      pelvis: 'Hips_01', spine: 'Spine_08', chest: 'Chest_09',
+      neck: 'Armadrillo Neck_010', head: 'Armadrillo Head_00',
+      shoulderL: 'Left shoulder_028', upperArmL: 'Left arm_029', forearmL: 'Left elbow_030', handL: 'Left wrist_031',
+      shoulderR: 'Right shoulder_011', upperArmR: 'Right arm_012', forearmR: 'Right elbow_013', handR: 'Right wrist_014',
+      thighL: 'Left leg_02', shinL: 'Left_ShortKnee_03', footL: 'Left_ShortAnkle_04',
+      thighR: 'Right leg_05', shinR: 'Right_ShortKnee_06', footR: 'Right_ShortAnkle_07',
+    },
+    // proxy pelvis translation (procedural units ~4.8 tall) → model units (~1.07 tall)
+    posScale: 0.55,
+    // T-pose rest offsets: bring the arms DOWN out of the T toward "hanging",
+    // slight resting elbow bend so forearms aren't ramrod-straight.
+    armDown: -1.15, foreRest: 0.15,
+    // duet framing: half-width slot, shifted LEFT (this creature is wide, so
+    // it gets a touch more width budget than the slimmer fairy-punk rig)
+    fitH: 0.82, fitW: 0.40, xOffset: -1.05,
+  };
+  const RIG_B = {
+    url: 'assets/scene/fairy-punk/scene.gltf',
+    // Bone names as authored by the Blender rig (see assets/scene/fairy-punk/
+    // license.txt) — dots sanitize to underscores on import, same as the
+    // Armadrillo's spaces, via the shared `norm()` below.
+    nameOf: {
+      pelvis: 'Pelvis', spine: 'Spine', chest: 'Chest', neck: 'Neck', head: 'Head',
+      upperArmL: 'UpperArm.L', forearmL: 'Forearm.L', upperArmR: 'UpperArm.R', forearmR: 'Forearm.R',
+      thighL: 'Thigh.L', shinL: 'Shin.L', thighR: 'Thigh.R', shinR: 'Shin.R',
+    },
+    posScale: 0.55,
+    // Hanging-arms bind pose (built this way specifically to avoid a T-pose
+    // rest hack) — near-zero rest offsets; small elbow bend to match.
+    armDown: 0, foreRest: 0.12,
+    fitH: 0.82, fitW: 0.34, xOffset: 1.0,
+  };
+
+  function createRigState(cfg) {
+    return {
+      cfg,
+      rigGroup: null, turnGroup: null, model: null,
+      skinnedMeshes: [], bones: null,
+      proxies: {}, adapters: [],
+      pelvisBone: null, pelvisBind: null,
+      modelReady: false, triCount: 0, vertCount: 0,
+      frameBonesCache: null,
+      currentMoveName: 'grooveSway', currentMove: null,
+      moveStartBeat: 0, moveMirror: 1, lastBar8: -1, prevDrop: false,
+      headTrail: 0,   // secondary-motion memory for the head (grooveSway only), per-rig
+    };
+  }
+  const rigA = createRigState(RIG_A);
+  const rigB = createRigState(RIG_B);
+  const rigs = [rigA, rigB];
+
+  // ── build (synchronous scaffold + async model loads) ──────────────────────
+  // Create renderer/scene/camera NOW and start the RAF (it renders an empty
+  // transparent scene until the models arrive). Then kick off both glTF
+  // loads; on each success, add that model, populate its proxies/adapters,
+  // frame it into its duet slot, and flip its modelReady so its dance/
+  // adapter/skeleton.update run (independently of the other rig's load state).
   function build() {
     renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'high-performance' });
     // A lost GL context (iOS backgrounding etc.) must not freeze a dead frame:
@@ -150,164 +172,149 @@ export function initKineticDancer() {
 
     scene = new THREE.Scene();
 
-    // static placement group (scale/position/facing tuned after load).
-    // GLTFLoader already imports this Sketchfab asset UPRIGHT (Y-up standing),
-    // so no uprighting rotation is applied here — only a facing spin about Y.
-    rig = new THREE.Group();
-    rig.rotation.y = FACE_SPIN;   // face the camera (flip to Math.PI if it faces away)
-    scene.add(rig);
-
-    // whole-figure sway pivot (dance's b.root.rotation.y — the slow 3/4 turn)
-    turnGroup = new THREE.Group();
-    rig.add(turnGroup);
-
-    // camera: TALL/NARROW canvas → frame the full figure vertically. Reuse the
-    // previously-tuned framing (fov 38, z 8.4); the model is scaled to fit.
+    // camera: TALL/NARROW canvas → frame the full duet vertically. Reuse the
+    // previously-tuned framing (fov 38, z 8.4); each rig is scaled to fit its
+    // own half-width slot (see frameModel).
     camera = new THREE.PerspectiveCamera(38, 0.5, 0.1, 100);
     camera.position.set(0, 0.05, 8.4);
     camera.lookAt(0, -0.05, 0);
 
     sizeToCanvas();
 
-    // ── async model load ────────────────────────────────────────────────
-    const loader = new THREE.GLTFLoader();
-    try {
-      if (THREE.DRACOLoader) {
-        const draco = new THREE.DRACOLoader();
-        draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
-        loader.setDRACOLoader(draco);
-      }
-    } catch (_) { /* DRACO optional — this asset is not draco-compressed */ }
+    for (const rigState of rigs) {
+      // static placement group (scale/position/facing tuned after load).
+      // GLTFLoader already imports these assets UPRIGHT (Y-up standing), so
+      // no uprighting rotation is applied here — only a facing spin about Y.
+      rigState.rigGroup = new THREE.Group();
+      rigState.rigGroup.rotation.y = FACE_SPIN;
+      scene.add(rigState.rigGroup);
 
-    loader.load(MODEL_URL, onModelLoaded, undefined, () => { /* load error → stay empty, fail safe */ });
+      // whole-figure sway pivot (dance's b.root.rotation.y — the slow 3/4 turn)
+      rigState.turnGroup = new THREE.Group();
+      rigState.rigGroup.add(rigState.turnGroup);
+
+      const loader = new THREE.GLTFLoader();
+      try {
+        if (THREE.DRACOLoader) {
+          const draco = new THREE.DRACOLoader();
+          draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+          loader.setDRACOLoader(draco);
+        }
+      } catch (_) { /* DRACO optional — neither asset is draco-compressed */ }
+
+      loader.load(rigState.cfg.url, (gltf) => onModelLoaded(rigState, gltf), undefined, () => { /* load error → that rig stays empty, fail safe */ });
+    }
   }
 
   // ── on model load: wire the rig, retarget the dance ──────────────────────
-  function onModelLoaded(gltf) {
+  function onModelLoaded(rigState, gltf) {
     if (dead) return;
-    model = gltf.scene;
+    const model = gltf.scene;
+    rigState.model = model;
 
     // theme wireframe on every mesh; collect skinned meshes for skeleton.update
     model.traverse((o) => {
       if (o.isMesh || o.isSkinnedMesh) {
         o.material = coreMat;
         o.frustumCulled = false;   // skinned bounds move; don't let it cull out
-        if (o.isSkinnedMesh) skinnedMeshes.push(o);
+        if (o.isSkinnedMesh) rigState.skinnedMeshes.push(o);
         const g = o.geometry;
         if (g && g.attributes && g.attributes.position) {
-          vertCount += g.attributes.position.count;
-          triCount += (g.index ? g.index.count : g.attributes.position.count) / 3;
+          rigState.vertCount += g.attributes.position.count;
+          rigState.triCount += (g.index ? g.index.count : g.attributes.position.count) / 3;
         }
       }
     });
 
     // find the mapped bones by exact name
-    // GLTFLoader SANITIZES node names (spaces + dots → underscores), so match on
-    // the normalized form — otherwise every bone with a space ("Left arm_029",
-    // "Armadrillo Neck_010", …) fails to map and never animates (which left only
-    // the torso/shins moving). Normalize both sides.
+    // GLTFLoader SANITIZES node names (spaces + dots → underscores), so match
+    // on the normalized form — otherwise any bone with a space/dot fails to
+    // map and never animates. Normalize both sides.
     const norm = (s) => s.replace(/[\s.]/g, '_');
     const boneByRole = {};
     model.traverse((o) => {
       if (!o.isBone) return;
-      for (const role in NAME_OF) if (norm(NAME_OF[role]) === o.name) boneByRole[role] = o;
+      for (const role in rigState.cfg.nameOf) if (norm(rigState.cfg.nameOf[role]) === o.name) boneByRole[role] = o;
     });
 
-    // ── frame: fit the figure to the canvas by PROJECTED height, centred ──
-    // The model loads UPRIGHT (Y-up): height along Y, arm-span along X. It is a
-    // stocky, WIDE creature with a long tail, so a naive bbox-height fit
-    // over-zooms — perspective magnifies the near face at this camera distance.
-    // Instead iterate a PROJECTED fit (project the 8 bbox corners to NDC, scale
-    // to a target on-screen height) and centre the TOP-LEVEL rig in world space.
-    turnGroup.add(model);
-    frameModel();
+    // ── frame: fit this rig into its half of the canvas, then slot it ──
+    rigState.turnGroup.add(model);
+    frameModel(rigState);
 
     // ── proxies + adapters (the retarget) ────────────────────────────────
     // A proxy per animated role: dance() writes to these (persist → damping).
     const ROLES = ['pelvis', 'spine', 'chest', 'neck', 'head',
       'upperArmL', 'forearmL', 'upperArmR', 'forearmR',
       'thighL', 'shinL', 'thighR', 'shinR'];
-    for (const role of ROLES) proxies[role] = { rotation: new THREE.Euler(0, 0, 0, 'XYZ'), position: new THREE.Vector3() };
+    for (const role of ROLES) rigState.proxies[role] = { rotation: new THREE.Euler(0, 0, 0, 'XYZ'), position: new THREE.Vector3() };
 
     // adapter helper: how a proxy's (x,y,z) rotations map onto a bone's LOCAL
-    // axes. mx/my/mz = [proxySource, sign] → the bone's local X/Y/Z value.
-    // rest = static local offset (folded before the dance delta).
+    // axes. Both rigs' torso/head/legs are ~identity-aligned in the render
+    // frame, so mx/my/mz stay identity for everything; only the arm REST
+    // offset differs per rig (T-pose vs. hanging-arms bind — see RIG_A/RIG_B).
     const A = (role, opts) => {
       const bone = boneByRole[role]; if (!bone) return;
-      adapters.push({
-        role, bone, proxy: proxies[role],
+      rigState.adapters.push({
+        role, bone, proxy: rigState.proxies[role],
         bindQ: bone.quaternion.clone(),
-        rest: opts.rest || { x: 0, y: 0, z: 0 },
-        mx: opts.mx || ['x', 1], my: opts.my || ['y', 1], mz: opts.mz || ['z', 1],
+        rest: (opts && opts.rest) || { x: 0, y: 0, z: 0 },
+        mx: ['x', 1], my: ['y', 1], mz: ['z', 1],
       });
     };
 
-    // Torso + head: ~identity-aligned in the render frame (local X = side,
-    // local Y ≈ up, local Z ≈ front) → proxy axes map 1:1.
-    A('pelvis', {});
-    A('spine', {});
-    A('chest', {});
-    A('neck', {});
-    A('head', {});
+    A('pelvis'); A('spine'); A('chest'); A('neck'); A('head');
 
-    // Arms: T-pose, bone points along local +Y (the arm). Local X ≈ the
-    // frontal (raise/lower) axis, local Z ≈ up (forward/in swing). Bring the
-    // arms DOWN out of the T with ARM_DOWN, then dance's proxy.x raises them.
-    //   proxy.x (proc "swing forward+up" / raise)  → local X (frontal raise)
-    //   proxy.z (proc "close to body")             → local Z (forward / in)
-    //   proxy.y (unused for arms)                  → local Y (twist)
-    A('upperArmL', { rest: { x: ARM_DOWN, y: 0, z: 0 }, mx: ['x', 1], my: ['y', 1], mz: ['z', 1] });
-    A('upperArmR', { rest: { x: ARM_DOWN, y: 0, z: 0 }, mx: ['x', 1], my: ['y', 1], mz: ['z', 1] });
-    // Forearms share the arm frame; proc forearm.x is the elbow (deep, negative)
-    // → local X curls the forearm up toward the face. Small resting bend.
-    A('forearmL', { rest: { x: FORE_REST, y: 0, z: 0 }, mx: ['x', 1], my: ['y', 1], mz: ['z', 1] });
-    A('forearmR', { rest: { x: FORE_REST, y: 0, z: 0 }, mx: ['x', 1], my: ['y', 1], mz: ['z', 1] });
+    const armDown = rigState.cfg.armDown || 0, foreRest = rigState.cfg.foreRest || 0;
+    A('upperArmL', { rest: { x: armDown, y: 0, z: 0 } });
+    A('upperArmR', { rest: { x: armDown, y: 0, z: 0 } });
+    A('forearmL', { rest: { x: foreRest, y: 0, z: 0 } });
+    A('forearmR', { rest: { x: foreRest, y: 0, z: 0 } });
 
-    // Legs: identity-aligned (local X = side = the sagittal swing axis proc uses).
-    A('thighL', {});
-    A('shinL', {});
-    A('thighR', {});
-    A('shinR', {});
+    A('thighL'); A('shinL'); A('thighR'); A('shinR');
 
     // pelvis translation sway: parent frame is Z-up → side = local X, up = local Z.
-    pelvisBone = boneByRole.pelvis || null;
-    if (pelvisBone) pelvisBind = pelvisBone.position.clone();
+    rigState.pelvisBone = boneByRole.pelvis || null;
+    if (rigState.pelvisBone) rigState.pelvisBind = rigState.pelvisBone.position.clone();
 
     // dance-facing rig: proxies for joints, the real turnGroup for `root`.
-    bones = { root: turnGroup };
-    for (const role of ROLES) bones[role] = proxies[role];
+    rigState.bones = { root: rigState.turnGroup };
+    for (const role of ROLES) rigState.bones[role] = rigState.proxies[role];
 
-    modelReady = true;
+    rigState.currentMove = MOVE_TABLE.grooveSway;
+    rigState.modelReady = true;
   }
 
-  // ── fit + centre the model to the canvas (projected, perspective-aware) ──
-  // This is a stocky, WIDE creature with a long tail, so projecting the BBOX
-  // CORNERS gives garbage (the arm/tail corners at extreme x/z dominate). Fit
-  // instead on the projected positions of the actual BONES — they trace the real
-  // figure. Iterate: measure the bones' projected vertical span, scale to fill
-  // ~FIT_H of the canvas, and shift the top-level rig so the span is centred.
-  const FIT_H = 0.86;                    // fraction of canvas HEIGHT the figure may fill
-  const FIT_W = 0.62;                    // fraction of canvas WIDTH (this creature is wide → usually binds)
+  // ── fit + centre + slot a rig into its duet position (projected, perspective-aware) ──
+  // Both source creatures are wide relative to a single narrow canvas, so
+  // projecting the BBOX CORNERS gives garbage (arm/tail corners at extreme
+  // x/z dominate). Fit instead on the projected positions of the actual
+  // BONES — they trace the real figure. Iterate: measure the bones'
+  // projected vertical/horizontal span, scale to fill this rig's own
+  // fraction of the canvas (fitH/fitW — each rig gets roughly HALF the
+  // width, per RIG_A/RIG_B), centre it, THEN shift it left/right by its
+  // fixed `xOffset` into its duet slot (applied once, after centering
+  // converges, so it isn't undone by the centering math).
   const _corner = new THREE.Vector3(), _c = new THREE.Vector3();
-  let _frameBones = null;
-  function frameModel() {
-    if (!model || !camera) return;
-    if (!_frameBones) { _frameBones = []; model.traverse(o => { if (o.isBone) _frameBones.push(o); }); }
-    if (!_frameBones.length) return;
+  function frameModel(rigState) {
+    if (!rigState.model || !camera) return;
+    if (!rigState.frameBonesCache) { rigState.frameBonesCache = []; rigState.model.traverse(o => { if (o.isBone) rigState.frameBonesCache.push(o); }); }
+    const frameBones = rigState.frameBonesCache;
+    if (!frameBones.length) return;
     camera.updateMatrixWorld(true);
     const fovR = THREE.MathUtils.degToRad(camera.fov);
     const worldPerNDC = Math.tan(fovR / 2) * Math.abs(camera.position.z);   // ≈ world units per NDC half-height
-    let s = rig.scale.x || 1;
+    let s = rigState.rigGroup.scale.x || 1;
+    const FIT_H = rigState.cfg.fitH, FIT_W = rigState.cfg.fitW;
     for (let iter = 0; iter < 8; iter++) {
       // centre X + depth(Z) in world from the bones' world positions
-      rig.updateMatrixWorld(true);
+      rigState.rigGroup.updateMatrixWorld(true);
       let cx = 0, cz = 0, ymin = Infinity, ymax = -Infinity;
-      for (const bn of _frameBones) { bn.getWorldPosition(_c); cx += _c.x; cz += _c.z; }
-      cx /= _frameBones.length; cz /= _frameBones.length;
-      rig.position.x -= cx; rig.position.z -= cz;
-      rig.updateMatrixWorld(true);
+      for (const bn of frameBones) { bn.getWorldPosition(_c); cx += _c.x; cz += _c.z; }
+      cx /= frameBones.length; cz /= frameBones.length;
+      rigState.rigGroup.position.x -= cx; rigState.rigGroup.position.z -= cz;
+      rigState.rigGroup.updateMatrixWorld(true);
       let xmin = Infinity, xmax = -Infinity;
-      for (const bn of _frameBones) {
+      for (const bn of frameBones) {
         bn.getWorldPosition(_corner).project(camera);
         if (_corner.y < ymin) ymin = _corner.y;
         if (_corner.y > ymax) ymax = _corner.y;
@@ -317,19 +324,17 @@ export function initKineticDancer() {
       const fracY = (ymax - ymin) / 2;                 // NDC vertical span → fraction of canvas height
       const fracX = (xmax - xmin) / 2;                 // NDC horizontal span → fraction of canvas width
       const yc = (ymax + ymin) / 2;                    // projected vertical centre (NDC)
-      const aspect = camera.aspect || 1;
       if (fracY < 1e-3) break;
-      rig.position.y -= yc * worldPerNDC;              // bring the on-screen centre to the middle
-      // fit BOTH dimensions — this creature is WIDE, so width usually binds and
-      // must not crop off the narrow canvas sides. worldPerNDC is the height
-      // scale; horizontal world-per-NDC = worldPerNDC * aspect.
+      rigState.rigGroup.position.y -= yc * worldPerNDC;              // bring the on-screen centre to the middle
       const kY = FIT_H / fracY;
       const kX = fracX > 1e-3 ? FIT_W / fracX : Infinity;
       const k = Math.min(kY, kX);
       s *= k;
-      rig.scale.setScalar(s);
+      rigState.rigGroup.scale.setScalar(s);
       if (Math.abs(k - 1) < 0.01 && Math.abs(yc) < 0.01) break;
     }
+    // slot into the duet position (world-space shift, applied once post-fit)
+    rigState.rigGroup.position.x += rigState.cfg.xOffset;
   }
 
   // Size the renderer + camera aspect to the canvas's CSS box (client px).
@@ -344,7 +349,7 @@ export function initKineticDancer() {
 
   // ── energy + beat, from the repo's existing offline envelope engine ──────
   // Read the lightshow's already-smoothed energy; if the lightshow floored /
-  // never ran, synthesize a calm idle breath so the figure still grooves.
+  // never ran, synthesize a calm idle breath so both figures still groove.
   function readRawEnergy(t) {
     const ls = appState.lightshow;
     // NOTE: Number.isFinite, NOT typeof === 'number' — typeof NaN is 'number',
@@ -391,11 +396,12 @@ export function initKineticDancer() {
   // Real per-beat "how hard does THIS beat hit" signal, sampled directly from
   // the offline RMS envelope (ENV.tracks[name].env @ ENV.fps — the same data
   // gen-envelopes.mjs already computed via ffmpeg for the whole track) around
-  // the beat's nominal time. Without this, the accent/amplitude below were a
+  // the beat's nominal time. Without this, the accent/amplitude would be a
   // pure function of beat-phase + bar position — IDENTICAL every beat
   // regardless of the actual mix, so a quiet breakdown beat and a hard drop
-  // beat produced the same shape. A small ±window (the analytic beat grid can
-  // lead/lag the real transient slightly) takes the peak, not just one frame.
+  // beat would produce the same shape. A small ±window (the analytic beat
+  // grid can lead/lag the real transient slightly) takes the peak, not just
+  // one frame.
   function beatStrength(trackName, beatCenterT) {
     const tr = ENV && ENV.tracks && ENV.tracks[trackName];
     const env = tr && tr.env;
@@ -443,7 +449,8 @@ export function initKineticDancer() {
 
   // Returns the gesture-phase RATE (Hz) + the on-beat accent for `now`, PLUS a
   // bar-grid `beatPos` (beats elapsed, monotonic float) that drives WHICH move
-  // is active (see MOVE_TABLE/updateMoveSelection below). When the music is
+  // is active per rig (see MOVE_TABLE/updateMoveSelection below) — shared by
+  // BOTH dancers so they're locked to the same music. When the music is
   // playing and its track is analysed: `phase`'s rate is BPM-locked (a full
   // grooveSway sway spans N_BEATS beats, halved again at high BPM via
   // `tempoScale` so fast tracks read as bigger/slower rather than flailing),
@@ -472,28 +479,26 @@ export function initKineticDancer() {
         beatPos, tempoScale, bpm: info.bpm, locked: true, strength,
       };
     }
-    // idle free-run (no music yet): keep it LIVELY so it visibly dances even
-    // before any track plays (~one gesture every ~2.4s), no beat accent. Still
-    // advance a synthetic beatPos so move-selection has a grid to work with.
+    // idle free-run (no music yet): keep it LIVELY so both figures visibly
+    // dance even before any track plays (~one gesture every ~2.4s), no beat
+    // accent. Still advance a synthetic beatPos so move-selection has a grid.
     idleBeatAccum += (Number.isFinite(dt) ? dt : 0.016) / IDLE_BEAT_PERIOD;
     return { rateHz: 0.42 + energy * 0.15, accent: 0, beatPos: idleBeatAccum, tempoScale: 1, bpm: 0, locked: false, strength: 0.6 };
   }
 
   // ── move library ─────────────────────────────────────────────────────
-  // Twelve move phrases replace the old single always-on sine loop (which
-  // repeated the same ~1s gesture unchanged for the length of an entire
-  // track) — the original seven (A-G) plus five more (H-L) widening the pool
-  // further, including a tribal-house/tribal-fusion-grounded vein: percussive
-  // grounded stomps, a torso figure-eight isolation, a low stalking crouch,
-  // and a syncopated polyrhythmic step, alongside a ceremonial arms-raised
-  // invocation. Every move is a pure function of a shared context — `b` (proxy
-  // joints), the damping helpers, amplitude `A`/beat accent `hit`, the
-  // grooveSway oscillator `p`/`s`, this move's own `elapsedBeats` (beats since
-  // it was selected, tempo-scaled), and `mirror` (±1, for L/R-picking moves).
-  // EVERY move sets a target for EVERY proxy axis another move might drive —
-  // otherwise an axis a move doesn't touch just freezes at whatever the
-  // PREVIOUS move left it at instead of easing back to rest, breaking the
-  // "moves crossfade for free through the shared damping" property.
+  // Twelve move phrases (the original seven A-G plus five more H-L, including
+  // a tribal-house/tribal-fusion-grounded vein) — every move is a pure
+  // function of a shared context — `b` (proxy joints), the damping helpers,
+  // amplitude `A`/beat accent `hit`, the grooveSway oscillator `p`/`s`, this
+  // move's own `elapsedBeats` (beats since it was selected, tempo-scaled),
+  // `mirror` (±1, for L/R-picking moves), and `rig` (this move's OWN rig
+  // state, so grooveSway's secondary-motion memory — `rig.headTrail` — stays
+  // per-dancer rather than shared). EVERY move sets a target for EVERY proxy
+  // axis another move might drive — otherwise an axis a move doesn't touch
+  // just freezes at whatever the PREVIOUS move left it at instead of easing
+  // back to rest, breaking the "moves crossfade for free through the shared
+  // damping" property.
   const REST_ARM_X = 0.20, REST_FORE_X = 0.12, REST_LEG_X = 0.06;
   // Ease-in-out for every move's draw/hold/release-style envelope (0..1 in,
   // 0 slope at both ends) instead of a raw linear ramp — a linear ramp has a
@@ -506,7 +511,7 @@ export function initKineticDancer() {
   // A. Groove sway — the retuned workhorse (was the only move). Whole-figure
   // sway + alternating hands-to-face reach, on grooveSway's own `p` oscillator.
   function grooveSway(c) {
-    const { b, tgt, set, A, p, s } = c;
+    const { b, tgt, set, A, p, s, rig } = c;
     const reachL = 0.5 - 0.5 * Math.cos(p);
     const reachR = 0.5 - 0.5 * Math.cos(p + 2.4);
     const reach = Math.max(reachL, reachR);
@@ -534,13 +539,13 @@ export function initKineticDancer() {
     tgt(b.shinL.rotation, 'x', 0.05 + Math.max(0, s) * 0.40 * A);
     tgt(b.shinR.rotation, 'x', 0.05 + Math.max(0, -s) * 0.40 * A);
 
-    // head trails the chest (secondary motion) — kept local to this move only
-    headTrail += (b.chest.rotation.z - headTrail) * (1 - Math.pow(0.92, (c.dt || 0.016) * 60));
+    // head trails the chest (secondary motion) — per-rig, kept local to this move only
+    rig.headTrail += (b.chest.rotation.z - rig.headTrail) * (1 - Math.pow(0.92, (c.dt || 0.016) * 60));
     tgt(b.neck.rotation, 'x', 0.03 + reach * 0.20 * A);
     tgt(b.neck.rotation, 'z', s * 0.08 * A);
     tgt(b.neck.rotation, 'y', look * 0.10 * A);
     tgt(b.head.rotation, 'x', -0.12 + reach * 0.54 * A);
-    tgt(b.head.rotation, 'z', s * 0.16 * A - headTrail * 0.4);
+    tgt(b.head.rotation, 'z', s * 0.16 * A - rig.headTrail * 0.4);
     tgt(b.head.rotation, 'y', look * 0.22 * A);
   }
 
@@ -576,6 +581,8 @@ export function initKineticDancer() {
   // C. Barrier strike — the Anyma signature accent. Triggered on the RISING
   // edge of a sustained-loud ("drop") section: 2-beat wind-up (coil back),
   // then an eased 6-beat recoil out of the strike. Motion-only (no opacity).
+  // Both dancers trigger this on the SAME drop edge (shared appState.
+  // lightshow.drop signal) — the one moment they always hit together.
   function strike(c) {
     const { b, tgt, set, add, A, elapsedBeats } = c;
     const eb = elapsedBeats;
@@ -771,16 +778,11 @@ export function initKineticDancer() {
 
   // J. Grounded isolation — a taxeem/maya-style torso figure-eight (chest and
   // hips counter-rotating in a serpentine wave) over a low, bent-knee stance.
-  // Per tribal-fusion vocabulary the isolation reads in the torso; the rest
-  // of the body stays quiet and grounded rather than travelling.
+  // Per tribal-fusion vocabulary the isolation reads in the torso; the arms
+  // counter-sway with it (curation fix — a fixed arm pose read as barely
+  // distinct from grooveSway/tribalStomp from the front camera).
   function groundedIsolation(c) {
     const { b, tgt, set, A, elapsedBeats } = c;
-    // Curation pass: the arms originally held a FIXED pose regardless of the
-    // torso isolation, so from a front-on camera this barely read as distinct
-    // from grooveSway/tribalStomp — the isolation is a Z-axis torso twist,
-    // which is nearly invisible face-on unless something else visibly tracks
-    // it. Arms now counter-sway with `iso` (a small circular hand-trace) and
-    // the cycle runs faster, so the isolation actually shows.
     const q = (elapsedBeats / 1.6) * Math.PI * 2;
     const iso = Math.sin(q), iso2 = Math.sin(q * 2) * 0.5;
 
@@ -859,7 +861,7 @@ export function initKineticDancer() {
   }
 
   // `affinity` tags which instrument register a move's vocabulary suits —
-  // used to WEIGHT (not gate) the pick below, so the dancer leans into moves
+  // used to WEIGHT (not gate) the pick below, so each dancer leans into moves
   // that fit what's actually playing right now: LOW (bass/kick) → grounded/
   // percussive; HIGH (hi-hat/cymbal/perc) → sharp/snappy isolations; MID
   // (melodic/vocal) → flowing/held gestures. Moves with no `affinity` (the
@@ -880,7 +882,6 @@ export function initKineticDancer() {
     crouchProwl: { beats: 8, pool: ['low', 'high'], affinity: 'low', run: crouchProwl },
     polyStep: { beats: 6, pool: ['low', 'high'], mirrored: true, affinity: 'high', run: polyStep },
   };
-  currentMove = MOVE_TABLE.grooveSway;
 
   // Weighted pick: `weights[i]` is the relative chance of `names[i]`. Used so
   // instrument-affinity BIASES the pick instead of gating it (every eligible
@@ -893,34 +894,35 @@ export function initKineticDancer() {
     return names[names.length - 1];
   }
 
-  // Re-selects the active move every 8 beats, AND immediately on a drop's
-  // rising edge (so the strike accent lands right when the section changes,
-  // not up to 8 beats late — it may then run short if the next 8-beat
-  // boundary falls soon after; that's fine, every move crossfades out
+  // Re-selects rigState's active move every 8 beats, AND immediately on a
+  // drop's rising edge (so the strike accent lands right when the section
+  // changes, not up to 8 beats late — it may then run short if the next
+  // 8-beat boundary falls soon after; that's fine, every move crossfades out
   // cleanly via the shared damping). Context gates the eligible pool: idle
   // (no track locked yet) / low (playing, not in a sustained-loud section) /
-  // high (`appState.lightshow.drop` — the repo's existing Schmitt-triggered,
-  // slow-eased sustained-loud-section flag). WITHIN that pool, the pick is
-  // weighted toward whichever move's `affinity` matches the instrument mix
-  // dominating the track right now (bandMix), so a bass-heavy passage favours
-  // grounded/percussive moves, a hi-hat-heavy passage favours sharp snappy
-  // ones, and a melodic/vocal passage favours the flowing/held gestures.
-  function updateMoveSelection(clk) {
+  // high (`appState.lightshow.drop`). WITHIN that pool, the pick is weighted
+  // toward whichever move's `affinity` matches the instrument mix dominating
+  // the track right now (bandMix). Called independently per rig — each
+  // dancer keeps its OWN moveStartBeat/lastBar8/prevDrop, so the two land on
+  // independent weighted-random picks at the same structural moments rather
+  // than a shared/duplicated choice (except `strike`, which both always
+  // trigger together on the same drop edge — the one synced duet accent).
+  function updateMoveSelection(rigState, clk) {
     const drop = !!(appState.lightshow && appState.lightshow.drop);
     const ctx = !clk.locked ? 'idle' : (drop ? 'high' : 'low');
 
-    if (drop && !prevDrop) {
-      currentMoveName = 'strike'; currentMove = MOVE_TABLE.strike;
-      moveStartBeat = clk.beatPos; moveMirror = 1;
-      lastBar8 = Math.floor(clk.beatPos / 8);   // don't immediately re-roll this same window
-      prevDrop = drop;
+    if (drop && !rigState.prevDrop) {
+      rigState.currentMoveName = 'strike'; rigState.currentMove = MOVE_TABLE.strike;
+      rigState.moveStartBeat = clk.beatPos; rigState.moveMirror = 1;
+      rigState.lastBar8 = Math.floor(clk.beatPos / 8);   // don't immediately re-roll this same window
+      rigState.prevDrop = drop;
       return;
     }
-    prevDrop = drop;
+    rigState.prevDrop = drop;
 
     const bar8 = Math.floor(clk.beatPos / 8);
-    if (bar8 !== lastBar8) {
-      lastBar8 = bar8;
+    if (bar8 !== rigState.lastBar8) {
+      rigState.lastBar8 = bar8;
       const pool = Object.keys(MOVE_TABLE).filter((n) => n !== 'strike' && MOVE_TABLE[n].pool.includes(ctx));
       let name = 'grooveSway';
       if (pool.length) {
@@ -932,25 +934,28 @@ export function initKineticDancer() {
         });
         name = weightedPick(pool, weights);
       }
-      currentMoveName = name; currentMove = MOVE_TABLE[name];
-      moveStartBeat = clk.beatPos;
-      moveMirror = (currentMove.mirrored && Math.random() < 0.5) ? -1 : 1;
+      rigState.currentMoveName = name; rigState.currentMove = MOVE_TABLE[name];
+      rigState.moveStartBeat = clk.beatPos;
+      rigState.moveMirror = (rigState.currentMove.mirrored && Math.random() < 0.5) ? -1 : 1;
     }
   }
 
-  // ── the dance ────────────────────────────────────────────────────────
+  // ── the dance (per rig) ────────────────────────────────────────────────
   // Everything is DAMPED toward a target each frame (factor k, framerate-aware)
-  // so the figure grooves smoothly and never snaps or seizures. Ranges are kept
-  // inside safe limits so no bone clips through another. dance() writes to the
-  // PROXY joints (persistent Euler/Vector3 — same `.rotation.x/y/z` /
-  // `.position` API as a THREE.Bone) so the gesture math + damping stay
-  // consistent; the adapter (applyRig) converts proxy → real bone each frame.
-  // WHICH move runs is decided by updateMoveSelection (an 8/16-beat grid,
-  // weighted-random within a context-gated pool); switching moves needs no
-  // special-case crossfade because every move writes every proxy and the
-  // shared `tgt`/`set` damping eases between whatever two targets differ.
-  function dance(dt, t, clk) {
-    const b = bones;
+  // so each figure grooves smoothly and never snaps or seizures. Ranges are
+  // kept inside safe limits so no bone clips through another. dance() writes
+  // to the rig's PROXY joints (persistent Euler/Vector3 — same `.rotation.
+  // x/y/z` / `.position` API as a THREE.Bone) so the gesture math + damping
+  // stay consistent; the adapter (applyRig) converts proxy → real bone each
+  // frame. WHICH move runs is decided per-rig by updateMoveSelection (an
+  // 8/16-beat grid, weighted-random within a context-gated pool); switching
+  // moves needs no special-case crossfade because every move writes every
+  // proxy and the shared `tgt`/`set` damping eases between whatever two
+  // targets differ. `energy`/`beatAccent` are shared across both rigs (same
+  // music), so amplitude/accent stay in lockstep even while each dancer's
+  // chosen MOVE differs.
+  function dance(rigState, dt, t, clk) {
+    const b = rigState.bones;
     const k = 1 - Math.pow(0.001, dt);         // framerate-independent damping
     const strength = Number.isFinite(clk.strength) ? clk.strength : 0.6;   // THIS beat's real envelope loudness
     const A = 0.55 + energy * 0.7 + strength * 0.35;   // section energy + per-beat strength: a genuinely hard beat moves bigger than a soft one, not just a slow section-level ramp
@@ -962,9 +967,9 @@ export function initKineticDancer() {
     const set = (vec, axis, target) => { vec[axis] += (target - vec[axis]) * k; };
     const add = (obj, axis, extra) => { obj[axis] += extra * k * 3; };
 
-    updateMoveSelection(clk);
-    const elapsedBeats = Math.max(0, (clk.beatPos - moveStartBeat) / (clk.tempoScale || 1));
-    currentMove.run({ b, tgt, set, add, A, hit, p, s, dt, elapsedBeats, mirror: moveMirror });
+    updateMoveSelection(rigState, clk);
+    const elapsedBeats = Math.max(0, (clk.beatPos - rigState.moveStartBeat) / (clk.tempoScale || 1));
+    rigState.currentMove.run({ b, tgt, set, add, A, hit, p, s, dt, elapsedBeats, mirror: rigState.moveMirror, rig: rigState });
 
     // shared, always-on accents regardless of the active move: the on-beat
     // knee/body dip so the tempo is always physically felt, and the slow 3/4
@@ -976,14 +981,15 @@ export function initKineticDancer() {
     tgt(b.root.rotation, 'y', Math.sin(p * 0.5) * 0.16);
   }
 
-  // ── adapter: proxy joints → real bone transforms ─────────────────────────
+  // ── adapter: proxy joints → real bone transforms (per rig) ────────────────
   // For every mapped bone: build a small LOCAL delta Euler from its proxy's
   // rotations (remapped axis/sign + static rest offset), then
   //   bone.quaternion = bindQ · Δ
   // so the captured bind pose is preserved and the dance eases away from it.
   // The pelvis also takes the translation sway (side = local X, up = local Z in
-  // its Z-up parent frame).
-  function applyRig() {
+  // its Z-up parent frame), scaled by THIS rig's own posScale.
+  function applyRig(rigState) {
+    const adapters = rigState.adapters;
     for (let i = 0; i < adapters.length; i++) {
       const a = adapters[i];
       const r = a.proxy.rotation;
@@ -994,12 +1000,13 @@ export function initKineticDancer() {
       _q.setFromEuler(_e);
       a.bone.quaternion.copy(a.bindQ).multiply(_q);
     }
-    if (pelvisBone) {
-      const p = proxies.pelvis.position;
-      pelvisBone.position.set(
-        pelvisBind.x + p.x * POS_SCALE,   // side sway
-        pelvisBind.y,                     // depth unchanged
-        pelvisBind.z + p.y * POS_SCALE,   // vertical bob (up = local Z)
+    if (rigState.pelvisBone) {
+      const p = rigState.proxies.pelvis.position;
+      const posScale = rigState.cfg.posScale;
+      rigState.pelvisBone.position.set(
+        rigState.pelvisBind.x + p.x * posScale,   // side sway
+        rigState.pelvisBind.y,                    // depth unchanged
+        rigState.pelvisBind.z + p.y * posScale,   // vertical bob (up = local Z)
       );
     }
   }
@@ -1013,42 +1020,43 @@ export function initKineticDancer() {
     dt = Math.min(dt, 1 / 30);      // clamp so a background pause can't lurch the pose
     last = now;
 
-    if (modelReady && bones) {
-      // energy: read raw (music envelope or idle), smooth (dt-scaled so the
-      // decay rate doesn't depend on display refresh rate), derive beat
-      const rawE = readRawEnergy(now);
-      const kEnergy = 1 - Math.pow(0.88, dt * 60);   // ≈ the old flat 0.12-per-frame-at-60fps factor
-      energy += (rawE - energy) * kEnergy;
-      if (!Number.isFinite(energy)) energy = 0.28;          // never let NaN corrupt the figure
+    // shared music clock: advances even if one (or both) rigs haven't
+    // finished loading yet, so neither rig's load time blocks the other.
+    const rawE = readRawEnergy(now);
+    const kEnergy = 1 - Math.pow(0.88, dt * 60);   // ≈ the old flat 0.12-per-frame-at-60fps factor
+    energy += (rawE - energy) * kEnergy;
+    if (!Number.isFinite(energy)) energy = 0.28;          // never let NaN corrupt either figure
 
-      // Advance the gesture phase at the BPM-locked rate (grooveSway's own
-      // oscillator spans N_BEATS beats), and capture the bar-weighted on-beat
-      // accent + the bar-grid beatPos that drives WHICH move is active.
-      const clk = musicClock(dt);
-      const rate = Number.isFinite(clk.rateHz) ? clk.rateHz : 0.42;
-      phase += rate * dt * 2 * Math.PI;
-      if (!Number.isFinite(phase)) phase = 0;               // guard against any NaN creep
-      beatAccent = Number.isFinite(clk.accent) ? clk.accent : 0;
-      if (!Number.isFinite(clk.beatPos)) clk.beatPos = 0;   // guard: never let move-selection see NaN
-      if (!Number.isFinite(clk.tempoScale) || clk.tempoScale <= 0) clk.tempoScale = 1;
-      if (!Number.isFinite(clk.strength)) clk.strength = 0.6;
+    const clk = musicClock(dt);
+    const rate = Number.isFinite(clk.rateHz) ? clk.rateHz : 0.42;
+    phase += rate * dt * 2 * Math.PI;
+    if (!Number.isFinite(phase)) phase = 0;               // guard against any NaN creep
+    beatAccent = Number.isFinite(clk.accent) ? clk.accent : 0;
+    if (!Number.isFinite(clk.beatPos)) clk.beatPos = 0;   // guard: never let move-selection see NaN
+    if (!Number.isFinite(clk.tempoScale) || clk.tempoScale <= 0) clk.tempoScale = 1;
+    if (!Number.isFinite(clk.strength)) clk.strength = 0.6;
 
-      dance(dt, now, clk);
-      applyRig();   // proxy joints → real bones (retarget)
+    for (let i = 0; i < rigs.length; i++) {
+      const rigState = rigs[i];
+      if (!rigState.modelReady || !rigState.bones) continue;   // that rig's load hasn't landed yet
 
-      // Refresh bone world matrices → skeleton bone matrices BEFORE render. GPU
-      // skinning does the per-vertex work.
-      rig.updateMatrixWorld(true);
-      for (let i = 0; i < skinnedMeshes.length; i++) {
-        const sk = skinnedMeshes[i].skeleton;
+      dance(rigState, dt, now, clk);
+      applyRig(rigState);   // proxy joints → real bones (retarget)
+
+      // Refresh bone world matrices → skeleton bone matrices BEFORE render.
+      // GPU skinning does the per-vertex work.
+      rigState.rigGroup.updateMatrixWorld(true);
+      for (let j = 0; j < rigState.skinnedMeshes.length; j++) {
+        const sk = rigState.skinnedMeshes[j].skeleton;
         if (sk) sk.update();
       }
-
-      // Beat illumination: energy sets the floor, beatAccent's smooth decay
-      // curve blooms it on each beat (bar-weighted, so the downbeat reads
-      // brightest). See the WCAG 2.3.1 note in the header comment.
-      coreMat.opacity = Math.min(0.95, 0.5 + energy * 0.3 + beatAccent * 0.4);
     }
+
+    // Beat illumination (shared material, both rigs): energy sets the floor,
+    // beatAccent's smooth decay curve blooms it on each beat (bar-weighted,
+    // so the downbeat reads brightest). See the WCAG 2.3.1 note in the
+    // header comment.
+    coreMat.opacity = Math.min(0.95, 0.5 + energy * 0.3 + beatAccent * 0.4);
 
     renderer.render(scene, camera);
 
@@ -1088,17 +1096,22 @@ export function initKineticDancer() {
   appState.dancer = {
     start, stop,
     // live diagnostics (also handy for tuning): current locked BPM + on-beat pulse
+    // (shared — both dancers read the same clock)
     get bpm() { const a = appState.music && appState.music.audio; const i = a && trackInfo[a._trackName]; return i ? Math.round(i.bpm) : 0; },
     get beatAccent() { return +beatAccent.toFixed(2); },
     get locked() { const m = appState.music, a = m && m.audio; return !!(a && !m.paused && !a.paused && a.currentTime > 0.05 && trackInfo[a._trackName]); },
-    // geometry diagnostics (loaded glTF budget)
-    get tris() { return triCount; },
-    get verts() { return vertCount; },
-    get ready() { return modelReady; },
+    // geometry diagnostics (loaded glTF budget, summed across both rigs)
+    get tris() { return rigA.triCount + rigB.triCount; },
+    get verts() { return rigA.vertCount + rigB.vertCount; },
+    get ready() { return rigA.modelReady && rigB.modelReady; },
     get phase() { return +phase.toFixed(2); },
     get energy() { return +energy.toFixed(2); },
-    // current choreography move (for tuning/iteration)
-    get move() { return currentMoveName; },
+    // current choreography move per dancer (for tuning/iteration) — `move`
+    // kept as the back-compat name for dancer A (the Armadrillo)
+    get move() { return rigA.currentMoveName; },
+    get moveB() { return rigB.currentMoveName; },
+    get readyA() { return rigA.modelReady; },
+    get readyB() { return rigB.modelReady; },
   };
 
   raf = requestAnimationFrame(frame);
