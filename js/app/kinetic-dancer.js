@@ -387,6 +387,30 @@ export function initKineticDancer() {
     }
     return { beatPeriod, bpm: 60 / beatPeriod, t0 };
   }
+
+  // Real per-beat "how hard does THIS beat hit" signal, sampled directly from
+  // the offline RMS envelope (ENV.tracks[name].env @ ENV.fps — the same data
+  // gen-envelopes.mjs already computed via ffmpeg for the whole track) around
+  // the beat's nominal time. Without this, the accent/amplitude below were a
+  // pure function of beat-phase + bar position — IDENTICAL every beat
+  // regardless of the actual mix, so a quiet breakdown beat and a hard drop
+  // beat produced the same shape. A small ±window (the analytic beat grid can
+  // lead/lag the real transient slightly) takes the peak, not just one frame.
+  function beatStrength(trackName, beatCenterT) {
+    const tr = ENV && ENV.tracks && ENV.tracks[trackName];
+    const env = tr && tr.env;
+    if (!env || !env.length) return 0.6;               // fail-safe neutral
+    const fps = (ENV.fps && ENV.fps > 0) ? ENV.fps : 25;
+    const center = Math.round(beatCenterT * fps);
+    let peak = 0, found = false;
+    for (let d = -1; d <= 2; d++) {
+      const i = center + d;
+      if (i < 0 || i >= env.length) continue;
+      const v = env[i];
+      if (Number.isFinite(v)) { peak = Math.max(peak, v); found = true; }
+    }
+    return found ? Math.max(0, Math.min(1, peak)) : 0.6;
+  }
   fetch('assets/audio/techno/envelopes.json').then(r => r.ok ? r.json() : null).then(j => {
     if (!j || !j.tracks) return;
     ENV = j;
@@ -404,9 +428,11 @@ export function initKineticDancer() {
   // `tempoScale` so fast tracks read as bigger/slower rather than flailing),
   // `beatPos` derives directly + driftlessly from `audio.currentTime`, and the
   // accent spikes on each beat, weighted so the downbeat (beat 0 of the bar)
-  // reads stronger than the off-beats. Otherwise a slow free-run idle clock
-  // with no phantom beat/accent. Rate-based (not absolute) so play/pause never
-  // snaps the phase.
+  // reads stronger than the off-beats, AND scaled by that beat's REAL
+  // envelope strength (beatStrength) so a quiet section and a hard drop don't
+  // produce the same accent. Otherwise a slow free-run idle clock with no
+  // phantom beat/accent. Rate-based (not absolute) so play/pause never snaps
+  // the phase.
   function musicClock(dt) {
     const m = appState.music, a = m && m.audio;
     const playing = !!(a && !m.paused && !a.paused && a.currentTime > 0.05);
@@ -417,23 +443,29 @@ export function initKineticDancer() {
       const beatIndex = Math.floor(beatPos);
       const beatPhase = beatPos - beatIndex;          // 0 = on the beat
       const barWeight = BAR_WEIGHT[beatIndex & 3];
+      const beatCenterT = info.t0 + beatIndex * info.beatPeriod;
+      const strength = beatStrength(a._trackName, beatCenterT);   // 0..1, THIS beat's real loudness
       return {
         rateHz: 1 / (N_BEATS * info.beatPeriod * tempoScale),
-        accent: Math.pow(1 - beatPhase, 4) * barWeight,
-        beatPos, tempoScale, bpm: info.bpm, locked: true,
+        accent: Math.pow(1 - beatPhase, 4) * barWeight * (0.4 + strength * 0.9),
+        beatPos, tempoScale, bpm: info.bpm, locked: true, strength,
       };
     }
     // idle free-run (no music yet): keep it LIVELY so it visibly dances even
     // before any track plays (~one gesture every ~2.4s), no beat accent. Still
     // advance a synthetic beatPos so move-selection has a grid to work with.
     idleBeatAccum += (Number.isFinite(dt) ? dt : 0.016) / IDLE_BEAT_PERIOD;
-    return { rateHz: 0.42 + energy * 0.15, accent: 0, beatPos: idleBeatAccum, tempoScale: 1, bpm: 0, locked: false };
+    return { rateHz: 0.42 + energy * 0.15, accent: 0, beatPos: idleBeatAccum, tempoScale: 1, bpm: 0, locked: false, strength: 0.6 };
   }
 
   // ── move library ─────────────────────────────────────────────────────
-  // Seven move phrases replace the old single always-on sine loop (which
+  // Twelve move phrases replace the old single always-on sine loop (which
   // repeated the same ~1s gesture unchanged for the length of an entire
-  // track). Every move is a pure function of a shared context — `b` (proxy
+  // track) — the original seven (A-G) plus five more (H-L) widening the pool
+  // further, including a tribal-house/tribal-fusion-grounded vein: percussive
+  // grounded stomps, a torso figure-eight isolation, a low stalking crouch,
+  // and a syncopated polyrhythmic step, alongside a ceremonial arms-raised
+  // invocation. Every move is a pure function of a shared context — `b` (proxy
   // joints), the damping helpers, amplitude `A`/beat accent `hit`, the
   // grooveSway oscillator `p`/`s`, this move's own `elapsedBeats` (beats since
   // it was selected, tempo-scaled), and `mirror` (±1, for L/R-picking moves).
@@ -657,6 +689,148 @@ export function initKineticDancer() {
     tgt(b.head.rotation, 'x', -0.14 - amt * 0.10 * A); tgt(b.head.rotation, 'z', 0); tgt(b.head.rotation, 'y', -mirror * amt * 0.20 * A);
   }
 
+  // H. Tribal stomp — grounded percussive stomping, alternating legs. A sharp
+  // attack / quick eased release on a narrow window (still smoothstep-
+  // continuous, so it stays fluid) reads as a percussive impact rather than
+  // the sinuous flow of grooveSway — tribal-house/tribal-fusion's "low centre
+  // of gravity, percussive accents on the beat" vocabulary.
+  function tribalStomp(c) {
+    const { b, tgt, set, A, elapsedBeats } = c;
+    const eb = elapsedBeats % 4;
+    const beatFrac = eb - Math.floor(eb);
+    const impact = smoothstep(Math.min(1, beatFrac / 0.12)) * (1 - smoothstep(Math.max(0, (beatFrac - 0.12) / 0.35)));
+    const legIdx = Math.floor(eb) % 2;
+    const dir = legIdx === 0 ? 1 : -1;
+
+    set(b.pelvis.position, 'x', dir * 0.05 * A);
+    set(b.pelvis.position, 'y', 0.06 - impact * 0.06 * A);
+    tgt(b.pelvis.rotation, 'z', -dir * 0.10 * A); tgt(b.pelvis.rotation, 'y', 0);
+    tgt(b.spine.rotation, 'x', 0.10 + impact * 0.08 * A); tgt(b.spine.rotation, 'z', dir * 0.06 * A);
+    tgt(b.chest.rotation, 'z', -dir * (0.10 + impact * 0.14 * A)); tgt(b.chest.rotation, 'y', 0);
+
+    tgt(b.upperArmL.rotation, 'z', 0.16); tgt(b.upperArmL.rotation, 'x', REST_ARM_X + (dir < 0 ? impact * 0.35 * A : 0));
+    tgt(b.upperArmR.rotation, 'z', -0.16); tgt(b.upperArmR.rotation, 'x', REST_ARM_X + (dir > 0 ? impact * 0.35 * A : 0));
+    tgt(b.forearmL.rotation, 'x', REST_FORE_X + (dir < 0 ? impact * 0.4 : 0));
+    tgt(b.forearmR.rotation, 'x', REST_FORE_X + (dir > 0 ? impact * 0.4 : 0));
+
+    tgt(b.thighL.rotation, 'x', REST_LEG_X + 0.10 + (legIdx === 0 ? impact * 0.5 * A : 0));
+    tgt(b.thighR.rotation, 'x', REST_LEG_X + 0.10 + (legIdx === 1 ? impact * 0.5 * A : 0));
+    tgt(b.shinL.rotation, 'x', REST_LEG_X + 0.08 + (legIdx === 0 ? impact * 0.35 * A : 0));
+    tgt(b.shinR.rotation, 'x', REST_LEG_X + 0.08 + (legIdx === 1 ? impact * 0.35 * A : 0));
+
+    tgt(b.neck.rotation, 'x', 0.05); tgt(b.neck.rotation, 'z', 0); tgt(b.neck.rotation, 'y', 0);
+    tgt(b.head.rotation, 'x', -0.06 - impact * 0.08 * A); tgt(b.head.rotation, 'z', 0); tgt(b.head.rotation, 'y', 0);
+  }
+
+  // I. Invocation — a ceremonial arms-raised offering: both arms rise wide
+  // together and HOLD (symmetric, not a hands-to-face gesture), chest opens,
+  // head tilts back. Reads at quiet contemplative moments as a ritual pose,
+  // and doubles as the "arms in the air" gesture at a peak.
+  function invocation(c) {
+    const { b, tgt, set, A, elapsedBeats } = c;
+    const eb = elapsedBeats % 12;
+    const amt = eb < 4 ? smoothstep(eb / 4) : eb < 8 ? 1 : 1 - smoothstep(Math.min(1, (eb - 8) / 4));
+    const breathe = Math.sin(eb * 1.1) * 0.025;
+
+    set(b.pelvis.position, 'x', 0); set(b.pelvis.position, 'y', 0.12 + amt * 0.04 * A + breathe);
+    tgt(b.pelvis.rotation, 'z', 0); tgt(b.pelvis.rotation, 'y', 0);
+    tgt(b.spine.rotation, 'x', 0.08 - amt * 0.10 * A); tgt(b.spine.rotation, 'z', 0);
+    tgt(b.chest.rotation, 'z', 0); tgt(b.chest.rotation, 'y', 0);
+
+    tgt(b.upperArmL.rotation, 'z', 0.14 + amt * 0.9 * A); tgt(b.upperArmL.rotation, 'x', 0.25 + amt * 1.5 * A);
+    tgt(b.upperArmR.rotation, 'z', -(0.14 + amt * 0.9 * A)); tgt(b.upperArmR.rotation, 'x', 0.25 + amt * 1.5 * A);
+    tgt(b.forearmL.rotation, 'x', REST_FORE_X - amt * 0.05); tgt(b.forearmR.rotation, 'x', REST_FORE_X - amt * 0.05);
+
+    tgt(b.thighL.rotation, 'x', REST_LEG_X); tgt(b.thighR.rotation, 'x', REST_LEG_X);
+    tgt(b.shinL.rotation, 'x', REST_LEG_X); tgt(b.shinR.rotation, 'x', REST_LEG_X);
+
+    tgt(b.neck.rotation, 'x', 0.02 - amt * 0.10 * A); tgt(b.neck.rotation, 'z', 0); tgt(b.neck.rotation, 'y', 0);
+    tgt(b.head.rotation, 'x', -0.12 - amt * 0.22 * A); tgt(b.head.rotation, 'z', 0); tgt(b.head.rotation, 'y', 0);
+  }
+
+  // J. Grounded isolation — a taxeem/maya-style torso figure-eight (chest and
+  // hips counter-rotating in a serpentine wave) over a low, bent-knee stance.
+  // Per tribal-fusion vocabulary the isolation reads in the torso; the rest
+  // of the body stays quiet and grounded rather than travelling.
+  function groundedIsolation(c) {
+    const { b, tgt, set, A, elapsedBeats } = c;
+    const q = (elapsedBeats / 2) * Math.PI * 2;
+    const iso = Math.sin(q), iso2 = Math.sin(q * 2) * 0.5;
+
+    set(b.pelvis.position, 'x', -iso * 0.10 * A); set(b.pelvis.position, 'y', 0.06 + Math.abs(iso2) * 0.03 * A);
+    tgt(b.pelvis.rotation, 'z', -iso * 0.14 * A); tgt(b.pelvis.rotation, 'y', iso2 * 0.10 * A);
+    tgt(b.spine.rotation, 'x', 0.10); tgt(b.spine.rotation, 'z', iso * 0.10 * A);
+    tgt(b.chest.rotation, 'z', iso * 0.22 * A); tgt(b.chest.rotation, 'y', -iso2 * 0.16 * A);
+
+    tgt(b.upperArmL.rotation, 'z', 0.14); tgt(b.upperArmL.rotation, 'x', REST_ARM_X + 0.05);
+    tgt(b.upperArmR.rotation, 'z', -0.14); tgt(b.upperArmR.rotation, 'x', REST_ARM_X + 0.05);
+    tgt(b.forearmL.rotation, 'x', REST_FORE_X); tgt(b.forearmR.rotation, 'x', REST_FORE_X);
+
+    tgt(b.thighL.rotation, 'x', REST_LEG_X + 0.14); tgt(b.thighR.rotation, 'x', REST_LEG_X + 0.14);
+    tgt(b.shinL.rotation, 'x', REST_LEG_X + 0.10); tgt(b.shinR.rotation, 'x', REST_LEG_X + 0.10);
+
+    tgt(b.neck.rotation, 'x', 0.03); tgt(b.neck.rotation, 'z', -iso * 0.05 * A); tgt(b.neck.rotation, 'y', 0);
+    tgt(b.head.rotation, 'x', -0.08); tgt(b.head.rotation, 'z', -iso * 0.06 * A); tgt(b.head.rotation, 'y', 0);
+  }
+
+  // K. Crouch-prowl — a low, martial crouch stalking side to side: deep bent
+  // knees, hunched spine, head low and forward. Grounded/predatory rather
+  // than upright — tribal-fusion's "almost martial posture" read.
+  function crouchProwl(c) {
+    const { b, tgt, set, A, elapsedBeats } = c;
+    const eb = elapsedBeats % 8;
+    const shift = Math.sin((eb / 8) * Math.PI * 2);
+    const settle = smoothstep(Math.min(1, elapsedBeats / 2));   // ease INTO the crouch on entry
+
+    set(b.pelvis.position, 'x', shift * 0.12 * A); set(b.pelvis.position, 'y', 0.12 - settle * 0.10 * A);
+    tgt(b.pelvis.rotation, 'z', shift * 0.08 * A); tgt(b.pelvis.rotation, 'y', shift * 0.10 * A);
+    tgt(b.spine.rotation, 'x', 0.08 + settle * 0.24 * A); tgt(b.spine.rotation, 'z', -shift * 0.06 * A);
+    tgt(b.chest.rotation, 'z', shift * 0.08 * A); tgt(b.chest.rotation, 'y', shift * 0.10 * A);
+
+    tgt(b.upperArmL.rotation, 'z', 0.16); tgt(b.upperArmL.rotation, 'x', REST_ARM_X + settle * 0.12 * A);
+    tgt(b.upperArmR.rotation, 'z', -0.16); tgt(b.upperArmR.rotation, 'x', REST_ARM_X + settle * 0.12 * A);
+    tgt(b.forearmL.rotation, 'x', REST_FORE_X + settle * 0.15); tgt(b.forearmR.rotation, 'x', REST_FORE_X + settle * 0.15);
+
+    tgt(b.thighL.rotation, 'x', REST_LEG_X + settle * 0.30 * A + Math.max(0, shift) * 0.08 * A);
+    tgt(b.thighR.rotation, 'x', REST_LEG_X + settle * 0.30 * A + Math.max(0, -shift) * 0.08 * A);
+    tgt(b.shinL.rotation, 'x', REST_LEG_X + settle * 0.34 * A); tgt(b.shinR.rotation, 'x', REST_LEG_X + settle * 0.34 * A);
+
+    tgt(b.neck.rotation, 'x', 0.05 + settle * 0.14 * A); tgt(b.neck.rotation, 'z', 0); tgt(b.neck.rotation, 'y', shift * 0.08 * A);
+    tgt(b.head.rotation, 'x', -0.05 + settle * 0.18 * A); tgt(b.head.rotation, 'z', 0); tgt(b.head.rotation, 'y', shift * 0.14 * A);
+  }
+
+  // L. Poly-step — a syncopated stepping pattern against a 6-beat cycle (a
+  // polyrhythm across the underlying 4/4 grid, per tribal house's blend of
+  // four-on-the-floor with polyrhythmic percussion): a heavier accent every
+  // 3rd beat with a mirrored arm-pump call-and-response.
+  function polyStep(c) {
+    const { b, tgt, set, A, elapsedBeats, mirror } = c;
+    const eb = elapsedBeats % 6;
+    const accentPhase = eb % 3;
+    const accent = smoothstep(Math.min(1, accentPhase / 0.5)) * (1 - smoothstep(Math.max(0, (accentPhase - 0.5) / 2)));
+    const dir = Math.floor(eb / 3) % 2 === 0 ? 1 : -1;
+    const featUp = mirror > 0 ? b.upperArmR : b.upperArmL, restUp = mirror > 0 ? b.upperArmL : b.upperArmR;
+    const featFore = mirror > 0 ? b.forearmR : b.forearmL, restFore = mirror > 0 ? b.forearmL : b.forearmR;
+
+    set(b.pelvis.position, 'x', dir * 0.09 * A * accent); set(b.pelvis.position, 'y', 0.11 + accent * 0.05 * A);
+    tgt(b.pelvis.rotation, 'z', dir * 0.10 * A * accent); tgt(b.pelvis.rotation, 'y', mirror * accent * 0.08 * A);
+    tgt(b.spine.rotation, 'x', 0.08); tgt(b.spine.rotation, 'z', -dir * 0.08 * A * accent);
+    tgt(b.chest.rotation, 'z', dir * 0.10 * A * accent); tgt(b.chest.rotation, 'y', mirror * accent * 0.12 * A);
+
+    tgt(featUp.rotation, 'x', 0.25 + accent * 0.9 * A); tgt(featUp.rotation, 'z', mirror * (0.12 + accent * 0.3 * A));
+    tgt(featFore.rotation, 'x', REST_FORE_X - accent * 0.3);
+    tgt(restUp.rotation, 'x', REST_ARM_X); tgt(restUp.rotation, 'z', 0.10 * -mirror);
+    tgt(restFore.rotation, 'x', REST_FORE_X);
+
+    tgt(b.thighL.rotation, 'x', REST_LEG_X + Math.max(0, dir) * accent * 0.20 * A);
+    tgt(b.thighR.rotation, 'x', REST_LEG_X + Math.max(0, -dir) * accent * 0.20 * A);
+    tgt(b.shinL.rotation, 'x', REST_LEG_X + Math.max(0, dir) * accent * 0.18 * A);
+    tgt(b.shinR.rotation, 'x', REST_LEG_X + Math.max(0, -dir) * accent * 0.18 * A);
+
+    tgt(b.neck.rotation, 'x', 0.03); tgt(b.neck.rotation, 'z', 0); tgt(b.neck.rotation, 'y', -mirror * accent * 0.12 * A);
+    tgt(b.head.rotation, 'x', -0.08); tgt(b.head.rotation, 'z', 0); tgt(b.head.rotation, 'y', -mirror * accent * 0.16 * A);
+  }
+
   const MOVE_TABLE = {
     grooveSway: { beats: 8, pool: ['idle', 'low', 'high'], run: grooveSway },
     handsFace: { beats: 8, pool: ['idle', 'low'], run: handsFace },
@@ -665,6 +839,11 @@ export function initKineticDancer() {
     stepTouch: { beats: 4, pool: ['high'], run: stepTouch },
     bodyWave: { beats: 4, pool: ['idle', 'low', 'high'], run: bodyWave },
     reachOpen: { beats: 8, pool: ['low', 'high'], mirrored: true, run: reachOpen },
+    tribalStomp: { beats: 4, pool: ['idle', 'low', 'high'], run: tribalStomp },
+    invocation: { beats: 12, pool: ['idle', 'low', 'high'], run: invocation },
+    groundedIsolation: { beats: 8, pool: ['idle', 'low', 'high'], run: groundedIsolation },
+    crouchProwl: { beats: 8, pool: ['low', 'high'], run: crouchProwl },
+    polyStep: { beats: 6, pool: ['low', 'high'], mirrored: true, run: polyStep },
   };
   currentMove = MOVE_TABLE.grooveSway;
 
@@ -714,8 +893,9 @@ export function initKineticDancer() {
   function dance(dt, t, clk) {
     const b = bones;
     const k = 1 - Math.pow(0.001, dt);         // framerate-independent damping
-    const A = 0.55 + energy * 0.9;             // wide gain: breakdowns visibly shrink, drops visibly grow
-    const hit = beatAccent * (0.5 + energy * 0.5);   // music-locked on-beat accent
+    const strength = Number.isFinite(clk.strength) ? clk.strength : 0.6;   // THIS beat's real envelope loudness
+    const A = 0.55 + energy * 0.7 + strength * 0.35;   // section energy + per-beat strength: a genuinely hard beat moves bigger than a soft one, not just a slow section-level ramp
+    const hit = beatAccent * (0.5 + energy * 0.5);   // music-locked on-beat accent (beatAccent already carries per-beat strength via musicClock)
     const p = phase;
     const s = Math.sin(p);
 
@@ -792,6 +972,7 @@ export function initKineticDancer() {
       beatAccent = Number.isFinite(clk.accent) ? clk.accent : 0;
       if (!Number.isFinite(clk.beatPos)) clk.beatPos = 0;   // guard: never let move-selection see NaN
       if (!Number.isFinite(clk.tempoScale) || clk.tempoScale <= 0) clk.tempoScale = 1;
+      if (!Number.isFinite(clk.strength)) clk.strength = 0.6;
 
       dance(dt, now, clk);
       applyRig();   // proxy joints → real bones (retarget)
