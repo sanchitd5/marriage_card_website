@@ -71,10 +71,17 @@ test('schema: optional roles exist and are extensible (spine subdiv, fingers, ta
     assert.ok(r in HUMANOID_ROLES, `optional role ${r} present`);
     assert.equal(HUMANOID_ROLES[r].core, false);
   }
-  // fingers: 5 per hand x 3 segments x 2 hands = 30
-  const fingers = ALL_ROLES.filter((r) => HUMANOID_ROLES[r].group === 'finger');
-  assert.equal(fingers.length, 30);
+  // per-finger tube roles: 5 fingers x 3 segments x 2 hands = 30
+  const fingerTubes = ALL_ROLES.filter((r) => /^(thumb|index|middle|ring|little)[LR](Prox|Mid|Dist)$/.test(r));
+  assert.equal(fingerTubes.length, 30);
   assert.ok(ALL_ROLES.includes('thumbLProx') && ALL_ROLES.includes('littleRDist'));
+  // combined finger-curl roles (a single grip bone per hand) — the honest
+  // stand-in for a mitt with no separable finger geometry (fairy-punk uses these).
+  for (const r of ['fingersL', 'fingersR']) {
+    assert.ok(r in HUMANOID_ROLES, `combined finger-curl role ${r} present`);
+    assert.equal(HUMANOID_ROLES[r].core, false);
+    assert.equal(HUMANOID_ROLES[r].group, 'finger');
+  }
 });
 
 test('schema: every parent reference resolves to a real role or null (valid hierarchy)', () => {

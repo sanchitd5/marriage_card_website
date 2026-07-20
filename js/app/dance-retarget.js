@@ -88,6 +88,16 @@ export const HUMANOID_ROLES = {
   // ── OPTIONAL: hands + feet extremities ──
   handL: { core: false, parent: 'forearmL', side: 'L', group: 'arm', axisDir: [1, 0, 0] },
   handR: { core: false, parent: 'forearmR', side: 'R', group: 'arm', axisDir: [-1, 0, 0] },
+  // ── OPTIONAL: combined finger curl (a single grip/relax bone per hand) ──
+  //   A schema extension for rigs whose hand geometry is a capped mitt with NO
+  //   separable finger tubes (verified true of the fairy-punk asset: the hand
+  //   vertices form one continuous blob, so per-finger bones — thumb/index/...
+  //   below — would just co-move identical verts for zero visual gain and real
+  //   binding risk). One curl bone weighted to the distal hand region is the
+  //   honest, standard low-poly stand-in (see the rigging research notes); a
+  //   rig WITH true finger geometry still uses the per-finger roles instead.
+  fingersL: { core: false, parent: 'handL', side: 'L', group: 'finger', axisDir: [1, 0, 0] },
+  fingersR: { core: false, parent: 'handR', side: 'R', group: 'finger', axisDir: [-1, 0, 0] },
   footL: { core: false, parent: 'shinL', side: 'L', group: 'leg', axisDir: [0, 0, 1] },
   footR: { core: false, parent: 'shinR', side: 'R', group: 'leg', axisDir: [0, 0, 1] },
   toesL: { core: false, parent: 'footL', side: 'L', group: 'leg', axisDir: [0, 0, 1] },
