@@ -39,43 +39,51 @@ function isBuffered(video, t) {
   return false;
 }
 
-export function initKineticVideo() {
-  if (REDUCED) return; // no fullscreen motion takeover under reduced-motion
-  const overlay = $('#k-video-takeover');
-  const video = overlay && overlay.querySelector('video');
-  if (!overlay || !video) return;
-
-  let loaded = false;    // kick the (preload="none") download once, on track-select
-  let occluding = false; // overlay currently blacking out the UI
-
-  function setOcclude(on) {
-    if (on === occluding) return;
-    occluding = on;
-    document.documentElement.classList.toggle('k-takeover', on);
-    overlay.classList.toggle('is-on', on);
+// The takeover as an object: it owns the overlay + <video>, mirrors the music
+// element's play/pause + currentTime, and drives the blackout/fade purely from
+// the authored-beat math (takeoverStateAt). One instance per page, ticked by its
+// own RAF; every state write is idempotent (the setOcclude/setVideoVis guards)
+// so re-running the frame is cheap and the DOM only changes on a real edge.
+class KineticVideoTakeover {
+  constructor(overlay, video) {
+    this.overlay = overlay;
+    this.video = video;
+    this.loaded = false;    // kick the (preload="none") download once, on track-select
+    this.occluding = false; // overlay currently blacking out the UI
+    this.videoVis = false;  // video currently painting (opacity > 0)
+    this.frame = this.frame.bind(this);
   }
-  let videoVis = false; // video currently painting (opacity > 0)
-  function setVideoVis(on) {
-    if (on === videoVis) return;
-    videoVis = on;
+
+  setOcclude(on) {
+    if (on === this.occluding) return;
+    this.occluding = on;
+    document.documentElement.classList.toggle('k-takeover', on);
+    this.overlay.classList.toggle('is-on', on);
+  }
+
+  setVideoVis(on) {
+    if (on === this.videoVis) return;
+    this.videoVis = on;
     document.documentElement.classList.toggle('k-video-vis', on);
   }
-  function offTrack() {
-    setOcclude(false);
-    setVideoVis(false);
-    video.style.opacity = '0';
-    if (!video.paused) { try { video.pause(); } catch (e) {} }
+
+  offTrack() {
+    this.setOcclude(false);
+    this.setVideoVis(false);
+    this.video.style.opacity = '0';
+    if (!this.video.paused) { try { this.video.pause(); } catch (e) {} }
   }
 
-  function frame() {
-    requestAnimationFrame(frame);
+  frame() {
+    requestAnimationFrame(this.frame);
+    const video = this.video;
     const m = appState.music;
     const a = m && m.audio;
-    if (!a || a._trackName !== TRACK) { offTrack(); return; }
+    if (!a || a._trackName !== TRACK) { this.offTrack(); return; }
 
     // Start buffering the moment Taratata is selected (source is preload="none",
     // so nothing downloads for other tracks / non-triggering visitors).
-    if (!loaded) { loaded = true; try { video.load(); } catch (e) {} }
+    if (!this.loaded) { this.loaded = true; try { video.load(); } catch (e) {} }
 
     // Mirror the audio's play/pause state so the hidden video tracks it 1:1.
     if (a.paused) {
@@ -96,10 +104,18 @@ export function initKineticVideo() {
     // The authored windows drive ONLY the blackout + fade; playback runs the
     // whole track regardless.
     const s = takeoverStateAt(t);
-    setOcclude(s.occlude);
-    setVideoVis(s.opacity > 0);
+    this.setOcclude(s.occlude);
+    this.setVideoVis(s.opacity > 0);
     video.style.opacity = s.opacity.toFixed(3);
   }
 
-  requestAnimationFrame(frame);
+  start() { requestAnimationFrame(this.frame); }
+}
+
+export function initKineticVideo() {
+  if (REDUCED) return; // no fullscreen motion takeover under reduced-motion
+  const overlay = $('#k-video-takeover');
+  const video = overlay && overlay.querySelector('video');
+  if (!overlay || !video) return;
+  new KineticVideoTakeover(overlay, video).start();
 }

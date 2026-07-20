@@ -39,3 +39,24 @@ export const MIN_FLASH_INTERVAL_S = 1 / MAX_FLASHES_PER_SEC; // ≈0.02s hard fl
 export function flashAllowed(now, lastFlashStart, minInterval = MIN_FLASH_INTERVAL_S) {
   return (now - lastFlashStart) >= minInterval;
 }
+
+// ── Stateful rate limiter (OOP wrapper over the pure decision above) ─────────
+// The light show holds ONE of these instead of hand-tracking a `lastFlashStart`
+// scalar: it encapsulates the "when did the last flash start" state together
+// with the cap so the two can't drift and a caller can't forget to advance the
+// window. `allow(now)` is the exact `flashAllowed` decision; `fire(now)` opens
+// the rate-cap window (records the flash start). The pure function + constants
+// above remain the single source of truth (and what the regression test pins),
+// so this class changes NOTHING about the shipped cap — it only bundles the
+// per-instance state with it.
+export class FlashGovernor {
+  constructor(minInterval = MIN_FLASH_INTERVAL_S) {
+    this.minInterval = minInterval;
+    this.lastFlashStart = -Infinity;
+  }
+  get maxPerSec() { return MAX_FLASHES_PER_SEC; }
+  // may a new flash START at `now`? (delegates to the pinned pure decision)
+  allow(now) { return flashAllowed(now, this.lastFlashStart, this.minInterval); }
+  // record that a flash started at `now` (opens the rate-cap window)
+  fire(now) { this.lastFlashStart = now; }
+}
