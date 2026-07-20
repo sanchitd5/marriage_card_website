@@ -11,26 +11,47 @@ If you use this 3D model in your project be sure to copy paste this credit where
 This work is based on "DP Techno Fairy Punk Set HD Textures" (https://sketchfab.com/3d-models/dp-techno-fairy-punk-set-hd-textures-6c2d6ff1ca3043ff9ffdf884ffbba1b8) by BilloXD (https://sketchfab.com/BilloXD) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
 
 Note: the source model shipped as a static (unrigged, unanimated) 7-mesh
-character set. Rigged in Blender (headless, scripted) with a custom
-13-bone biped armature in a hanging-arms bind pose, matching the joint set
-the site's procedural choreography engine drives (see js/app/kinetic-dancer.js).
+character set. Rigged for the site's procedural choreography engine (see
+js/app/kinetic-dancer.js).
 
-Re-rigged from a pristine, never-round-tripped export
-(source/untitled.gltf from the fuller Sketchfab download package) after
-the first rigging pass -- built from a single .glb export and repeatedly
-patched in place -- accumulated damage from a known Blender bug where
-re-importing an already-exported skinned glTF explodes it into hundreds
-of mesh objects. This rebuild applies object transforms (the classic
-"unapplied 0.01 scale" cause of a 100x rest-pose blowup) before parenting,
-uses Blender's automatic (heat) weights where the solver succeeds, and a
-rigid nearest-bone-segment fallback (single-bone weight, no blending) for
-meshes the heat solver cannot traverse -- the Face and Hairs meshes, both
-built from many disconnected geometry islands (a face plate and hundreds
-of separate hair-strand pieces) that heat diffusion cannot solve across.
-The Chest mesh (the wing/pauldron piece) has its spurious blend weight
-onto the arm bones removed and renormalized, so it moves with the torso
-rather than tearing at the shoulder seam when an arm swings through a
-real choreography angle.
+CURRENT RIG -- an EXPANDED 21-bone biped skeleton, built deterministically
+in pure Python (no Blender round-trip -- the exported glTF is treated as an
+output artifact, never re-imported, to sidestep the known Blender bug where
+re-importing an already-exported skinned glTF explodes it into hundreds of
+mesh objects). The skeleton is derived from the mesh's own geometry: a
+subdivided torso (pelvis, spine, spine2, chest, upperChest, neck, head) for
+a real travelling spine wave; clavicle bones (Shoulder.L/R) so arm raises
+lead from a moving shoulder girdle; and per arm a wrist (Hand.L/R) plus a
+single combined finger-curl bone (Fingers.L/R) -- the honest low-poly
+stand-in for a mitt whose hand geometry is one continuous blob with no
+separable finger tubes. Crucially the arm bones follow the mesh's actual
+A-pose so the arms genuinely DEFORM; the prior 13-bone rig had them
+dead-bound to the Chest (~8% arm-bone influence -- an arm raise moved almost
+no geometry).
+
+WEIGHTING is region-gated nearest-bone-segment envelope (the deterministic,
+headless-safe method recommended for a tiny background asset): every vertex
+is gated to its anatomical region (torso / left-arm / right-arm / leg / head)
+before being weighted to the 1-2 nearest bone segments within that region,
+so a wing or torso vert can never bleed onto an arm bone and vice versa. All
+bones are identity-rotation / translation-only, so the bind pose reproduces
+the raw geometry with zero deformation drift (verified) and the retarget
+engine's canonical axes map straight through. Every mesh/bone pairing was
+audited by DOMINANT-JOINT-per-vertex (not byte histograms): zero
+cross-region mismatches, zero dead bones. A full LBS stress sweep (every
+bone x 3 axes x extreme angles) showed no runaway growth or detached
+geometry (only the pelvis ROOT, which tips the whole rigid figure).
+
+HISTORY: an earlier pass rigged a 13-bone armature in Blender from a
+pristine, never-round-tripped source/untitled.gltf export (the fuller
+Sketchfab download package), after a still-earlier .glb-based attempt
+accumulated damage from the re-import bug above. That 13-bone rig used
+Blender heat weights where the solver succeeded and a rigid nearest-bone
+fallback for the Face and Hairs meshes (both built from many disconnected
+geometry islands -- a face plate and hundreds of separate hair-strand
+pieces -- that heat diffusion cannot solve across). The current Python
+rebuild preserves those same region assignments (Face/Hairs/HairBand -> Head)
+while fixing the dead arms and adding the new joints.
 
 Textures: baseColor images restored from the same pristine download
 package's named texture files (BaseColor Chest/Face/Legs/Lower/Shirt/Band),
