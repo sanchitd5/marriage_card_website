@@ -383,15 +383,28 @@ export function initKineticDancer() {
         rigState.vertCount += g.attributes.position.count;
         rigState.triCount += (g.index ? g.index.count : g.attributes.position.count) / 3;
       }
-      // `.clone()` on a SkinnedMesh rebinds to the SAME Skeleton instance
-      // (THREE's SkinnedMesh.copy() calls bind() with the source skeleton),
-      // so this overlay deforms identically with zero extra per-frame
-      // skeleton work — the original's skeleton.update() already covers it.
-      const wireOverlay = o.clone();
-      wireOverlay.material = wireMat;
-      wireOverlay.frustumCulled = false;
-      wireOverlay.renderOrder = (o.renderOrder || 0) + 1;
-      if (o.parent) o.parent.add(wireOverlay);
+      // Hair geometry (thin, densely-packed strand triangles) reads WAY
+      // brighter in wireframe than a broad body-surface mesh at the same
+      // opacity — many more edges land in the same screen area, so it washes
+      // out into a bright white tangle that swamps the chrome/texture read
+      // right where the face is. Skip the circuitry-accent pass for it (the
+      // chrome+texture base pass alone still shows real hair colour/shading);
+      // every other mesh keeps the accent. Identified by the SOURCE
+      // material's name (captured before the chrome material overwrites it
+      // above) — Blender's own export names survive as material names even
+      // though mesh/node names get renumbered on round-trip.
+      const isHair = !!(srcMat && srcMat.name && /hair/i.test(srcMat.name));
+      if (!isHair) {
+        // `.clone()` on a SkinnedMesh rebinds to the SAME Skeleton instance
+        // (THREE's SkinnedMesh.copy() calls bind() with the source skeleton),
+        // so this overlay deforms identically with zero extra per-frame
+        // skeleton work — the original's skeleton.update() already covers it.
+        const wireOverlay = o.clone();
+        wireOverlay.material = wireMat;
+        wireOverlay.frustumCulled = false;
+        wireOverlay.renderOrder = (o.renderOrder || 0) + 1;
+        if (o.parent) o.parent.add(wireOverlay);
+      }
     }
 
     // find the mapped bones by exact name
@@ -1349,9 +1362,14 @@ export function initKineticDancer() {
     // (one per unique diffuse texture now that real textures are restored,
     // not just the single flat-color instance this used to be). See the
     // WCAG 2.3.1 note in the header comment.
-    const glow = Math.min(1, 0.5 + energy * 0.3 + beatAccent * 0.4);
+    const glow = Math.min(1, 0.15 + energy * 0.3 + beatAccent * 0.4);
     wireMat.opacity = Math.min(0.5, 0.06 + glow * 0.28);
-    const chromeColor = 0.72 + glow * 0.5;
+    // Keep this at/below 1.0 — MeshMatcapMaterial multiplies `.color` into
+    // BOTH the matcap tone and the real diffuse `.map`, so anything above 1.0
+    // blows out the texture (and the matcap's own highlight) toward flat
+    // white instead of brightening it, which is what was washing out the
+    // real skin tone/texture detail under the chrome shading.
+    const chromeColor = Math.min(1, 0.62 + glow * 0.38);
     for (let i = 0; i < chromeMats.length; i++) chromeMats[i].color.setScalar(chromeColor);
 
     renderer.render(scene, camera);
