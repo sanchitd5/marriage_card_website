@@ -74,6 +74,16 @@ import { appState } from './state.js';
 //    per-beat `beatJitter`, `dance()`'s per-move-instance `moveAmp`/
 //    `movePhaseOfs` (rolled once per move pick — see updateMoveSelection),
 //    and a second-harmonic asymmetry on the master `s` oscillator.
+//  • SECONDARY-MOTION PHYSICS: `tgt`/`set` (inside dance()) are a spring-
+//    mass-damper integrator, not a plain low-pass — see `springStep`/
+//    SPRING_LIGHT/SPRING_HEAVY below dance()'s header comment for the full
+//    rationale (short version: the user asked for PhysX/Euphoria; neither is
+//    viable — Euphoria isn't licensable at all, PhysX-web is a multi-MB WASM
+//    dependency this zero-runtime-dependency site can't take on — so this is
+//    the from-scratch equivalent: real velocity/momentum/overshoot on the
+//    proxy joints, tuned per-joint via a `__heavy` tag so head/neck/chest/
+//    spine — which carry the skinned hair/wings/ornament — visibly follow
+//    through a turn instead of moving rigidly with the bone).
 //  • RAF pauses on hidden tab; dt clamped so a long pause can't lurch the pose.
 //  • Async load: renderer/scene/camera/RAF start immediately (empty scene);
 //    each rig's dance/adapter no-ops safely until ITS model arrives, so one
@@ -477,7 +487,20 @@ export function initKineticDancer() {
     const ROLES = ['pelvis', 'spine', 'chest', 'neck', 'head',
       'upperArmL', 'forearmL', 'upperArmR', 'forearmR',
       'thighL', 'shinL', 'thighR', 'shinR'];
-    for (const role of ROLES) rigState.proxies[role] = { rotation: new THREE.Euler(0, 0, 0, 'XYZ'), position: new THREE.Vector3() };
+    for (const role of ROLES) {
+      const rotation = new THREE.Euler(0, 0, 0, 'XYZ');
+      const position = new THREE.Vector3();
+      // Tag the "weighted" joints for the spring integrator (see SPRING_HEAVY
+      // at dance()) — head/neck/chest/spine carry the hair (skinned to Head)
+      // and wings/chest ornament (skinned to Chest) for FREE through skinning,
+      // so giving THESE joints real momentum/overshoot is what makes hair and
+      // wings visibly follow through a turn instead of moving rigidly with
+      // the bone. Limbs/pelvis stay on the snappier default profile.
+      if (role === 'head' || role === 'neck' || role === 'chest' || role === 'spine') {
+        rotation.__heavy = true; position.__heavy = true;
+      }
+      rigState.proxies[role] = { rotation, position };
+    }
 
     // adapter helper: how a proxy's (x,y,z) rotations map onto a bone's LOCAL
     // axes. Both rigs' torso/head/legs are ~identity-aligned in the render
@@ -1278,6 +1301,58 @@ export function initKineticDancer() {
     }
   }
 
+  // ── secondary-motion PHYSICS (spring-damper, zero dependencies) ──────────
+  // The user asked for PhysX/Euphoria. Neither is viable here: Euphoria was
+  // NaturalMotion's proprietary tech, absorbed by Rockstar, never sold or
+  // open-sourced as an SDK anyone can license; PhysX's web build is a
+  // multi-MB WASM binary, and this project's CLAUDE.md states "zero runtime
+  // dependencies" as a hard rule (no npm install, everything vendored). What
+  // a physics engine would actually BUY here — hair/wings/fringe that swing
+  // with real momentum and settle instead of moving rigidly with the bone —
+  // is achievable with a proper spring-mass-damper integrator on the EXISTING
+  // proxy joints, at zero extra dependency cost: neither rig has separate
+  // hair/wing/cloth bones (hair is skinned to Head, wings/chest ornament to
+  // Chest — see the recent attachment-fix commits), so giving Head/Chest (and
+  // Neck/Spine, which drive them) real momentum makes the skinned hair/wing
+  // geometry follow through for free, no new bones or Blender pass needed.
+  //
+  // The OLD `tgt`/`set` were a pure exponential low-pass (`x += (target-x)*k`)
+  // — no velocity, no overshoot, ever. This is why nothing had physical
+  // "weight": it eases directly onto the target and stops dead, the textbook
+  // critically-overdamped response. A damped harmonic oscillator (semi-
+  // implicit/symplectic Euler: integrate acceleration → velocity → position
+  // each step, sub-stepped for stability) is the standard lightweight
+  // technique for this in games ("spring bones") — same category of tool as
+  // the coherent-noise/Markov-selection techniques already cited in this
+  // file, deliberately NOT a physics-engine dependency.
+  //
+  // Two tuned profiles, chosen by damping ratio (zeta = k2 / (2*sqrt(k1))):
+  // SPRING_LIGHT (limbs/pelvis, zeta≈0.90) stays close to the old snappy feel
+  // — barely any overshoot, so legs/arms never read as loose or floppy.
+  // SPRING_HEAVY (head/neck/chest/spine, zeta≈0.74) is deliberately more
+  // underdamped — a visible settle/overshoot on quick direction changes is
+  // the whole point, since that's what reads as hair/wing momentum. Both are
+  // tuned to reach the target on a similar TIMESCALE to the old damping (a
+  // few hundred ms), just with a different response SHAPE, not a slower one.
+  const SPRING_LIGHT = { k1: 210, k2: 26 };   // omega≈14.5 rad/s, zeta≈0.90
+  const SPRING_HEAVY = { k1: 90, k2: 14 };    // omega≈9.5 rad/s,  zeta≈0.74
+  const SPRING_SUBSTEPS = 2;   // cheap stability margin at low framerates (dt is already clamped ≤1/30 in frame())
+  function springStep(obj, axis, target, dt, profile) {
+    const vKey = '_v' + axis;
+    let v = obj[vKey] || 0;
+    let x = obj[axis];
+    if (!Number.isFinite(v)) v = 0;      // guard: a NaN velocity must never persist and corrupt every future frame
+    if (!Number.isFinite(x)) x = target;
+    const h = dt / SPRING_SUBSTEPS;
+    for (let i = 0; i < SPRING_SUBSTEPS; i++) {
+      const accel = profile.k1 * (target - x) - profile.k2 * v;
+      v += accel * h;
+      x += v * h;
+    }
+    obj[vKey] = v;
+    obj[axis] = x;
+  }
+
   // ── the dance (per rig) ────────────────────────────────────────────────
   // Everything is DAMPED toward a target each frame (factor k, framerate-aware)
   // so each figure grooves smoothly and never snaps or seizures. Ranges are
@@ -1308,8 +1383,8 @@ export function initKineticDancer() {
     // instead of a textbook wave.
     const s = Math.max(-1, Math.min(1, Math.sin(p) + 0.12 * Math.sin(2 * p + 0.6)));
 
-    const tgt = (euler, axis, target) => { euler[axis] += (target - euler[axis]) * k; };
-    const set = (vec, axis, target) => { vec[axis] += (target - vec[axis]) * k; };
+    const tgt = (euler, axis, target) => springStep(euler, axis, target, dt, euler.__heavy ? SPRING_HEAVY : SPRING_LIGHT);
+    const set = (vec, axis, target) => springStep(vec, axis, target, dt, vec.__heavy ? SPRING_HEAVY : SPRING_LIGHT);
     const add = (obj, axis, extra) => { obj[axis] += extra * k * 3; };
 
     updateMoveSelection(rigState, clk);
