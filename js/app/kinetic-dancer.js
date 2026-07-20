@@ -52,6 +52,19 @@ import { appState } from './state.js';
 //    under the 3-flashes/sec G19 ceiling at every tempo used here, independent
 //    of amplitude — so a beat-locked glow is compliant by the simplest
 //    sufficient technique, not just a stylistic risk.
+//  • ORGANIC vs. ROBOTIC MOTION: procedural motion reads mechanical mainly
+//    from PERFECT REPETITION and PERFECT SYMMETRY, not from a lack of
+//    smoothing (that was already solved by the smoothstep fluidity pass).
+//    Standard fix per character-animation practice is coherent noise (Perlin/
+//    simplex is the canonical tool — Ken Perlin built it specifically to
+//    escape "machine-like" CGI motion) layered onto otherwise-deterministic
+//    motion, plus animation's "arcs" principle (curved, not symmetric,
+//    paths read as alive). This file uses a cheap sine-hash in place of a
+//    full noise function (bounded per-frame cost, same coherent-but-varied
+//    property, sufficient for a handful of scalars): `musicClock()`'s
+//    per-beat `beatJitter`, `dance()`'s per-move-instance `moveAmp`/
+//    `movePhaseOfs` (rolled once per move pick — see updateMoveSelection),
+//    and a second-harmonic asymmetry on the master `s` oscillator.
 //  • RAF pauses on hidden tab; dt clamped so a long pause can't lurch the pose.
 //  • Async load: renderer/scene/camera/RAF start immediately (empty scene);
 //    each rig's dance/adapter no-ops safely until ITS model arrives, so one
@@ -150,6 +163,7 @@ export function initKineticDancer() {
       frameBonesCache: null,
       currentMoveName: 'grooveSway', currentMove: null,
       moveStartBeat: 0, moveMirror: 1, lastBar8: -1, prevDrop: false,
+      moveAmp: 1, movePhaseOfs: 0,   // per-move-instance jitter, rolled fresh on each pick (see updateMoveSelection)
       headTrail: 0,   // secondary-motion memory for the head (grooveSway only), per-rig
     };
   }
@@ -473,9 +487,19 @@ export function initKineticDancer() {
       const barWeight = BAR_WEIGHT[beatIndex & 3];
       const beatCenterT = info.t0 + beatIndex * info.beatPeriod;
       const strength = beatStrength(a._trackName, beatCenterT);   // 0..1, THIS beat's real loudness
+      // Cheap per-beat "noise" (research: Perlin/coherent noise is the standard
+      // fix for procedural motion reading robotic — it breaks perfectly
+      // identical repetition without true randomness; a sine-hash of the
+      // integer beat index gives the same coherent-but-varied property far
+      // more cheaply than a full noise implementation for a single scalar per
+      // beat). Without this, every beat at the same bar position and the same
+      // envelope strength produces the EXACT same accent, forever — real
+      // musicians/dancers vary attack beat-to-beat even within a steady groove.
+      const hashN = Math.sin(beatIndex * 12.9898) * 43758.5453;
+      const beatJitter = 0.78 + 0.44 * (hashN - Math.floor(hashN));   // ~0.78..1.22, deterministic per beat index
       return {
         rateHz: 1 / (N_BEATS * info.beatPeriod * tempoScale),
-        accent: Math.pow(1 - beatPhase, 4) * barWeight * (0.4 + strength * 0.9),
+        accent: Math.pow(1 - beatPhase, 4) * barWeight * (0.4 + strength * 0.9) * beatJitter,
         beatPos, tempoScale, bpm: info.bpm, locked: true, strength,
       };
     }
@@ -914,6 +938,7 @@ export function initKineticDancer() {
     if (drop && !rigState.prevDrop) {
       rigState.currentMoveName = 'strike'; rigState.currentMove = MOVE_TABLE.strike;
       rigState.moveStartBeat = clk.beatPos; rigState.moveMirror = 1;
+      rigState.moveAmp = 0.94 + Math.random() * 0.12; rigState.movePhaseOfs = 0;   // the drop accent stays tight/on-time, only a small amplitude variance
       rigState.lastBar8 = Math.floor(clk.beatPos / 8);   // don't immediately re-roll this same window
       rigState.prevDrop = drop;
       return;
@@ -937,6 +962,12 @@ export function initKineticDancer() {
       rigState.currentMoveName = name; rigState.currentMove = MOVE_TABLE[name];
       rigState.moveStartBeat = clk.beatPos;
       rigState.moveMirror = (rigState.currentMove.mirrored && Math.random() < 0.5) ? -1 : 1;
+      // Per-instance variation (see dance()): a small amplitude scale and a
+      // small internal-clock nudge, rolled fresh each time this move is
+      // picked, so neither back-to-back reps within the move's own cycle nor
+      // separate pickings of the same move later in the track are identical.
+      rigState.moveAmp = 0.88 + Math.random() * 0.24;          // 0.88..1.12
+      rigState.movePhaseOfs = (Math.random() - 0.5) * 0.5;     // ±0.25 beat
     }
   }
 
@@ -959,17 +990,35 @@ export function initKineticDancer() {
     const k = 1 - Math.pow(0.001, dt);         // framerate-independent damping
     const strength = Number.isFinite(clk.strength) ? clk.strength : 0.6;   // THIS beat's real envelope loudness
     const A = 0.55 + energy * 0.7 + strength * 0.35;   // section energy + per-beat strength: a genuinely hard beat moves bigger than a soft one, not just a slow section-level ramp
-    const hit = beatAccent * (0.5 + energy * 0.5);   // music-locked on-beat accent (beatAccent already carries per-beat strength via musicClock)
+    const hit = beatAccent * (0.5 + energy * 0.5);   // music-locked on-beat accent (beatAccent already carries per-beat strength + jitter via musicClock)
     const p = phase;
-    const s = Math.sin(p);
+    // A pure Math.sin is perfectly symmetric attack/release, which is one of
+    // the tells that reads as mechanical rather than a human weight transfer
+    // (a body moves in arcs, not a metronome). Adding a small second harmonic
+    // breaks that symmetry — still perfectly smooth/continuous (no velocity
+    // discontinuity), just no longer a pure sinusoid — the cheapest way to
+    // give the master oscillator an organic, slightly asymmetric silhouette
+    // instead of a textbook wave.
+    const s = Math.max(-1, Math.min(1, Math.sin(p) + 0.12 * Math.sin(2 * p + 0.6)));
 
     const tgt = (euler, axis, target) => { euler[axis] += (target - euler[axis]) * k; };
     const set = (vec, axis, target) => { vec[axis] += (target - vec[axis]) * k; };
     const add = (obj, axis, extra) => { obj[axis] += extra * k * 3; };
 
     updateMoveSelection(rigState, clk);
-    const elapsedBeats = Math.max(0, (clk.beatPos - rigState.moveStartBeat) / (clk.tempoScale || 1));
-    rigState.currentMove.run({ b, tgt, set, add, A, hit, p, s, dt, elapsedBeats, mirror: rigState.moveMirror, rig: rigState });
+    // Per-instance amplitude/timing jitter (rolled once per move selection,
+    // not per frame — see updateMoveSelection): the SAME move repeating its
+    // internal cycle (e.g. tribalStomp's 4-beat stomp, twice inside its 8-beat
+    // slot) would otherwise be pixel-identical rep to rep, and picking the
+    // same move again later in the track would look identical to the last
+    // time — both are the "looped animation" tell. Scaling amplitude and
+    // nudging the move's internal clock per-instance (applied here, once, so
+    // every move function gets it for free without touching all twelve) fixes
+    // that without needing true per-frame randomness.
+    const A_j = A * (rigState.moveAmp || 1);
+    let elapsedBeats = Math.max(0, (clk.beatPos - rigState.moveStartBeat) / (clk.tempoScale || 1));
+    elapsedBeats = Math.max(0, elapsedBeats + (rigState.movePhaseOfs || 0));
+    rigState.currentMove.run({ b, tgt, set, add, A: A_j, hit, p, s, dt, elapsedBeats, mirror: rigState.moveMirror, rig: rigState });
 
     // shared, always-on accents regardless of the active move: the on-beat
     // knee/body dip so the tempo is always physically felt, and the slow 3/4
