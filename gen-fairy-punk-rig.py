@@ -61,6 +61,16 @@ BONES = [
  ('Shin.L',    'Thigh.L',   (-0.11, 0.55, 0.02), (-0.11, 0.15, 0.03)),
  ('Thigh.R',   'Pelvis',    ( 0.11, 0.95, 0.02), ( 0.11, 0.55, 0.02)),
  ('Shin.R',    'Thigh.R',   ( 0.11, 0.55, 0.02), ( 0.11, 0.15, 0.03)),
+ # Secondary-motion "dangle" bones — not driven by the choreography (no
+ # MOVE_TABLE role), purely by the runtime spring-bone physics in
+ # kinetic-dancer.js (updateDanglers). A 2-link chain down the trailing
+ # length of the hair (root under Head) and a single tip per wing/cloth
+ # plate (root under Chest, at the plate's outer-bottom corner, the region
+ # weight_chestwing already leaves un-gated to Shoulder — see below).
+ ('HairMid',   'Head',      (0.0,  1.45, 0.07), (0.0, 1.25, 0.11)),
+ ('HairTip',   'HairMid',   (0.0,  1.25, 0.11), (0.0, 1.05, 0.14)),
+ ('WingTip.L', 'Chest',     (-0.44, 1.09, 0.0), (-0.50, 0.98, 0.0)),
+ ('WingTip.R', 'Chest',     ( 0.44, 1.09, 0.0), ( 0.50, 0.98, 0.0)),
 ]
 NAME2I={b[0]:i for i,b in enumerate(BONES)}
 HEAD={b[0]:b[2] for b in BONES}
@@ -124,7 +134,12 @@ def weight_upper(x,y,z):
 
 def weight_chestwing(x,y,z):
     # pauldron/wing plate: follows Chest/UpperChest by height; outer-high tips
-    # get a little Shoulder so they move with the shoulder girdle.
+    # get a little Shoulder so they move with the shoulder girdle. The
+    # outer-BOTTOM corner (the free trailing edge, not near a shoulder joint)
+    # instead blends onto the WingTip dangle bone for secondary sway.
+    if y<=1.20 and abs(x)>0.28:
+        side='L' if x<0 else 'R'
+        return blend2((x,y,z), [f'WingTip.{side}','Chest'])
     cands=['Chest','UpperChest']
     if y>1.30 and abs(x)>0.30: cands=['UpperChest','Shoulder.L' if x<0 else 'Shoulder.R']
     return blend2((x,y,z), cands)
@@ -142,11 +157,31 @@ def weight_legs(x,y,z):
 def weight_head(x,y,z):
     return [('Head',1.0)]
 
+# Trailing hair length: smooth height-interpolated blend down a 3-link chain
+# (same smoothstep technique as TORSO_STACK) so a whip/lag reads as a
+# continuous curve along the hair rather than a hinge at one bone. Above the
+# scalp line it's rigidly Head (topknot/hairline verts shouldn't dangle).
+HAIR_STACK = [('Head',1.62),('HairMid',1.45),('HairTip',1.20)]
+def hair_interp(y):
+    st=HAIR_STACK
+    if y>=st[0][1]: return [(st[0][0],1.0)]
+    if y<=st[-1][1]: return [(st[-1][0],1.0)]
+    for i in range(len(st)-1):
+        y0=st[i][1]; y1=st[i+1][1]   # descending
+        if y1<=y<=y0:
+            t=(y0-y)/(y0-y1)
+            ts=t*t*(3-2*t)
+            return [(st[i][0],1-ts),(st[i+1][0],ts)]
+    return [(st[-1][0],1.0)]
+
+def weight_hair(x,y,z):
+    return hair_interp(y)
+
 MESH_WEIGHT={
  'BilloXD Chest': weight_chestwing,
  'BilloXD Face': weight_head,
  'BilloXD Hair Band': weight_head,
- 'BilloXD Hairs': weight_head,
+ 'BilloXD Hairs': weight_hair,
  'BilloXD Legs': weight_legs,
  'BilloXD Lower': weight_lower,
  'BilloXD Upper': weight_upper,

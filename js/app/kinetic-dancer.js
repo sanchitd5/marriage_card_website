@@ -283,6 +283,10 @@ export function initKineticDancer() {
     // Roles this rig DRIVES (beyond the core 13): the new torso subdivisions,
     // clavicles, wrists and finger-curls. RIG_A stays core-only.
     extraRoles: ['spine2', 'upperChest', 'shoulderL', 'shoulderR', 'handL', 'handR', 'fingersL', 'fingersR'],
+    // Non-anatomical secondary-motion bones (gen-fairy-punk-rig.py) — no
+    // choreography role, driven purely by updateDanglers()'s runtime physics.
+    // Post-GLTFLoader-import names (loader drops dots: "WingTip.L" -> "WingTipL").
+    danglers: ['HairMid', 'HairTip', 'WingTipL', 'WingTipR'],
     posScale: 0.55,
     // A-pose bind: arms rest angled ~45° down-and-out (the character's own
     // modelled pose). Near-zero rest offsets — the A-pose IS a natural dance
@@ -542,6 +546,16 @@ export function initKineticDancer() {
 
     rigState.currentMove = MOVE_TABLE.grooveSway;
     rigState.modelReady = true;
+
+    // Non-anatomical dangle bones (fairy-punk only) — collect real THREE.Bone
+    // refs directly by name; they have no retarget role/proxy, so they sit
+    // outside the mapBones()/adapters system entirely (see updateDanglers).
+    if (rigState.cfg.danglers) {
+      rigState.danglerBones = {};
+      model.traverse((o) => {
+        if (o.isBone && rigState.cfg.danglers.includes(o.name)) rigState.danglerBones[o.name] = o;
+      });
+    }
   }
 
   // Build the EXPLICIT (hand-tuned) retarget hints for a rig from its cfg,
@@ -1461,6 +1475,55 @@ export function initKineticDancer() {
     obj[axis] = x;
   }
 
+  // ── hair/cloth "dangle" bones (fairy-punk only, see gen-fairy-punk-rig.py) ─
+  // HairMid/HairTip/WingTip.L/R carry no choreography role — they exist
+  // purely for secondary motion beyond what riding Head/Chest already gives
+  // (the spring-damper above). Each joint's rest offset direction (its own
+  // `.position`, fixed since these bones never translate — only rotate) is
+  // spring-eased toward a per-frame target that blends (a) that rest
+  // direction with (b) "world down" re-expressed in the joint's PARENT-local
+  // frame via the parent's current world quaternion — so a joint settles
+  // toward gravity regardless of how the skeleton above it is oriented, not
+  // just rigidly following the parent's spin. Simulating in normalized
+  // DIRECTION space rather than tracking a world position + a distance
+  // constraint is a cheaper cousin of a verlet chain — length is implicit
+  // (always renormalized) — sufficient for a single dangle joint per region
+  // and consistent with the rotation-only bone-driving convention used
+  // everywhere else in this file (identity bind rotation, quaternion = delta).
+  const SPRING_HAIR = { k1: 34, k2: 7 };    // omega≈5.8 rad/s, zeta≈0.60 — soft, trailing lag
+  const SPRING_CLOTH = { k1: 70, k2: 12 };  // omega≈8.4 rad/s, zeta≈0.72 — stiffer plate, less droop
+  const _dangleDown = new THREE.Vector3(0, -1, 0);
+  const _dangleLocal = new THREE.Vector3();
+  const _dangleTarget = new THREE.Vector3();
+  const _dangleQ = new THREE.Quaternion();
+  const _dangleDeltaQ = new THREE.Quaternion();
+  function updateDangleBone(bone, dt, profile, gravityWeight) {
+    if (!bone.parent) return;
+    if (!bone._restDir) bone._restDir = bone.position.clone().normalize();
+    if (!bone._dangleDir) {
+      bone._dangleDir = { x: bone._restDir.x, y: bone._restDir.y, z: bone._restDir.z, _vx: 0, _vy: 0, _vz: 0 };
+    }
+    _dangleQ.setFromRotationMatrix(bone.parent.matrixWorld);
+    _dangleLocal.copy(_dangleDown).applyQuaternion(_dangleQ.invert());
+    _dangleTarget.copy(bone._restDir).lerp(_dangleLocal, gravityWeight).normalize();
+    const d = bone._dangleDir;
+    springStep(d, 'x', _dangleTarget.x, dt, profile);
+    springStep(d, 'y', _dangleTarget.y, dt, profile);
+    springStep(d, 'z', _dangleTarget.z, dt, profile);
+    const len = Math.hypot(d.x, d.y, d.z) || 1;
+    _dangleTarget.set(d.x / len, d.y / len, d.z / len);
+    _dangleDeltaQ.setFromUnitVectors(bone._restDir, _dangleTarget);
+    bone.quaternion.copy(_dangleDeltaQ);
+  }
+  function updateDanglers(rigState, dt) {
+    const d = rigState.danglerBones;
+    if (!d) return;
+    if (d.HairMid) updateDangleBone(d.HairMid, dt, SPRING_HAIR, 0.55);
+    if (d.HairTip) updateDangleBone(d.HairTip, dt, SPRING_HAIR, 0.72);
+    if (d.WingTipL) updateDangleBone(d.WingTipL, dt, SPRING_CLOTH, 0.35);
+    if (d.WingTipR) updateDangleBone(d.WingTipR, dt, SPRING_CLOTH, 0.35);
+  }
+
   // ── the dance (per rig) ────────────────────────────────────────────────
   // Everything is DAMPED toward a target each frame (factor k, framerate-aware)
   // so each figure grooves smoothly and never snaps or seizures. Ranges are
@@ -1571,6 +1634,7 @@ export function initKineticDancer() {
       updateDuetSlot(rigState, i === 0 ? 'a' : 'b', dt);   // per-panel placement (see PANEL_LAYOUTS)
       dance(rigState, dt, now, clk);
       applyRig(rigState);   // proxy joints → real bones (retarget)
+      updateDanglers(rigState, dt);   // hair/cloth secondary motion (fairy-punk only)
 
       // Refresh bone world matrices → skeleton bone matrices BEFORE render.
       // GPU skinning does the per-vertex work.
