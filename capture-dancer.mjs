@@ -28,7 +28,7 @@ const distDir = path.join(root, 'dist');
 const outDir = process.env.OUT_DIR || '/tmp/dancer-frames';
 const FRAMES = parseInt(process.env.FRAMES || '8', 10);
 const GAP_MS = parseInt(process.env.GAP_MS || '450', 10);
-const PORT = parseInt(process.env.PORT || '8743', 10);
+const PORT_PREF = parseInt(process.env.PORT || '0', 10);   // 0 = ephemeral (avoids EADDRINUSE from a prior run)
 
 if (!fs.existsSync(path.join(distDir, 'index.html'))) {
   console.error(`no ${distDir}/index.html — run: WEDDING_THEME=kinetic node build.js`);
@@ -58,7 +58,8 @@ const server = http.createServer((req, res) => {
     fs.createReadStream(fp).pipe(res);
   } catch (e) { res.writeHead(500); res.end(String(e)); }
 });
-await new Promise((r) => server.listen(PORT, r));
+await new Promise((r) => server.listen(PORT_PREF, r));
+const PORT = server.address().port;   // actual (ephemeral if PORT_PREF was 0)
 console.log(`serving dist/ on http://127.0.0.1:${PORT}`);
 
 const pw = await import(PW);

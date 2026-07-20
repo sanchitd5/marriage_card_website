@@ -3,66 +3,294 @@
   "tracks": {
     "techno/theme-1": {
       "sections": [
-        { "t0": 0,   "t1": 16,  "type": "intro" },
-        { "t0": 16,  "t1": 112, "type": "groove" },
-        { "t0": 112, "t1": 148, "type": "breakdown" },
-        { "t0": 148, "t1": 204, "type": "drop" },
-        { "t0": 204, "t1": 224, "type": "breakdown" },
-        { "t0": 224, "t1": 312, "type": "groove" },
-        { "t0": 312, "t1": 329, "type": "outro" }
+        {
+          "t0": 0,
+          "t1": 16,
+          "type": "intro"
+        },
+        {
+          "t0": 16,
+          "t1": 112,
+          "type": "groove"
+        },
+        {
+          "t0": 112,
+          "t1": 148,
+          "type": "breakdown"
+        },
+        {
+          "t0": 148,
+          "t1": 204,
+          "type": "drop"
+        },
+        {
+          "t0": 204,
+          "t1": 224,
+          "type": "breakdown"
+        },
+        {
+          "t0": 224,
+          "t1": 312,
+          "type": "groove"
+        },
+        {
+          "t0": 312,
+          "t1": 329,
+          "type": "outro"
+        }
       ]
     },
     "techno/theme-2": {
       "sections": [
-        { "t0": 0,   "t1": 20,  "type": "intro" },
-        { "t0": 20,  "t1": 80,  "type": "groove" },
-        { "t0": 80,  "t1": 212, "type": "drop" },
-        { "t0": 212, "t1": 332, "type": "breakdown" },
-        { "t0": 332, "t1": 412, "type": "drop" },
-        { "t0": 412, "t1": 476, "type": "groove" },
-        { "t0": 476, "t1": 487, "type": "outro" }
+        {
+          "t0": 0,
+          "t1": 20,
+          "type": "intro"
+        },
+        {
+          "t0": 20,
+          "t1": 80,
+          "type": "groove"
+        },
+        {
+          "t0": 80,
+          "t1": 212,
+          "type": "drop"
+        },
+        {
+          "t0": 212,
+          "t1": 332,
+          "type": "breakdown"
+        },
+        {
+          "t0": 332,
+          "t1": 412,
+          "type": "drop"
+        },
+        {
+          "t0": 412,
+          "t1": 476,
+          "type": "groove"
+        },
+        {
+          "t0": 476,
+          "t1": 487,
+          "type": "outro"
+        }
       ]
     },
     "techno/theme-3": {
       "sections": [
-        { "t0": 0,   "t1": 16,  "type": "intro" },
-        { "t0": 16,  "t1": 32,  "type": "drop" },
-        { "t0": 32,  "t1": 44,  "type": "breakdown" },
-        { "t0": 44,  "t1": 64,  "type": "drop" },
-        { "t0": 64,  "t1": 88,  "type": "groove" },
-        { "t0": 88,  "t1": 116, "type": "drop" },
-        { "t0": 116, "t1": 128, "type": "groove" },
-        { "t0": 128, "t1": 147, "type": "outro" }
+        {
+          "t0": 0,
+          "t1": 16,
+          "type": "intro"
+        },
+        {
+          "t0": 16,
+          "t1": 32,
+          "type": "drop"
+        },
+        {
+          "t0": 32,
+          "t1": 44,
+          "type": "breakdown"
+        },
+        {
+          "t0": 44,
+          "t1": 64,
+          "type": "drop"
+        },
+        {
+          "t0": 64,
+          "t1": 88,
+          "type": "groove"
+        },
+        {
+          "t0": 88,
+          "t1": 116,
+          "type": "drop"
+        },
+        {
+          "t0": 116,
+          "t1": 128,
+          "type": "groove"
+        },
+        {
+          "t0": 128,
+          "t1": 147,
+          "type": "outro"
+        }
       ]
     },
     "techno/theme-4": {
       "sections": [
-        { "t0": 0,   "t1": 32,  "type": "intro" },
-        { "t0": 32,  "t1": 64,  "type": "groove" },
-        { "t0": 64,  "t1": 120, "type": "drop" },
-        { "t0": 120, "t1": 144, "type": "groove" },
-        { "t0": 144, "t1": 168, "type": "breakdown" },
-        { "t0": 168, "t1": 197, "type": "groove" }
+        {
+          "t0": 0,
+          "t1": 32,
+          "type": "intro"
+        },
+        {
+          "t0": 32,
+          "t1": 64,
+          "type": "groove"
+        },
+        {
+          "t0": 64,
+          "t1": 120,
+          "type": "drop"
+        },
+        {
+          "t0": 120,
+          "t1": 144,
+          "type": "groove"
+        },
+        {
+          "t0": 144,
+          "t1": 168,
+          "type": "breakdown"
+        },
+        {
+          "t0": 168,
+          "t1": 197,
+          "type": "groove"
+        }
       ]
     },
     "techno/theme-5": {
       "sections": [
-        { "t0": 0,   "t1": 36,  "type": "intro" },
-        { "t0": 36,  "t1": 88,  "type": "groove" },
-        { "t0": 88,  "t1": 136, "type": "breakdown" },
-        { "t0": 136, "t1": 196, "type": "groove" },
-        { "t0": 196, "t1": 260, "type": "drop" }
+        {
+          "t0": 0,
+          "t1": 36,
+          "type": "intro"
+        },
+        {
+          "t0": 36,
+          "t1": 88,
+          "type": "groove"
+        },
+        {
+          "t0": 88,
+          "t1": 136,
+          "type": "breakdown"
+        },
+        {
+          "t0": 136,
+          "t1": 196,
+          "type": "groove"
+        },
+        {
+          "t0": 196,
+          "t1": 260,
+          "type": "drop"
+        }
       ]
     },
     "techno/theme-6": {
       "sections": [
-        { "t0": 0,   "t1": 52,  "type": "drop" },
-        { "t0": 52,  "t1": 64,  "type": "breakdown" },
-        { "t0": 64,  "t1": 208, "type": "groove" },
-        { "t0": 208, "t1": 232, "type": "breakdown" },
-        { "t0": 232, "t1": 412, "type": "groove" },
-        { "t0": 412, "t1": 428, "type": "breakdown" },
-        { "t0": 428, "t1": 493, "type": "drop" }
+        {
+          "t0": 0,
+          "t1": 52,
+          "type": "drop"
+        },
+        {
+          "t0": 52,
+          "t1": 64,
+          "type": "breakdown"
+        },
+        {
+          "t0": 64,
+          "t1": 208,
+          "type": "groove"
+        },
+        {
+          "t0": 208,
+          "t1": 232,
+          "type": "breakdown"
+        },
+        {
+          "t0": 232,
+          "t1": 412,
+          "type": "groove"
+        },
+        {
+          "t0": 412,
+          "t1": 428,
+          "type": "breakdown"
+        },
+        {
+          "t0": 428,
+          "t1": 493,
+          "type": "drop"
+        }
+      ]
+    },
+    "techno/theme-7": {
+      "sections": [
+        {
+          "t0": 0,
+          "t1": 7,
+          "type": "intro"
+        },
+        {
+          "t0": 7,
+          "t1": 15,
+          "type": "build"
+        },
+        {
+          "t0": 15,
+          "t1": 94,
+          "type": "groove"
+        },
+        {
+          "t0": 94,
+          "t1": 146,
+          "type": "breakdown"
+        },
+        {
+          "t0": 146,
+          "t1": 155,
+          "type": "build"
+        },
+        {
+          "t0": 155,
+          "t1": 198,
+          "type": "drop"
+        },
+        {
+          "t0": 198,
+          "t1": 205,
+          "type": "outro"
+        }
+      ]
+    },
+    "techno/theme-8": {
+      "sections": [
+        {
+          "t0": 0,
+          "t1": 8,
+          "type": "intro"
+        },
+        {
+          "t0": 8,
+          "t1": 86,
+          "type": "groove"
+        },
+        {
+          "t0": 86,
+          "t1": 141,
+          "type": "breakdown"
+        },
+        {
+          "t0": 141,
+          "t1": 179,
+          "type": "drop"
+        },
+        {
+          "t0": 179,
+          "t1": 202,
+          "type": "outro"
+        }
       ]
     }
   }

@@ -263,6 +263,28 @@ export function initKinetic() {
   // navigation. (Reduced-motion + no-GSAP paths returned above and keep a plain
   // scrolling page with none of this chrome, so all content stays reachable.)
   document.documentElement.classList.add('k-deck');
+
+  // HUD auto-hide on mouse idle: fade the console chrome out after IDLE_MS of no
+  // pointer/key activity, bring it straight back on the next move (video-player
+  // style). Toggles html.hud-idle (CSS hides the HUD chrome, NOT #hero). Deck /
+  // full-motion path only — REDUCED returned above, so idle users on the static
+  // page always keep the HUD. Independent of html.hud-hidden (the presenter-giant
+  // takeover); CSS ORs the two so either can hide the chrome.
+  (() => {
+    const root = document.documentElement;
+    const IDLE_MS = 3000;
+    let idleTimer = 0;
+    const arm = () => { clearTimeout(idleTimer); idleTimer = setTimeout(() => root.classList.add('hud-idle'), IDLE_MS); };
+    const wake = () => { if (root.classList.contains('hud-idle')) root.classList.remove('hud-idle'); arm(); };
+    for (const ev of ['pointermove', 'pointerdown', 'keydown', 'wheel', 'touchstart']) {
+      window.addEventListener(ev, wake, { passive: true });
+    }
+    // The presenter fires this when it releases the HUD (welcome/drop end) — reset
+    // the idle countdown so the freshly-revealed HUD isn't hidden the same instant.
+    window.addEventListener('kinetic-hud-shown', wake, { passive: true });
+    arm();   // start the idle countdown immediately
+  })();
+
   const acts = [$('#hero'), ...$$('#smooth-content .band'), $('.footer')].filter(Boolean);
   const hudSecEl = $('#k-hud-sec');
   const revealedActs = new WeakSet();

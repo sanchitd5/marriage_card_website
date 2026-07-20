@@ -13,6 +13,7 @@ import { initLightshow } from './app/lightshow.js';
 import { initMilkdrop } from './app/milkdrop.js';
 import { initKinetic, initKineticGate } from './app/kinetic.js';
 import { initKineticDancer } from './app/kinetic-dancer.js';
+import { initKineticVideo } from './app/kinetic-video.js';
 import {
   initCountdown,
   initCalendarButtons,
@@ -40,4 +41,5 @@ window.addEventListener('DOMContentLoaded', () => {
   initMilkdrop();    // no-ops if butterchurn CDN absent
   initTilt();        // vanilla-tilt on the event cards ([data-tilt])
   initKineticDancer(); // persistent side wireframe humanoid, dances to the music (own canvas)
+  initKineticVideo();  // theme-8 (Taratata) fullscreen visualizer takeover at authored beats
 });

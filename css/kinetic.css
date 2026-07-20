@@ -426,6 +426,20 @@ html.hud-hidden #hero {
    ambient canvas otherwise paints at .5). Reverts when the class is dropped. */
 html.hud-hidden #k-ambient-dancers.is-live { opacity: 1; }
 
+/* HUD idle auto-hide (html.hud-idle, toggled by kinetic.js after IDLE_MS of no
+   pointer/key activity, cleared on the next move). Hides ONLY the console chrome
+   — NOT #hero (unlike the presenter takeover), so an idle viewer still sees the
+   title over the dance scene. Same --k-ease glide as above (shared transition
+   rule). Deck/full-motion only; reduced-motion never adds the class. */
+html.hud-idle #k-hud,
+html.hud-idle #k-panel-menu,
+html.hud-idle #k-panel-controls,
+html.hud-idle #right-dock,
+html.hud-idle #k-cursor {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    CONTROL PANEL / SETUP-WIZARD (html.k-deck — added by kinetic.js in the
    full-motion path only; reduced-motion / no-JS keep a normal scrolling
@@ -1216,4 +1230,56 @@ html[data-variant="kinetic"] #hero { overflow: hidden; }
 
 @media (prefers-reduced-motion: reduce) {
   #k-panel-menu, #k-sheet-backdrop { transition: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   THEME-8 (Taratata) FULLSCREEN VIDEO TAKEOVER
+   Driven by js/app/kinetic-video.js at authored beats. When armed (.is-on),
+   the opaque overlay sits ABOVE every other layer (custom cursor z9998, HUD/
+   dock z56–59, gate z60) so its black fill occludes the ENTIRE UI by pure
+   occlusion — no per-element hiding needed. The muted, audio-stripped video
+   inside then fades in on top (opacity driven inline, frame-synced to the
+   track). Removing .is-on drops the overlay and the UI returns underneath,
+   untouched. A short overlay fade softens the cut to/from black without
+   materially shifting the authored hide/return instants.
+   ═══════════════════════════════════════════════════════════════════ */
+#k-video-takeover {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;            /* above cursor (9998), HUD/dock, gate — occludes all */
+  background: #000;
+  display: none;             /* not painted until armed */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .22s linear;
+}
+#k-video-takeover.is-on {
+  display: block;
+  opacity: 1;
+  pointer-events: auto;      /* swallow taps on the now-hidden UI beneath */
+}
+/* Belt-and-braces: while the takeover is armed, HARD-HIDE every top-level layer
+   except the overlay itself — milkdrop, lightshow, vignette, grain, both dancer
+   canvases, the HUD, dock, cursor, all page content (#smooth-wrapper) and any
+   JS-injected kinetic chrome (panel menu / controls / step / sheet backdrop).
+   The opaque overlay already occludes them by z-order; this ALSO stops the
+   milkdrop/flash bleeding through the overlay's brief fade and is future-proof
+   against anything that later grabs a z-index above the overlay. Driven by the
+   html.k-takeover class that kinetic-video.js toggles in lockstep with .is-on. */
+html.k-takeover body > *:not(#k-video-takeover) {
+  visibility: hidden !important;
+}
+#k-video-takeover video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;         /* fill the viewport like the full-screen scene */
+  opacity: 0;                /* ramped inline by kinetic-video.js */
+  background: #000;
+  will-change: opacity;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* kinetic-video.js already bails under reduced-motion; belt-and-braces. */
+  #k-video-takeover { display: none !important; }
 }

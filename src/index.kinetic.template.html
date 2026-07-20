@@ -292,6 +292,16 @@
        Own low-DPR canvas, fixed and OUTSIDE #smooth-wrapper. Hidden on mobile +
        reduced-motion (kinetic.css). Driven by kinetic-dancer.js. -->
   <canvas id="k-dancer-canvas" aria-hidden="true"></canvas>
+  <!-- Theme-8 (Taratata) fullscreen visualizer takeover. Fixed opaque overlay
+       above EVERY other layer (cursor/HUD/dock included) so, when armed at the
+       authored beats, its black background occludes the whole UI; the muted,
+       audio-stripped video then fades in on top, synced to the track. Idle +
+       preload="none" until kinetic-video.js arms it (theme-8 only). -->
+  <div id="k-video-takeover" aria-hidden="true">
+    <video muted playsinline preload="none" disablepictureinpicture>
+      <source src="assets/audio/techno/theme-8.mp4" type="video/mp4">
+    </video>
+  </div>
   <!-- obsidian→transparent scrim over the dancer's left edge so panel content
        (left column) always reads over the figure; the figure stays clear on the
        far right. -->

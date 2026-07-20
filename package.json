@@ -7,7 +7,11 @@
   "scripts": {
     "build": "node build.js",
     "build:bride": "FROM_GROOM_SIDE=false node build.js",
-    "test": "node --test \"test/**/*.test.mjs\""
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "watch": "npx nodemon --watch src --watch js --watch css --watch site.config.mjs --watch build.js --ignore js/app/couple.mjs --ext html,mjs,js,css --exec 'node build.js'",
+    "serve": "python3 -m http.server -d dist 8642",
+    "start": "npx concurrently -n build,serve -c cyan,green \"npm run watch\" \"npm run serve\"",
+    "start:kinetic": "WEDDING_THEME=kinetic npx concurrently -n build,serve -c cyan,green \"npm run watch\" \"npm run serve\""
   },
   "engines": {
     "node": ">=18"

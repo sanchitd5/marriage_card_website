@@ -184,6 +184,22 @@ export function initKineticDancer() {
     return tex;
   }
 
+  // Soft radial glow (white, alpha falloff) for the giant's Super-Saiyan aura
+  // sprites — tinted CYAN (theme) per-sprite via material.color, additive-blended
+  // so it reads as emitted energy. One texture, reused by both aura sprites.
+  function makeAuraTexture() {
+    const s = 128, c = document.createElement('canvas');
+    c.width = c.height = s;
+    const x = c.getContext('2d');
+    const g = x.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.25, 'rgba(255,255,255,0.82)');
+    g.addColorStop(0.6, 'rgba(255,255,255,0.22)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.fillRect(0, 0, s, s);
+    const t = new THREE.CanvasTexture(c); t.needsUpdate = true; return t;
+  }
+
   // ── shared materials (both rigs): chrome body + wireframe accent ─────
   // Every mesh gets a chrome BASE pass — one MeshMatcapMaterial instance PER
   // UNIQUE source diffuse texture (see getChromeMat below), so sculpted form
@@ -210,6 +226,10 @@ export function initKineticDancer() {
   // shows. Stored as `mat.__base` so the per-frame beat-illumination modulates
   // this hue's BRIGHTNESS instead of overwriting it to grey (see frame()).
   const ARMADRILLO_TINT = 0x22d3ee;   // site accent cyan
+  // Super-Saiyan aura (giant only): a soft additive glow texture + its gold tints.
+  const auraTex = makeAuraTexture();
+  const AURA_CORE = 0xcaf6ff;   // white-hot cyan core (theme)
+  const AURA_FLAME = 0x22d3ee;  // site accent cyan flame column
   const chromeMats = [];
   function getChromeMat(srcMat) {
     const map = srcMat && srcMat.map ? srcMat.map : null;
@@ -231,7 +251,7 @@ export function initKineticDancer() {
     return mat;
   }
   const wireMat = new THREE.MeshBasicMaterial({ color: 0x66f0ff, wireframe: true, transparent: true, opacity: 0.14, blending: THREE.AdditiveBlending, depthWrite: false, skinning: true });
-  const disposables = [wireMat, chromeMatcapTex];   // chromeMats are pushed in as they're created (see below)
+  const disposables = [wireMat, chromeMatcapTex, auraTex];   // chromeMats are pushed in as they're created (see below)
 
   // ── lifecycle ────────────────────────────────────────────────────────
   let running = true, raf = 0, dead = false;
@@ -269,21 +289,28 @@ export function initKineticDancer() {
   const AMBIENT_MAX = (_cores >= 8 && _mem >= 8) ? 20 : (_cores <= 4 || _mem <= 4) ? 12 : 16;
   const AMBIENT_SCALE_BASE = 0.34;     // fraction of the armadrillo's duet fit scale → scattered-crowd size
   const _ndc = new THREE.Vector3();    // scratch for screen→world unprojection (spawn-time only)
+  const _box = new THREE.Box3();       // scratch for the giant's head-centring measurement
+  const _vec = new THREE.Vector3();    // scratch for the giant's per-frame head-bone pin
 
-  // ── GIANT "presenter" armadrillo (welcome + drop takeover) ───────────────
-  // ONE reserved, humongous armadrillo — NOT part of the spawn pool — that
+  // ── GIANT "presenter" WAY BIG (welcome + drop takeover) ──────────────────
+  // ONE reserved, humongous figure — the "Way Big" humanoid, a DIFFERENT model
+  // from the armadrillo crowd/featured pair — NOT part of the spawn pool. It
   // takes the stage as a presenter in two moments: a WELCOME right after the
   // gate opens (dances a few seconds, then leaves), and a DROP TAKEOVER
   // whenever the live drop level crosses its threshold. While it is on screen
   // the console HUD is hidden together (html.hud-hidden — see css/kinetic.css)
   // so nothing competes with it; the HUD fades back in as the giant leaves. It
-  // is built lazily from the SAME loaded armadrillo (SkeletonUtils.clone of
-  // rigA.model) via buildAmbientInstance, then removed from ambientPool so the
-  // crowd scheduler never reuses it, and driven by the SAME dance()/applyRig
-  // engine into this SAME shared scene (no third WebGL context). Reduced-motion
+  // is LOADED LAZILY once (its OWN glTF at assets/scene/waybig via its OWN
+  // GLTFLoader — like setupDuet), built with its OWN cyan-forced chrome
+  // materials + rig (RIG_WAYBIG) by buildGiant, added to the SAME shared scene
+  // (no third WebGL context) and kept OUT of ambientPool so the crowd scheduler
+  // never touches it, then driven by the SAME dance()/applyRig engine. Until its
+  // glTF lands the presenter simply doesn't show (no throw). Reduced-motion
   // never reaches here (initKineticDancer bails under REDUCED at the very top),
   // so the HUD can never vanish for those users.
-  let giant = null;                    // the reserved presenter instance (lazy)
+  let giant = null;                    // the reserved presenter instance (lazy, Way Big)
+  let giantLoading = false;            // Way Big glTF fetch in flight (one-shot guard)
+  let giantFailed = false;             // Way Big load failed → presenter stays absent, fail safe
   let giantOpacity = 0;                // eased 0..1 fade (independent of the crowd)
   let giantDropHi = false;             // hysteretic threshold state of the live drop level
   let dropBurstTimer = 0;              // seconds left in a drop-triggered takeover BURST (capped, edge-armed)
@@ -296,16 +323,19 @@ export function initKineticDancer() {
   let welcomeArmed = false;            // gate-open fired; welcome not yet started (may defer until the model loads)
   let welcomeStarted = false;          // one-shot latch: the welcome has already run
   let welcomeTimer = 0;                // seconds left in the welcome window
-  const WELCOME_SECONDS = 5;           // how long the welcome dance holds before the HUD arrives
+  const WELCOME_SECONDS = 3;           // HUD appears this long after gate-unlock — a FIXED timer, independent of beats/drops
   const GIANT_FADE_SECONDS = 0.55;     // giant fade in/out duration (opacity ramp)
-  const GIANT_SCALE_MULT = 1.6;        // × the duet fit → humongous (VISUAL-VERIFY / tune)
-  // Centre stage, and low enough that the HEAD lands at screen centre (not the
-  // body). frameModel anchors the model's BODY-centre at this NDC, and the giant
-  // is ≈0.93 viewport tall (fit 0.58 × GIANT_SCALE_MULT 1.6), so its head sits
-  // ≈+0.9 NDC above centre — drop the anchor ≈that much so the head reads centred
-  // and the humongous body fills the lower + side stage. VISUAL-VERIFY: this is
-  // the head-centring knob; nudge if the head sits high/low or clips the top.
-  const GIANT_NDC_X = 0, GIANT_NDC_Y = -0.85;
+  const GIANT_SCALE_MULT = 1.5;        // × Way Big's OWN fit → humongous but head + torso stay in frame (tall humanoid)
+  // The giant is head-CENTRED in code (placeGiant): it's positioned by its FEET
+  // via placeAtNDC (the model origin is at the feet), so a fixed NDC anchor left
+  // the head at the top. Instead placeGiant measures the scaled model's world
+  // bbox each frame and shifts the whole rig so the head (bbox top) lands at
+  // GIANT_HEAD_NDC — scale-independent, so bumping GIANT_SCALE_MULT keeps the
+  // face centred and the humongous body filling below. Horn tips target the
+  // upper area so the FACE reads at centre.
+  const GIANT_NDC_X = 0;
+  const GIANT_HEAD_NDC = 0.05;         // screen NDC-y the head BONE pins to (via the per-frame pin) → face reads ~centre
+  const GIANT_MAX_OPACITY = 1.0;       // Way Big body FULLY opaque — its dark texture faded into the obsidian bg at 0.8 and read as wireframe-only; solid fill must dominate
   const DROP_ON = 0.55, DROP_OFF = 0.42;        // hysteresis band on appState.lightshow.drop (0..1)
   const DROP_BURST_SECONDS = 4.5;               // capped takeover per drop EDGE — HUD returns after this even on a sustained high upbeat
 
@@ -410,6 +440,64 @@ export function initKineticDancer() {
     // fraction now (see RIG_A note); still a featured figure, above crowd size.
     fitH: 0.5, fitW: 0.44,
   };
+  // "Way Big" (Ben 10) — the reserved presenter GIANT ONLY (NOT a featured dancer
+  // and NOT in the crowd; the crowd + featured pair stay armadrillo). A STANDARD
+  // Mixamo humanoid (57 joints; FBX → glTF via Blender). Mixamo authors bones as
+  // "mixamorig:Hips" etc.; the colon prefix was stripped at conversion so the
+  // clean "Hips"/"Spine"/"LeftArm"… names map straight through norm(). Full
+  // 6-bone torso (Hips→Spine→Spine1→Spine2→Neck→Head): the arms + shoulders hang
+  // off Spine2, so Spine2 plays the upperChest role (arm lead), Spine1 the chest,
+  // Spine the mid-spine — a real travelling spine, not one rigid rotation.
+  //
+  // ORIENTATION (measured from the glTF, see buildGiant/onGiantLoaded): the
+  // asset's root node carries a 180° rotation about (0,-1,1)/√2, which lands the
+  // figure UPRIGHT in world Y-up (head at +Y≈1.72, feet ≈0) — so NO uprighting is
+  // needed — but leaves it FACING -X (toes point -X; left side +Z, right -Z),
+  // i.e. SIDE-ON to the camera. A +90° spin about vertical turns its front to the
+  // camera (forward -X, rotated +π/2 about Y → +Z, toward the cam at z≈8.4). This
+  // is why faceSpin is +π/2 here, NOT the π a normal Mixamo T-pose (which imports
+  // facing straight away) would use.
+  //
+  // RETARGET: unlike the two SHIPPING rigs (armadrillo, fairy-punk) — which carry
+  // hand-tuned EXPLICIT hints because they predate the engine and were verified
+  // that way — Way Big is a genuinely NEW port, so it rides the engine's ANALYTIC
+  // path (buildGiant passes NO axis-map hints; the change-of-basis derives each
+  // bone's canonical→local axis map from the captured bind). That is exactly what
+  // a standard Mixamo skeleton needs: its bones are NOT world-aligned (fairy-punk
+  // was) and its bind is an A-POSE, not a T-pose (armadrillo was) — measured arms
+  // hang ~45° down-and-out (LeftArm→hand ≈ (-.05,-.75,.66)), so an armDown offset
+  // would OVER-rotate the already-lowered arms. The A-pose IS a natural dance
+  // neutral (as with the fairy-punk), so no rest offsets are declared.
+  const RIG_WAYBIG = {
+    url: 'assets/scene/waybig/scene.gltf',
+    nameOf: {
+      pelvis: 'Hips', spine: 'Spine', chest: 'Spine1', upperChest: 'Spine2',
+      neck: 'Neck', head: 'Head',
+      shoulderL: 'LeftShoulder', upperArmL: 'LeftArm', forearmL: 'LeftForeArm', handL: 'LeftHand',
+      shoulderR: 'RightShoulder', upperArmR: 'RightArm', forearmR: 'RightForeArm', handR: 'RightHand',
+      // L/R legs SWAPPED vs the arms: Way Big's leg-bone axes read mirrored under
+      // the analytic retarget, so the dance drove the legs on the wrong side
+      // ("mapped opposite"). Cross the mapping so a move's left-leg step lands on
+      // the leg that reads as left on screen. (Arms are correct as-is.)
+      thighL: 'RightUpLeg', shinL: 'RightLeg', footL: 'RightFoot',
+      thighR: 'LeftUpLeg', shinR: 'LeftLeg', footR: 'LeftFoot',
+    },
+    // Roles driven beyond the core 13: the upper-chest lead + clavicles + wrists
+    // (Mixamo has no single finger-curl bone, so no fingers role). footL/R are
+    // MAPPED (so frameModel measures the real silhouette) but NOT driven — the
+    // same trick the armadrillo uses for its shoulders/hands/feet.
+    extraRoles: ['upperChest', 'shoulderL', 'shoulderR', 'handL', 'handR'],
+    // Measured standing height ≈1.72 units (head bone; mesh top ≈1.99) vs the
+    // armadrillo's ~1.07 → posScale (proxy→model units for the pelvis-translation
+    // sway) scaled up ~×1.6 from RIG_A's 0.55 to keep the same RELATIVE sway;
+    // frameModel auto-fits the on-screen SIZE regardless (buildGiant/placeGiant).
+    posScale: 0.9,
+    // Front faces -X after the root rotation → +90° about vertical faces the cam.
+    faceSpin: Math.PI / 2,
+    // Roughly the armadrillo's silhouette budget (broad, heavy figure). Used ONLY
+    // as the giant's OWN frameModel fit (× GIANT_SCALE_MULT), never a duet fit.
+    fitH: 0.56, fitW: 0.5,
+  };
 
   // ── full-screen featured-duet placement ──────────────────────────────────
   // The featured pair render into the SAME full-viewport scene/renderer/camera
@@ -485,28 +573,32 @@ export function initKineticDancer() {
   rigA.leanSign = 1;  rigA.idlePhase = 0;
   rigB.leanSign = -1; rigB.idlePhase = 1.7;
 
-  // TEMPORARY (coordinator, "for now"): show ONLY the armadrillo (rigA) as the
-  // featured full-screen dancer; suppress the fairy-punk (rigB) ENTIRELY. rigB
-  // is never added to the scene, loaded, framed, danced, danglered, or rendered
-  // because the `rigs` array below — the SINGLE iteration point for both setup
-  // (setupDuet) and the per-frame update (frame()) — omits it. rigA stays the
-  // crowd clone source (buildAmbientInstance → rigA.model), unaffected. Flip
-  // this one flag back to true to restore the full duet with NO other changes.
+  // Which partner shares the featured stage with the armadrillo (rigA — ALWAYS
+  // shown + the crowd clone source). The flag adds its rig to the `rigs` array
+  // below — the SINGLE iteration point for setup (setupDuet, whose loader.load is
+  // the ONLY glTF fetch for featured rigs) and the per-frame update (frame()); a
+  // suppressed rig is never loaded, framed, danced or rendered. rigA stays the
+  // crowd clone source regardless. Flip the flag to add fairy-punk with NO other
+  // changes.
+  //   NB: "Way Big" is NOT a featured/crowd toggle — it is the reserved presenter
+  //   GIANT (loaded on demand by buildGiant). The crowd + featured pair are
+  //   ALWAYS armadrillo; only the humongous presenter is Way Big.
   const SHOW_FAIRY_PUNK = false;
 
-  // Full-screen anchors (NDC). Duet ON → spread the pair ACROSS the viewport
+  // Full-screen anchors (NDC). Partner ON → spread the pair ACROSS the viewport
   // (armadrillo left-of-centre, fairy-punk right-of-centre) so they read as two
-  // prominent dancers standing apart among the scattered crowd. Duet OFF (now)
+  // prominent dancers standing apart among the scattered crowd. Partner OFF (now)
   // → the lone armadrillo sits near centre so the single featured dancer reads
   // balanced, not stranded on one side. A slow independent drift keeps each
   // from reading as a static sticker; placeDuet maps these NDC anchors → world
   // against the live camera aspect every frame, so the spread holds across
   // window shapes.
-  rigA.duetAnchor = SHOW_FAIRY_PUNK
+  const hasPartner = SHOW_FAIRY_PUNK;
+  rigA.duetAnchor = hasPartner
     ? { x: -0.46, y: -0.03, driftX: 0.05, driftY: 0.03,  speed: 0.05, phase: 0.0 }
     : { x: -0.06, y: -0.02, driftX: 0.06, driftY: 0.035, speed: 0.05, phase: 0.0 };
   rigB.duetAnchor = { x: 0.47, y: 0.04, driftX: 0.05, driftY: 0.03, speed: 0.045, phase: 1.9 };
-  const rigs = SHOW_FAIRY_PUNK ? [rigA, rigB] : [rigA];
+  const rigs = [rigA, ...(SHOW_FAIRY_PUNK ? [rigB] : [])];
 
   // ── build (evaluate the width gate; start the RAF elsewhere) ──────────────
   // The featured duet and the ambient crowd share ONE renderer/scene/camera
@@ -2211,11 +2303,11 @@ export function initKineticDancer() {
       const inst = ambientPool[i];
       if (inst.rigGroup && ambientScene) { try { ambientScene.remove(inst.rigGroup); } catch (_) {} }
     }
-    // the reserved giant is NOT in ambientPool (removed in buildGiant) — remove
-    // it explicitly + restore the HUD (its cloned materials are in
+    // the reserved giant is NOT in ambientPool (it's a separately-loaded Way Big)
+    // — remove its rigGroup explicitly + restore the HUD (its own materials are in
     // ambientDisposables already, disposed by the loop below).
     if (giant && giant.rigGroup && ambientScene) { try { ambientScene.remove(giant.rigGroup); } catch (_) {} }
-    giant = null;
+    giant = null; giantLoading = false; giantFailed = false;
     try { resetPresenter(); } catch (_) {}
     for (let i = 0; i < ambientDisposables.length; i++) { try { ambientDisposables[i].dispose(); } catch (_) {} }
     ambientDisposables.length = 0;
@@ -2226,32 +2318,173 @@ export function initKineticDancer() {
   }
 
   // ── GIANT presenter build + per-frame state machine ─────────────────────
-  // Build the reserved giant once the clone-source armadrillo has loaded: reuse
-  // buildAmbientInstance for IDENTICAL construction (own cloned materials in
-  // ambientDisposables, own proxies/adapters, added to ambientScene), then
-  // REMOVE it from ambientPool so the crowd scheduler never grabs it.
+  // Kick the reserved giant's LAZY, one-shot load (its OWN Way Big glTF, own
+  // GLTFLoader — like setupDuet). Returns immediately; the giant stays null (the
+  // presenter simply doesn't show) until onGiantLoaded lands and sets it. A
+  // failed fetch fails safe (giantFailed → the presenter stays absent, no throw).
   function buildGiant() {
-    if (giant || !rigA.modelReady) return giant;
-    const inst = buildAmbientInstance();
-    if (!inst) return null;
-    const i = ambientPool.indexOf(inst);
-    if (i >= 0) ambientPool.splice(i, 1);   // reserve it — the crowd must never reuse it
-    inst.rigGroup.visible = false;
+    if (giant || giantLoading || giantFailed || dead) return giant;
+    if (!ambientScene || !ambientCamera || !THREE.GLTFLoader) return null;
+    giantLoading = true;
+    const loader = new THREE.GLTFLoader();
+    try {
+      if (THREE.DRACOLoader) {
+        const draco = new THREE.DRACOLoader();
+        draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+        loader.setDRACOLoader(draco);
+      }
+    } catch (_) { /* DRACO optional — Way Big is not draco-compressed */ }
+    loader.load(RIG_WAYBIG.url,
+      (gltf) => { try { onGiantLoaded(gltf); } catch (_) { giantFailed = true; } giantLoading = false; },
+      undefined,
+      () => { giantFailed = true; giantLoading = false; /* load error → presenter stays absent, fail safe */ });
+    return null;
+  }
+
+  // Build the Way Big giant from its loaded glTF: cyan-forced chrome materials
+  // (its own diffuse texture is OVERRIDDEN so the whole scene stays cyan-on-
+  // obsidian, same identity as the armadrillo), its OWN retarget rig (RIG_WAYBIG,
+  // ANALYTIC path — no explicit hints), its OWN dance state, framed to its OWN
+  // proportions. Kept OUT of ambientPool (the crowd never touches it).
+  function onGiantLoaded(gltf) {
+    if (dead || giant || !ambientScene || !ambientCamera) return;
+    const model = gltf.scene;
+
+    // static placement group. Way Big imports UPRIGHT (Y-up standing) so there is
+    // NO uprighting rotation — only the facing spin about vertical (RIG_WAYBIG
+    // faces -X after its glTF root rotation; +π/2 turns its front to the camera).
+    const rigGroup = new THREE.Group();
+    rigGroup.rotation.y = (RIG_WAYBIG.faceSpin != null) ? RIG_WAYBIG.faceSpin : 0;
+    const turnGroup = new THREE.Group();   // b.root — dance()'s slow 3/4 turn pivot
+    rigGroup.add(turnGroup);
+    turnGroup.add(model);
+
+    // Chrome on every mesh (own MATERIAL INSTANCES so the opacity fade is
+    // independent + disposable). Way Big keeps its OWN colours — its real diffuse
+    // texture is preserved (`.map`, colour white) and the matcap grey ramp shades
+    // the sculpted form over it (NOT cyan-tinted, per the brief). __base = white so
+    // the beat-illum modulates BRIGHTNESS without recolouring. Plus a thin additive
+    // wireframe accent on a clone sharing the SAME skeleton (deforms for free).
+    // Collect the mesh list first, THEN clone+append (mutating the graph
+    // mid-traversal would re-visit the new siblings).
+    const chromeMats = [], wireMats = [], skinnedMeshes = [];
+    const meshList = [];
+    model.traverse((o) => { if (o.isMesh || o.isSkinnedMesh) meshList.push(o); });
+    for (const o of meshList) {
+      const srcMat = o.material;
+      const map = srcMat && srcMat.map ? srcMat.map : null;
+      const opts = { matcap: chromeMatcapTex, color: 0xffffff, skinning: true, transparent: true, opacity: 0 };
+      if (map) opts.map = map;                                   // Way Big's real texture → its own white/red/black
+      if (srcMat && srcMat.alphaTest) opts.alphaTest = srcMat.alphaTest;
+      if (srcMat && srcMat.side !== undefined) opts.side = srcMat.side;
+      const mat = new THREE.MeshMatcapMaterial(opts);
+      mat.__base = new THREE.Color(0xffffff);   // white → beat-illum modulates brightness, texture colours preserved
+      o.material = mat;
+      o.frustumCulled = false;
+      chromeMats.push(mat); ambientDisposables.push(mat);
+      if (o.isSkinnedMesh) skinnedMeshes.push(o);
+      const wireOverlay = o.clone();
+      const w = wireMat.clone(); w.transparent = true; w.opacity = 0;
+      wireOverlay.material = w;
+      wireOverlay.frustumCulled = false;
+      wireOverlay.renderOrder = (o.renderOrder || 0) + 1;
+      wireMats.push(w); ambientDisposables.push(w);
+      if (o.parent) o.parent.add(wireOverlay);
+    }
+
+    // Retarget via the portable engine, ANALYTIC path (NO axis-map hints): a
+    // standard-Mixamo skeleton is not world-aligned, so the change-of-basis
+    // derives each bone's canonical→local map from the captured bind — the
+    // engine's intended new-rig path. Drives the core 13 + Way Big's extra roles.
+    const proxies = createProxyRig(THREE);
+    const driveRoles = RIG_WAYBIG.extraRoles ? CORE_ROLES.concat(RIG_WAYBIG.extraRoles) : CORE_ROLES;
+    const rig = buildRig(THREE, { model, nameOf: RIG_WAYBIG.nameOf, driveRoles, hints: {}, proxies });
+    const bones = { root: turnGroup };
+    for (const role in proxies) bones[role] = proxies[role];
+
+    const inst = {
+      cfg: RIG_WAYBIG,
+      rigGroup, turnGroup, model, skinnedMeshes,
+      proxies, adapters: rig.adapters, pelvisBone: rig.pelvisBone, pelvisBind: rig.pelvisBind,
+      bones, chromeMats, wireMats, retargetReport: rig.report,
+      headBone: (rig.boneByRole && rig.boneByRole.head) || null,   // real head bone → per-frame head-centre pin (placeGiant/updateGiant)
+      // dance state (mirrors createRigState's animated fields)
+      currentMove: MOVE_TABLE.grooveSway, currentMoveName: 'grooveSway',
+      moveStartBeat: 0, moveMirror: 1, prevDrop: false, moveAmp: 1, movePhaseOfs: 0,
+      headTrail: 0, idlePhase: 2.4, leanSign: -1,
+      baseX: 0, baseY: 0, baseZ: 0, baseScale: 1,
+      fitX: 0, fitY: 0, fitZ: 0, frameBonesCache: null,
+    };
+    rigGroup.visible = false;
+    ambientScene.add(rigGroup);
+
+    // Fit Way Big to ITS OWN proportions (frameModel scales rigGroup + captures
+    // baseScale/fitZ). placeGiant then re-scales by GIANT_SCALE_MULT + head-
+    // centres each frame; dance()'s figRatio (= scale.y/baseScale = the mult)
+    // keeps the weight bounce proportional at the giant's size instead of hopping.
+    frameModel(inst, rig.boneByRole);
+
+    // Measure the head-top offset ONCE, AFTER frameModel has scaled/positioned the
+    // rig (measuring before it, as an earlier version did, left the offset stale →
+    // the head flew off-screen). Take the model's world bbox top and normalise it
+    // back to UNSCALED rigGroup-local units (subtract the group's position, divide
+    // by its scale), so placeGiant's `scale · headTopLocal` lands the head at the
+    // target regardless of what frameModel did. Bind-pose / rest-geometry bounds →
+    // POSE-INDEPENDENT (a raised-arm dance move can't fling the framing).
+    rigGroup.updateMatrixWorld(true);
+    _box.setFromObject(model);
+    const gs = rigGroup.scale.y || 1;
+    inst.headTopLocal = _box.isEmpty() ? 1.72 : (_box.max.y - rigGroup.position.y) / gs;
+
+    // Super-Saiyan aura: two additive billboard glows parented to the rig (so they
+    // scale + head-pin WITH the giant). A round white-hot CYAN core hugging the
+    // torso, and a taller cyan flame column rising past the head. Both flare on the
+    // beat + flicker (driven in updateGiant). renderOrder 20 + depthTest off → the
+    // energy draws ON TOP of the body, enveloping it. H = the model's local height
+    // (unscaled); sprite scale is in those units, ×the giant's world scale (parent).
+    const H = inst.headTopLocal || 1.72;
+    const mkAura = (color, w, h, y, baseOp) => {
+      const m = new THREE.SpriteMaterial({ map: auraTex, color, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false });
+      const sp = new THREE.Sprite(m);
+      sp.scale.set(H * w, H * h, 1);
+      sp.position.set(0, H * y, 0);
+      sp.renderOrder = 20;   // ON TOP — the cyan energy glows OVER the body (depthTest off), enveloping it
+      sp.userData = { bw: H * w, bh: H * h, baseOp };
+      rigGroup.add(sp);
+      ambientDisposables.push(m);
+      return sp;
+    };
+    // core halo (wide, torso-centred) + flame column (narrow, tall, rising)
+    inst.auraSprites = [
+      mkAura(AURA_CORE, 1.5, 1.9, 0.55, 0.9),
+      mkAura(AURA_FLAME, 1.0, 2.8, 0.85, 0.7),
+    ];
+
     giant = inst;
-    return giant;
   }
 
   // Centre + size the giant against the LIVE camera each frame it shows (so a
-  // resize keeps it centred). baseScale = rigA's duet fit so dance()'s figRatio
-  // (= scale.y / baseScale = GIANT_SCALE_MULT) keeps the weight bounce
-  // proportional at the giant's size instead of making it hop.
+  // resize keeps it centred). It sizes off its OWN frameModel fit (giant.baseScale
+  // × GIANT_SCALE_MULT), not the armadrillo's, so Way Big's proportions are
+  // honoured; dance()'s figRatio (= scale.y / baseScale = GIANT_SCALE_MULT) keeps
+  // the weight bounce proportional instead of making it hop.
   function placeGiant() {
     if (!giant || !ambientCamera) return;
-    const dist = Math.abs(ambientCamera.position.z - (rigA.fitZ || 0)) || 8.4;
-    placeAtNDC(giant, GIANT_NDC_X, GIANT_NDC_Y, dist);   // sets position + baseX/Y/Z
-    giant.baseScale = rigA.baseScale || 1;
-    giant.rigGroup.scale.setScalar((rigA.baseScale || 1) * GIANT_SCALE_MULT);
-    giant.rigGroup.rotation.y = 0;   // face camera (dance() owns the .z/.x lean each frame)
+    const dist = Math.abs(ambientCamera.position.z - (giant.fitZ || 0)) || 8.4;
+    const scale = (giant.baseScale || 1) * GIANT_SCALE_MULT;
+    placeAtNDC(giant, GIANT_NDC_X, 0, dist);   // centre X (+ baseX/baseZ); Y overridden below
+    giant.rigGroup.scale.setScalar(scale);
+    // Head-centre off the CONSTANT bind-pose head-top offset (giant.headTopLocal),
+    // NOT a per-frame bbox — so the framing is pose-INDEPENDENT (a raised-arm
+    // move can't fling it). Position the rig so the head-top lands at
+    // GIANT_HEAD_NDC; the humongous body fills below. dance() bounces from baseY.
+    const worldPerNDC = Math.tan(THREE.MathUtils.degToRad(ambientCamera.fov / 2)) * dist;
+    const targetY = ambientCamera.position.y + GIANT_HEAD_NDC * worldPerNDC;
+    giant.baseY = targetY - scale * (giant.headTopLocal || 1);   // feet drop so head reaches target
+    giant.rigGroup.position.y = giant.baseY;
+    // Facing: keep the base spin toward the camera (dance() owns the .z/.x lean
+    // and the turnGroup 3/4 turn each frame; rigGroup.y is the base facing only).
+    giant.rigGroup.rotation.y = (giant.cfg.faceSpin != null) ? giant.cfg.faceSpin : 0;
   }
 
   // Force the presenter off the stage + restore the HUD — called when the
@@ -2264,10 +2497,9 @@ export function initKineticDancer() {
   }
 
   // Presenter state machine (per frame, only while the shared context is live).
-  // Shows the giant during (a) the welcome window and (b) a thresholded drop,
-  // and toggles html.hud-hidden on the show/hide EDGE. `welcome || drop` keeps
-  // `show` continuously true if a drop lands during / right after the welcome,
-  // so the HUD never flickers in then straight back out between the two.
+  // Shows the giant ONLY during the welcome window and toggles html.hud-hidden on
+  // the show/hide EDGE. (The drop/high-beat takeover was removed — the HUD must
+  // not hide on high beats; idle auto-hide + welcome are the only HUD-hide paths.)
   function updateGiant(dt, now, clk) {
     if (dead || !ambientRenderer) return;
     if (!giant) buildGiant();
@@ -2283,22 +2515,21 @@ export function initKineticDancer() {
     // after which the small crowd may begin (updateAmbient counts it down).
     if (welcomeStarted && welcomeTimer <= 0 && !crowdArmed) { crowdArmed = true; crowdArmTimer = CROWD_START_DELAY; }
 
-    // thresholded live drop level (appState.lightshow.drop is 0..1, NOT boolean),
-    // with hysteresis so a value hovering at the edge can't strobe the HUD.
-    const lvl = (appState.lightshow && Number.isFinite(appState.lightshow.drop)) ? appState.lightshow.drop : 0;
-    // Rising EDGE of the drop arms a CAPPED burst — the giant takes the stage
-    // once, then leaves and the HUD returns EVEN IF energy stays high. On a
-    // continuous high upbeat the level never dips below DROP_OFF, so no new edge
-    // fires and the HUD stays put after the one burst; a fresh burst needs the
-    // level to fall below DROP_OFF and spike above DROP_ON again.
-    if (giantDropHi) { if (lvl < DROP_OFF) giantDropHi = false; }
-    else if (lvl > DROP_ON) { giantDropHi = true; dropBurstTimer = DROP_BURST_SECONDS; }
-    if (dropBurstTimer > 0) dropBurstTimer -= dt;
-
-    const show = !!giant && (welcomeActive || dropBurstTimer > 0);
+    // The giant is on stage whenever the HUD is HIDDEN: during the welcome, AND
+    // while the mouse is idle (kinetic.js sets html.hud-idle → the giant appears,
+    // an immersive "screensaver" takeover; moving the mouse clears hud-idle and
+    // the giant leaves + the HUD returns). NOT on high beats (that takeover was
+    // removed). The beat still drives the giant's dance + Super-Saiyan aura flare.
+    const idleActive = document.documentElement.classList.contains('hud-idle');
+    const show = !!giant && (welcomeActive || idleActive);
     if (show !== presenterShown) {
       document.documentElement.classList.toggle('hud-hidden', show);
       presenterShown = show;
+      // When the presenter RELEASES the stage (HUD appears), wake the idle
+      // watcher so it doesn't immediately re-hide the just-revealed HUD — the
+      // welcome (3s) and the idle timeout (3s) both count from the gate tap and
+      // would otherwise collide. Gives the HUD a fresh idle countdown.
+      if (!show) { try { window.dispatchEvent(new CustomEvent('kinetic-hud-shown')); } catch (_) {} }
     }
     if (!giant) return;
 
@@ -2318,11 +2549,37 @@ export function initKineticDancer() {
     const wireOp = Math.min(0.5, 0.06 + glow * 0.28);
     const chromeCol = Math.min(1, 0.62 + glow * 0.38);
     try {
-      for (let j = 0; j < giant.chromeMats.length; j++) { const m = giant.chromeMats[j]; m.opacity = giantOpacity; if (m.__base) m.color.copy(m.__base).multiplyScalar(chromeCol); else m.color.setScalar(chromeCol); }
-      for (let j = 0; j < giant.wireMats.length; j++) giant.wireMats[j].opacity = wireOp * giantOpacity;
+      for (let j = 0; j < giant.chromeMats.length; j++) { const m = giant.chromeMats[j]; m.opacity = giantOpacity * GIANT_MAX_OPACITY; if (m.__base) m.color.copy(m.__base).multiplyScalar(chromeCol); else m.color.setScalar(chromeCol); }
+      for (let j = 0; j < giant.wireMats.length; j++) giant.wireMats[j].opacity = wireOp * giantOpacity * 0.4;   // dim the wire on the giant so the SOLID body dominates (not "wireframe only")
+      // Super-Saiyan aura: base glow + a hard FLARE on the beat, fast flicker, and
+      // a scale swell on the beat — all faded with the giant's own opacity.
+      if (giant.auraSprites) {
+        const beat = Number.isFinite(beatAccent) ? beatAccent : 0;
+        const flick = 0.8 + 0.2 * Math.sin(now * 30);
+        const lvl = giantOpacity * (0.3 + 0.9 * beat) * flick;
+        const pulse = 1 + 0.3 * beat;
+        for (const sp of giant.auraSprites) {
+          sp.material.opacity = Math.min(1, lvl * sp.userData.baseOp);
+          sp.scale.set(sp.userData.bw * pulse, sp.userData.bh * pulse, 1);
+        }
+      }
       dance(giant, dt, now, clk);       // same engine, own rigState → own move/phase
       applyRig(giant);                  // proxy joints → real bones (retarget)
       giant.rigGroup.updateMatrixWorld(true);
+      // HEAD-CENTRE PIN: after the pose is applied, read the REAL head bone's
+      // world position and shift the whole rig so the head lands at GIANT_HEAD_NDC.
+      // Robust + self-correcting — no assumptions about the model origin, frameModel
+      // scaling, or bind offsets (all of which fought the earlier offset-math). The
+      // vertical weight-bounce is absorbed into this pin (the head stays put, which
+      // is exactly "head in centre"); the dance's limb/torso motion still reads.
+      if (giant.headBone) {
+        giant.headBone.getWorldPosition(_vec);
+        const dist = Math.abs(ambientCamera.position.z - (giant.fitZ || 0)) || 8.4;
+        const worldPerNDC = Math.tan(THREE.MathUtils.degToRad(ambientCamera.fov / 2)) * dist;
+        const targetY = ambientCamera.position.y + GIANT_HEAD_NDC * worldPerNDC;
+        giant.rigGroup.position.y += (targetY - _vec.y);
+        giant.rigGroup.updateMatrixWorld(true);
+      }
       for (let j = 0; j < giant.skinnedMeshes.length; j++) { const sk = giant.skinnedMeshes[j].skeleton; if (sk) sk.update(); }
     } catch (_) { /* a giant failure must never take down the RAF */ }
   }
@@ -2352,15 +2609,21 @@ export function initKineticDancer() {
     if (!Number.isFinite(clk.tempoScale) || clk.tempoScale <= 0) clk.tempoScale = 1;
     if (!Number.isFinite(clk.strength)) clk.strength = 0.6;
 
-    // ── featured duet + ambient crowd: ONE shared renderer/scene/camera ──────
-    // The two hero rigs (rigA/rigB) and the crowd render into the same context.
-    // Only runs on tablet/desktop (ambientRenderer exists) and once a rig has
+    // ── featured armadrillo + ambient crowd + Way Big giant: ONE shared context ─
+    // The featured rig(s), the crowd, and the presenter giant all render into the
+    // same renderer/scene/camera. Only runs on tablet/desktop (ambientRenderer
+    // exists) and once the armadrillo (rigA — the featured + crowd source) has
     // loaded. The RAF pauses for free when the tab hides (frame() stops).
-    if (ambientRenderer && (rigA.modelReady || rigB.modelReady)) {
+    if (ambientRenderer && rigA.modelReady) {
       if (ambientEnabled) {
         for (let i = 0; i < rigs.length; i++) {
           const rigState = rigs[i];
           if (!rigState.modelReady || !rigState.bones) continue;   // that rig's load hasn't landed yet
+          // Hide the featured dancer while the presenter giant holds the stage —
+          // ONLY Way Big should be on screen during the welcome / drop takeover
+          // (otherwise the tiny featured armadrillo sits on the giant's chest).
+          if (presenterShown) { rigState.rigGroup.visible = false; continue; }
+          rigState.rigGroup.visible = true;
 
           placeDuet(rigState, now);       // full-screen anchor placement (see placeDuet)
           dance(rigState, dt, now, clk);
@@ -2439,7 +2702,7 @@ export function initKineticDancer() {
     get bpm() { const a = appState.music && appState.music.audio; const i = a && trackInfo[a._trackName]; return i ? Math.round(i.bpm) : 0; },
     get beatAccent() { return +beatAccent.toFixed(2); },
     get locked() { const m = appState.music, a = m && m.audio; return !!(a && !m.paused && !a.paused && a.currentTime > 0.05 && trackInfo[a._trackName]); },
-    // geometry diagnostics (loaded glTF budget, summed across both rigs)
+    // geometry diagnostics (loaded glTF budget for the featured rigs)
     get tris() { return rigA.triCount + rigB.triCount; },
     get verts() { return rigA.vertCount + rigB.vertCount; },
     get ready() { return rigA.modelReady && (!SHOW_FAIRY_PUNK || rigB.modelReady); },
@@ -2449,11 +2712,13 @@ export function initKineticDancer() {
     // kept as the back-compat name for dancer A (the Armadrillo)
     get move() { return rigA.currentMoveName; },
     get moveB() { return rigB.currentMoveName; },
+    get moveGiant() { return giant ? giant.currentMoveName : null; },   // the Way Big presenter
     get readyA() { return rigA.modelReady; },
     get readyB() { return rigB.modelReady; },
-    // retarget diagnostics: driven roles + the honest auto-vs-manual measure
-    // (how close a hint-free analytic derivation gets to each hand-tuned bone).
-    get retargetReport() { return { a: rigA.retargetReport, b: rigB.retargetReport }; },
+    get readyGiant() { return !!giant; },   // Way Big glTF loaded + rigged
+    // retarget diagnostics: driven roles + (featured rigs) the honest auto-vs-
+    // manual measure; the giant's Way Big uses the analytic path (report only).
+    get retargetReport() { return { a: rigA.retargetReport, b: rigB.retargetReport, giant: giant ? giant.retargetReport : null }; },
   };
 
   raf = requestAnimationFrame(frame);

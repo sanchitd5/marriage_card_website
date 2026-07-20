@@ -1,0 +1,28 @@
+Model Information:
+* title:   Way Big (Ben 10) — fan model
+* source:  imported from Downloads/waybig-ben-10 (FBX "Standing 2H Magic Area
+           Attack 02.fbx", Mixamo-rigged fan model of the Ben 10 character)
+* character IP: "Way Big" and Ben 10 are © Cartoon Network. This is a
+           third-party fan-made 3D model. Used here only in the private,
+           non-commercial friends-facing techno wedding-invite variant — NOT for
+           commercial use or public redistribution.
+
+Rig:
+* Standard Mixamo humanoid skeleton (57 bones, T-pose). The source authored bone
+  names with the "mixamorig:" prefix; the prefix was stripped at conversion so
+  GLTFLoader's name sanitization (which drops ':') stays in sync with the site's
+  norm() (see js/app/dance-retarget.js normalizeBoneName). Bones are driven by
+  the site's PROCEDURAL choreography engine (js/app/kinetic-dancer.js RIG_C) —
+  the FBX's baked "magic attack" clip is discarded, not used.
+
+Conversion (FBX -> glTF), done offline with Blender 5.x, NOT part of node build.js:
+* import FBX, strip "mixamorig:" from bones + matching mesh vertex groups
+* the two "MeshCompleteMap" body textures referenced dead Windows paths and were
+  missing; repointed to the one provided UV atlas (textures/Picsart_*.jpg, the
+  red body map) so the mesh isn't flat white
+* drop the baked action; bake a uniform scale so model height ~= the armadrillo
+  (~2.14 units) for consistent pelvis-sway units (RIG_C.posScale)
+* export GLTF_SEPARATE (scene.gltf + scene.bin + Picsart_*.png), Y-up, no anims
+
+Web-serving files (scene.gltf / scene.bin / Picsart_*.png) are committed; the
+source FBX is not in the repo.
