@@ -4,7 +4,7 @@ import { TRACK, takeoverStateAt } from './kinetic-video-timing.js';
 
 // -- THEME-8 VIDEO TAKEOVER -----------------------------------------------
 // During the Taratata track ('techno/theme-8') the official visualizer takes
-// over the whole viewport at two authored moments: a hard cut to black that
+// over the whole viewport at an authored moment: a hard cut to black that
 // hides EVERYTHING (scene, panels, HUD, dock, cursor) by pure occlusion (a
 // full-screen opaque overlay above every other layer), then the video fades in
 // on top, then it all disappears and the UI returns.
@@ -54,8 +54,15 @@ export function initKineticVideo() {
     document.documentElement.classList.toggle('k-takeover', on);
     overlay.classList.toggle('is-on', on);
   }
+  let videoVis = false; // video currently painting (opacity > 0)
+  function setVideoVis(on) {
+    if (on === videoVis) return;
+    videoVis = on;
+    document.documentElement.classList.toggle('k-video-vis', on);
+  }
   function offTrack() {
     setOcclude(false);
+    setVideoVis(false);
     video.style.opacity = '0';
     if (!video.paused) { try { video.pause(); } catch (e) {} }
   }
@@ -90,6 +97,7 @@ export function initKineticVideo() {
     // whole track regardless.
     const s = takeoverStateAt(t);
     setOcclude(s.occlude);
+    setVideoVis(s.opacity > 0);
     video.style.opacity = s.opacity.toFixed(3);
   }
 

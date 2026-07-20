@@ -1269,6 +1269,27 @@ html[data-variant="kinetic"] #hero { overflow: hidden; }
 html.k-takeover body > *:not(#k-video-takeover) {
   visibility: hidden !important;
 }
+/* #hero rides ABOVE the video during the takeover (couple's name over the
+   visualizer). #hero is trapped in #smooth-wrapper's stacking context (z2), so
+   rather than fight to lift it past z10000, drop the overlay BELOW that layer
+   while armed — every other layer is already hidden by visibility above, so the
+   overlay's black still occludes them at any z. Then re-show #hero (a
+   visibility:visible child overrides its hidden ancestor) and force it opaque
+   (GSAP may have parked it at autoAlpha:0 on another panel). Gated to k-video-vis
+   so the name appears only once the video is actually painting, not during the
+   initial 2s cut-to-black. */
+html.k-takeover #k-video-takeover { z-index: 1; }
+html.k-video-vis #hero {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+/* ...but not the hero's own backdrop (grid/light-shaft) or its scrim (which
+   fades to solid obsidian at the bottom) — those would paint over the video.
+   Keep only the text so the name floats over the full visualizer. */
+html.k-video-vis #hero .hero-media,
+html.k-video-vis #hero .hero-veil {
+  visibility: hidden !important;
+}
 #k-video-takeover video {
   position: absolute;
   inset: 0;

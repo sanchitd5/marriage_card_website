@@ -3,7 +3,7 @@
 // the unit test (test/kinetic-video.test.mjs) asserts them against the exact
 // timestamps the client specified. See kinetic-video.js for the runtime wiring.
 
-export const TRACK = 'techno/theme-8';
+export const TRACK = "techno/theme-8";
 
 // Each window is [hide, fade, full, end] in seconds of the track's currentTime:
 //   hide → blackout: overlay occludes the whole UI (video still opacity 0)
