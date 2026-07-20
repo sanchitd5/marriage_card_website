@@ -1,0 +1,19 @@
+Model Information:
+* title:	DP Techno Fairy Punk Set HD Textures
+* source:	https://sketchfab.com/3d-models/dp-techno-fairy-punk-set-hd-textures-6c2d6ff1ca3043ff9ffdf884ffbba1b8
+* author:	BilloXD (https://sketchfab.com/BilloXD)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "DP Techno Fairy Punk Set HD Textures" (https://sketchfab.com/3d-models/dp-techno-fairy-punk-set-hd-textures-6c2d6ff1ca3043ff9ffdf884ffbba1b8) by BilloXD (https://sketchfab.com/BilloXD) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+
+Note: the source model shipped as a static (unrigged, unanimated) 7-mesh
+character set. It was rigged in Blender (headless, scripted) with a custom
+13-bone biped armature for this project, matching the joint set the site's
+procedural choreography engine already drives (see js/app/kinetic-dancer.js).
+Original PBR textures/materials were NOT re-exported — this project renders
+the dancer as a wireframe with a single shared material at runtime, so the
+source textures are unused; stripping them keeps this asset lightweight.
