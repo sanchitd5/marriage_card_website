@@ -26,7 +26,7 @@ import {
 // ── Two independent RIGS, one shared choreography engine ─────────────────
 // Each rig gets its own Group (`rigGroup` → `turnGroup` → model), its own
 // proxy/adapter set, and its own move-selection state (currentMove/
-// moveStartBeat/moveMirror/lastBar8/prevDrop/headTrail) — see `createRigState`.
+// moveStartBeat/moveMirror/prevDrop/headTrail) — see `createRigState`.
 // Both rigs run the SAME `MOVE_TABLE`/move functions and the SAME beat/
 // instrument-aware `updateMoveSelection`, driven by ONE shared music clock
 // (energy/phase/beatAccent/ENV), so they read as two performers responding
@@ -384,9 +384,13 @@ export function initKineticDancer() {
       modelReady: false, triCount: 0, vertCount: 0,
       frameBonesCache: null,
       currentMoveName: 'grooveSway', currentMove: null,
-      moveStartBeat: 0, moveMirror: 1, lastBar8: -1, prevDrop: false,
+      moveStartBeat: 0, moveMirror: 1, prevDrop: false,
       moveAmp: 1, movePhaseOfs: 0,   // per-move-instance jitter, rolled fresh on each pick (see updateMoveSelection)
       headTrail: 0,   // secondary-motion memory for the head (grooveSway only), per-rig
+      // Persistent per-rig asymmetry so the two figures never read as one signal
+      // mirrored (the research "kill L/R symmetry" fix): a dominant-side lean and
+      // a de-phased idle sway, applied whole-figure on rigGroup each frame (§ dance).
+      idlePhase: 0, leanSign: 1,
       // calibrated base transform (set once by frameModel) + the animated
       // per-panel "duet slot" offset applied on top each frame (updateDuetSlot)
       baseX: 0, baseY: 0, baseZ: 0, baseScale: 1,
@@ -395,6 +399,10 @@ export function initKineticDancer() {
   }
   const rigA = createRigState(RIG_A);
   const rigB = createRigState(RIG_B);
+  // Opposite dominant side + a de-phased idle clock per rig: the pair leans and
+  // breathes independently instead of moving as one mirrored unit.
+  rigA.leanSign = 1;  rigA.idlePhase = 0;
+  rigB.leanSign = -1; rigB.idlePhase = 1.7;
   const rigs = [rigA, rigB];
 
   // ── build (synchronous scaffold + async model loads) ──────────────────────
@@ -886,6 +894,12 @@ export function initKineticDancer() {
   // back to rest, breaking the "moves crossfade for free through the shared
   // damping" property.
   const REST_ARM_X = 0.20, REST_FORE_X = 0.12, REST_LEG_X = 0.06;
+  // Peak whole-figure vertical drop (world units) of the always-on weight
+  // bounce in dance() — lowest on the beat. Deliberately larger than the old
+  // on-beat hip dip: the "body drops under its own weight on the kick" is the
+  // single biggest thing separating a dancer from a wobbling mannequin. Tuned
+  // against the framed on-screen figure height; adjust here, verify visually.
+  const BOUNCE_MAX = 0.12;
   // Rest targets for fairy-punk's EXTRA joints (subdivided spine, clavicles,
   // wrists, finger-curls). These proxies exist on BOTH rigs (createProxyRig
   // allocates every schema role), but only fairy-punk has adapters for them —
@@ -1033,31 +1047,33 @@ export function initKineticDancer() {
     tgt(b.shinL.rotation, 'x', REST_LEG_X); tgt(b.shinR.rotation, 'x', REST_LEG_X);
   }
 
-  // D. Breakdown gaze — long near-stillness for quiet sections/idle: one slow
-  // 16-beat weight shift, a full head turn toward the viewer, breath only.
-  // Giving the figure permission to STOP is the cheapest anti-monotony move.
+  // D. Slow groove — the CALMEST move but still energetic (brief: every move
+  // energetic): a rolling 4-beat weight shift with pelvis sway, pendulum arm
+  // swing that lags the torso (overlapping action), knee weight-transfer and a
+  // head that follows the sway. Replaces the old 16-beat near-freeze — it's now
+  // the flowing/low-intensity end of the vocabulary, not a stop.
   function breakdown(c) {
     const { b, tgt, set, A, elapsedBeats } = c;
-    const eb = elapsedBeats % 16;
-    const breathe = Math.sin(eb * 0.4) * 0.03 * A;
-    const shift = (eb < 8 ? smoothstep(eb / 8) : 1 - smoothstep((eb - 8) / 8)) - 0.5;
-    const gaze = Math.sin((eb / 16) * Math.PI * 2 + 0.3) * 0.26 * A;
+    const w = Math.sin((elapsedBeats / 2) * Math.PI);            // full L→R→L per 4 beats
+    const wLag = Math.sin(((elapsedBeats - 0.4) / 2) * Math.PI); // arms lag the torso ~0.4 beat
+    const breathe = Math.sin(elapsedBeats * 0.8) * 0.03 * A;
+    const reach = 0.5 - 0.5 * Math.cos(elapsedBeats * Math.PI);
 
-    set(b.pelvis.position, 'x', shift * 0.10 * A);
-    set(b.pelvis.position, 'y', 0.10 + breathe);
-    tgt(b.pelvis.rotation, 'z', 0); tgt(b.pelvis.rotation, 'y', shift * 0.10 * A);
-    tgt(b.spine.rotation, 'x', 0.06 + breathe * 0.5); tgt(b.spine.rotation, 'z', 0);
-    tgt(b.chest.rotation, 'z', 0); tgt(b.chest.rotation, 'y', gaze * 0.3);
+    set(b.pelvis.position, 'x', w * 0.15 * A);
+    set(b.pelvis.position, 'y', 0.11 + Math.abs(w) * 0.05 * A + breathe);
+    tgt(b.pelvis.rotation, 'z', w * 0.14 * A); tgt(b.pelvis.rotation, 'y', w * 0.14 * A);
+    tgt(b.spine.rotation, 'x', 0.08); tgt(b.spine.rotation, 'z', -w * 0.12 * A);
+    tgt(b.chest.rotation, 'z', wLag * 0.12 * A); tgt(b.chest.rotation, 'y', -w * 0.10 * A);
 
-    tgt(b.upperArmL.rotation, 'z', 0.10); tgt(b.upperArmL.rotation, 'x', REST_ARM_X);
-    tgt(b.upperArmR.rotation, 'z', -0.10); tgt(b.upperArmR.rotation, 'x', REST_ARM_X);
-    tgt(b.forearmL.rotation, 'x', REST_FORE_X); tgt(b.forearmR.rotation, 'x', REST_FORE_X);
+    tgt(b.upperArmL.rotation, 'z', 0.12 + Math.max(0, wLag) * 0.20 * A); tgt(b.upperArmL.rotation, 'x', REST_ARM_X + Math.max(0, wLag) * 0.35 * A);
+    tgt(b.upperArmR.rotation, 'z', -(0.12 + Math.max(0, -wLag) * 0.20 * A)); tgt(b.upperArmR.rotation, 'x', REST_ARM_X + Math.max(0, -wLag) * 0.35 * A);
+    tgt(b.forearmL.rotation, 'x', REST_FORE_X - Math.max(0, wLag) * 0.30); tgt(b.forearmR.rotation, 'x', REST_FORE_X - Math.max(0, -wLag) * 0.30);
 
-    tgt(b.thighL.rotation, 'x', REST_LEG_X); tgt(b.thighR.rotation, 'x', REST_LEG_X);
-    tgt(b.shinL.rotation, 'x', REST_LEG_X); tgt(b.shinR.rotation, 'x', REST_LEG_X);
+    tgt(b.thighL.rotation, 'x', REST_LEG_X + Math.max(0, w) * 0.18 * A); tgt(b.thighR.rotation, 'x', REST_LEG_X + Math.max(0, -w) * 0.18 * A);
+    tgt(b.shinL.rotation, 'x', REST_LEG_X + Math.max(0, w) * 0.22 * A); tgt(b.shinR.rotation, 'x', REST_LEG_X + Math.max(0, -w) * 0.22 * A);
 
-    tgt(b.neck.rotation, 'x', 0.03); tgt(b.neck.rotation, 'z', 0); tgt(b.neck.rotation, 'y', gaze * 0.4);
-    tgt(b.head.rotation, 'x', -0.10); tgt(b.head.rotation, 'z', 0); tgt(b.head.rotation, 'y', gaze);
+    tgt(b.neck.rotation, 'x', 0.03 + reach * 0.10 * A); tgt(b.neck.rotation, 'z', w * 0.06 * A); tgt(b.neck.rotation, 'y', w * 0.10 * A);
+    tgt(b.head.rotation, 'x', -0.10); tgt(b.head.rotation, 'z', w * 0.10 * A); tgt(b.head.rotation, 'y', w * 0.14 * A);
   }
 
   // E. Step-touch — a 4-beat weight-shifting step with elbow pumps ON the
@@ -1337,7 +1353,7 @@ export function initKineticDancer() {
     grooveSway: { beats: 8, pool: ['idle', 'low', 'high'], run: grooveSway },
     handsFace: { beats: 8, pool: ['idle', 'low'], affinity: 'mid', extras: true, run: handsFace },
     strike: { beats: 8, pool: ['high'], run: strike },
-    breakdown: { beats: 16, pool: ['idle', 'low'], run: breakdown },
+    breakdown: { beats: 8, pool: ['idle', 'low'], run: breakdown },
     stepTouch: { beats: 4, pool: ['high'], affinity: 'low', run: stepTouch },
     bodyWave: { beats: 4, pool: ['idle', 'low', 'high'], affinity: 'mid', extras: true, run: bodyWave },
     reachOpen: { beats: 8, pool: ['low', 'high'], mirrored: true, affinity: 'mid', extras: true, run: reachOpen },
@@ -1368,7 +1384,7 @@ export function initKineticDancer() {
   // high (`appState.lightshow.drop`). WITHIN that pool, the pick is weighted
   // toward whichever move's `affinity` matches the instrument mix dominating
   // the track right now (bandMix). Called independently per rig — each
-  // dancer keeps its OWN moveStartBeat/lastBar8/prevDrop, so the two land on
+  // dancer keeps its OWN moveStartBeat/prevDrop, so the two land on
   // independent weighted-random picks at the same structural moments rather
   // than a shared/duplicated choice (except `strike`, which both always
   // trigger together on the same drop edge — the one synced duet accent).
@@ -1391,16 +1407,34 @@ export function initKineticDancer() {
       rigState.currentMoveName = 'strike'; rigState.currentMove = MOVE_TABLE.strike;
       rigState.moveStartBeat = clk.beatPos; rigState.moveMirror = 1;
       rigState.moveAmp = 0.94 + Math.random() * 0.12; rigState.movePhaseOfs = 0;   // the drop accent stays tight/on-time, only a small amplitude variance
-      rigState.lastBar8 = Math.floor(clk.beatPos / 8);   // don't immediately re-roll this same window
       rigState.prevDrop = drop;
       return;
     }
     rigState.prevDrop = drop;
 
-    const bar8 = Math.floor(clk.beatPos / 8);
-    if (bar8 !== rigState.lastBar8) {
-      rigState.lastBar8 = bar8;
-      const pool = Object.keys(MOVE_TABLE).filter((n) => n !== 'strike' && MOVE_TABLE[n].pool.includes(ctx));
+    // Re-select when the CURRENT move has run its full DECLARED length, measured
+    // in the move's own tempo-scaled beat clock (the same `elapsedBeats` basis
+    // dance() feeds the move), floored to 8 beats. The old fixed 8-beat window
+    // both CHOPPED the long deliberate moves (breakdown @16, invocation @12 —
+    // stillness is choreography, and it was being cut in half) and, at high BPM
+    // (tempoScale=2), cut every move at half its internal cycle. Keying off the
+    // move's own `beats` fixes both; the 8-beat floor keeps the short loopers
+    // (stepTouch/tribalStomp @4, polyStep @6) repeating at least once instead of
+    // flickering move-to-move.
+    const tempoScale = clk.tempoScale || 1;
+    const period = Math.max(8, (rigState.currentMove && rigState.currentMove.beats) || 8);
+    // `!currentMove` forces the very first pick: createRigState can't seed a
+    // MOVE_TABLE entry (the table is defined further down), so the first frame
+    // must select before dance() calls currentMove.run().
+    if (!rigState.currentMove || (clk.beatPos - rigState.moveStartBeat) / tempoScale >= period) {
+      // anti-repeat: drop the move that just finished so nothing plays twice in
+      // a row (a cheap, research-backed variety win — real dancers don't repeat
+      // a phrase identically). If that empties the eligible set (a ctx with a
+      // single eligible move) fall back to the full set rather than freeze.
+      const eligible = (extra) => Object.keys(MOVE_TABLE).filter((n) =>
+        n !== 'strike' && n !== extra && MOVE_TABLE[n].pool.includes(ctx));
+      let pool = eligible(rigState.currentMoveName);
+      if (!pool.length) pool = eligible(null);
       let name = 'grooveSway';
       if (pool.length) {
         const a = appState.music && appState.music.audio;
@@ -1542,8 +1576,15 @@ export function initKineticDancer() {
     const b = rigState.bones;
     const k = 1 - Math.pow(0.001, dt);         // framerate-independent damping
     const strength = Number.isFinite(clk.strength) ? clk.strength : 0.6;   // THIS beat's real envelope loudness
-    const A = 0.55 + energy * 0.7 + strength * 0.35;   // section energy + per-beat strength: a genuinely hard beat moves bigger than a soft one, not just a slow section-level ramp
-    const hit = beatAccent * (0.5 + energy * 0.5);   // music-locked on-beat accent (beatAccent already carries per-beat strength + jitter via musicClock)
+    // Amplitude: a HIGH floor so every move is danced energetically even in a
+    // quiet section (the brief was "every move should be energetic" — the old
+    // 0.55 floor let low-energy stretches go sleepy), still scaled up by section
+    // energy + this beat's strength so a hard beat moves bigger than a soft one.
+    // Clamped so the raised floor doesn't push the high-energy poses (already
+    // tuned around A≈1.3) into over-extension where limbs clip or hyper-bend.
+    let A = 0.9 + energy * 0.55 + strength * 0.35;
+    if (A > 1.35) A = 1.35;
+    const hit = beatAccent * (0.6 + energy * 0.5);   // music-locked on-beat accent (beatAccent already carries per-beat strength + jitter via musicClock)
     const p = phase;
     // A pure Math.sin is perfectly symmetric attack/release, which is one of
     // the tells that reads as mechanical rather than a human weight transfer
@@ -1578,14 +1619,42 @@ export function initKineticDancer() {
     // those joints themselves. On the 13-bone Armadrillo these are free no-ops.
     if (!rigState.currentMove.extras) restExtras(b, tgt);
 
-    // shared, always-on accents regardless of the active move: the on-beat
-    // knee/body dip so the tempo is always physically felt, and the slow 3/4
-    // turn so the figure never sits flat-on for long.
+    // ── shared, always-on GROOVE — the weight engine every move rides on ──
+    // Research's #1 anti-robot fix: the body must visibly DROP under its own
+    // weight on the beat, knees absorbing it, or no amount of arm motion reads
+    // as dancing. Two coupled layers:
+    //  (1) a whole-figure vertical bounce on the outer rigGroup — an ABSOLUTE
+    //      write each frame (updateDuetSlot owns only x/z/scale, so .y is ours;
+    //      no spring, no drift), lowest exactly ON the beat and deeper when the
+    //      beat hits harder (per-beat `strength`) or the section is hotter
+    //      (`energy`). beatFrac comes from the driftless beatPos so the bounce
+    //      is locked to the music, not to the RAF clock.
+    //  (2) the on-beat knee/hip give on the proxy bones — now folding the SHINS
+    //      too, not just the thighs, so the drop reads as the knees giving
+    //      rather than the whole figure teleporting down, and scaled by the same
+    //      groove weight so a hard kick visibly buckles the knees more.
+    // Plus the slow 3/4 root turn so the figure never sits flat-on for long.
+    const beatFrac = clk.beatPos - Math.floor(clk.beatPos);
+    const onBeat = 0.5 + 0.5 * Math.cos(beatFrac * Math.PI * 2);   // 1 on the beat → 0 mid-beat
+    const grv = 0.7 + 0.4 * energy + 0.35 * (Number.isFinite(clk.strength) ? clk.strength : 0.6);   // high floor so the weight bounce is always felt (energetic brief)
+    rigState.rigGroup.position.y = rigState.baseY - BOUNCE_MAX * onBeat * grv;
+
     add(b.pelvis.position, 'y', -hit * 0.06);
-    add(b.thighL.rotation, 'x', hit * 0.12);
-    add(b.thighR.rotation, 'x', hit * 0.12);
+    add(b.thighL.rotation, 'x', hit * 0.16 * grv);
+    add(b.thighR.rotation, 'x', hit * 0.16 * grv);
+    add(b.shinL.rotation, 'x', hit * 0.20 * grv);   // knees fold to absorb the drop
+    add(b.shinR.rotation, 'x', hit * 0.20 * grv);
     add(b.spine.rotation, 'x', hit * 0.06);
     tgt(b.root.rotation, 'y', Math.sin(p * 0.5) * 0.16);
+
+    // Persistent per-rig asymmetry (research "kill L/R symmetry"): a dominant-
+    // side lean + a slow, de-phased idle sway/breath, applied whole-figure on
+    // rigGroup (again ABSOLUTE — .x/.z are unused by placement). Stops the two
+    // figures reading as one mirrored signal and keeps the silhouette alive even
+    // when the music sits idle, without phase-locking any joint into a loop.
+    const idle = t * 0.6 + rigState.idlePhase;
+    rigState.rigGroup.rotation.z = rigState.leanSign * (0.045 + 0.02 * Math.sin(idle));
+    rigState.rigGroup.rotation.x = 0.015 * Math.sin(idle * 0.73 + 0.5);
   }
 
   // ── adapter: proxy joints → real bone transforms (per rig) ────────────────
