@@ -607,6 +607,39 @@ export function initKineticDancer() {
     }
   }).catch(() => {});
 
+  // ── authored choreography arc (offline, hand-read — not a runtime model) ──
+  // assets/audio/techno/choreo-arcs.json is a per-track list of {t0,t1,type}
+  // sections (intro/groove/build/drop/breakdown/outro), hand-authored by
+  // reading each track's actual energy curve in envelopes.json (see that
+  // file's `_authoring` note) rather than guessed live. The live per-frame
+  // signals (appState.lightshow.drop, bandMix) are still reactive/real-time;
+  // this ARC is deliberate STRUCTURE — it knows in advance where the real
+  // breakdown and the real drop are, so move selection can commit to "calm"
+  // or "big" ahead of the live Schmitt-trigger catching up, and both dancers
+  // can hit the SAME authored drop moment together (see ARC_LAST_SECTION /
+  // the synced-strike edge-trigger in updateMoveSelection). A missing/failed
+  // fetch just means no arc bias — the live-only system (this file's
+  // original behaviour) still runs exactly as before.
+  let ARCS = null;
+  fetch('assets/audio/techno/choreo-arcs.json').then(r => r.ok ? r.json() : null).then(j => {
+    if (j && j.tracks) ARCS = j.tracks;
+  }).catch(() => {});
+
+  function currentSection(trackName, t) {
+    const arc = ARCS && ARCS[trackName];
+    if (!arc || !arc.sections) return null;
+    const secs = arc.sections;
+    for (let i = 0; i < secs.length; i++) if (t >= secs[i].t0 && t < secs[i].t1) return secs[i].type;
+    return null;
+  }
+  // Edge-detect entering an authored 'drop' section (shared across both rigs,
+  // keyed by track so a track change resets it) — fires the SAME synchronized
+  // strike accent both rigs already do on the live drop signal, but from the
+  // authored arc, so the "big moment" the track ACTUALLY has (not just
+  // whatever crossed the live energy threshold) is guaranteed to land, in
+  // unison, right on cue.
+  let lastArcTrack = null, lastArcSection = null;
+
   // Returns the gesture-phase RATE (Hz) + the on-beat accent for `now`, PLUS a
   // bar-grid `beatPos` (beats elapsed, monotonic float) that drives WHICH move
   // is active per rig (see MOVE_TABLE/updateMoveSelection below) — shared by
@@ -625,6 +658,19 @@ export function initKineticDancer() {
     const m = appState.music, a = m && m.audio;
     const playing = !!(a && !m.paused && !a.paused && a.currentTime > 0.05);
     const info = playing && a._trackName && trackInfo[a._trackName];
+
+    // Authored arc lookup + edge-detect entering a 'drop' section — computed
+    // ONCE here (musicClock runs once per frame, shared by both rigs, unlike
+    // updateMoveSelection which runs once PER rig) so the edge fires exactly
+    // once per frame and both rigs see the SAME `arcDropEdge` on that frame,
+    // rather than the first rig's read consuming the edge before the second
+    // rig checks it.
+    const arcTrackName = a && a._trackName;
+    const arcSection = (playing && arcTrackName) ? currentSection(arcTrackName, a.currentTime) : null;
+    if (arcTrackName !== lastArcTrack) { lastArcTrack = arcTrackName; lastArcSection = null; }
+    const arcDropEdge = arcSection === 'drop' && lastArcSection !== 'drop';
+    lastArcSection = arcSection;
+
     if (info && Number.isFinite(info.beatPeriod) && info.beatPeriod > 0.05) {
       const tempoScale = info.bpm >= 140 ? 2 : 1;   // half-time at high BPM (bigger, slower per beat)
       const beatPos = (a.currentTime - info.t0) / info.beatPeriod;
@@ -646,14 +692,14 @@ export function initKineticDancer() {
       return {
         rateHz: 1 / (N_BEATS * info.beatPeriod * tempoScale),
         accent: Math.pow(1 - beatPhase, 4) * barWeight * (0.4 + strength * 0.9) * beatJitter,
-        beatPos, tempoScale, bpm: info.bpm, locked: true, strength,
+        beatPos, tempoScale, bpm: info.bpm, locked: true, strength, arcSection, arcDropEdge,
       };
     }
     // idle free-run (no music yet): keep it LIVELY so both figures visibly
     // dance even before any track plays (~one gesture every ~2.4s), no beat
     // accent. Still advance a synthetic beatPos so move-selection has a grid.
     idleBeatAccum += (Number.isFinite(dt) ? dt : 0.016) / IDLE_BEAT_PERIOD;
-    return { rateHz: 0.42 + energy * 0.15, accent: 0, beatPos: idleBeatAccum, tempoScale: 1, bpm: 0, locked: false, strength: 0.6 };
+    return { rateHz: 0.42 + energy * 0.15, accent: 0, beatPos: idleBeatAccum, tempoScale: 1, bpm: 0, locked: false, strength: 0.6, arcSection, arcDropEdge };
   }
 
   // ── move library ─────────────────────────────────────────────────────
@@ -1079,9 +1125,20 @@ export function initKineticDancer() {
   // trigger together on the same drop edge — the one synced duet accent).
   function updateMoveSelection(rigState, clk) {
     const drop = !!(appState.lightshow && appState.lightshow.drop);
-    const ctx = !clk.locked ? 'idle' : (drop ? 'high' : 'low');
+    // Authored arc overrides the pool context where it KNOWS the structure —
+    // 'drop' commits to the high-energy pool, 'breakdown' commits to the calm
+    // pool — ahead of (or in place of) the live Schmitt-trigger, which reacts
+    // to the signal rather than knowing the track. Other section types
+    // (intro/groove/build/outro/no-arc-loaded) fall back to the live-only
+    // idle/low/high gate exactly as before.
+    const arcCtx = clk.arcSection === 'drop' ? 'high' : clk.arcSection === 'breakdown' ? 'idle' : null;
+    const ctx = arcCtx || (!clk.locked ? 'idle' : (drop ? 'high' : 'low'));
 
-    if (drop && !rigState.prevDrop) {
+    // Strike fires in unison on EITHER trigger: the live reactive drop signal
+    // (as before) OR the authored arc entering its known 'drop' section
+    // (clk.arcDropEdge — computed once per frame in musicClock, shared by
+    // both rigs, so this can't double-fire out of sync between them).
+    if ((drop && !rigState.prevDrop) || clk.arcDropEdge) {
       rigState.currentMoveName = 'strike'; rigState.currentMove = MOVE_TABLE.strike;
       rigState.moveStartBeat = clk.beatPos; rigState.moveMirror = 1;
       rigState.moveAmp = 0.94 + Math.random() * 0.12; rigState.movePhaseOfs = 0;   // the drop accent stays tight/on-time, only a small amplitude variance
