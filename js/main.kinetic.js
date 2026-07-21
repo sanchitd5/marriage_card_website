@@ -14,6 +14,7 @@ import { initMilkdrop } from './app/milkdrop.js';
 import { initKinetic, initKineticGate } from './app/kinetic.js';
 import { initKineticDancer } from './app/kinetic-dancer.js';
 import { initKineticVideo } from './app/kinetic-video.js';
+import { initKineticVideo9 } from './app/kinetic-video9.js';
 import {
   initCountdown,
   initCalendarButtons,
@@ -50,6 +51,7 @@ class KineticApp {
     initTilt();          // vanilla-tilt on the event cards ([data-tilt])
     initKineticDancer(); // persistent side wireframe humanoid, dances to the music (own canvas)
     initKineticVideo();  // theme-8 (Taratata) fullscreen visualizer takeover at authored beats
+    initKineticVideo9(); // theme-9 own-audio video that plays instead of the scene (HUD solo 3:00→3:35)
   }
 
   // Wire the two phases. Idempotent per phase; the deferred phase waits for the DOM.

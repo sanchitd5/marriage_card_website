@@ -1304,3 +1304,77 @@ html.k-video-vis #hero .hero-veil {
   /* kinetic-video.js already bails under reduced-motion; belt-and-braces. */
   #k-video-takeover { display: none !important; }
 }
+
+/* ═══ THEME-9 VIDEO TAKEOVER (own-audio, plays INSTEAD of the scene) ══════
+   Unlike theme-8 (a muted visualizer synced to the music at two brief windows),
+   theme-9's video IS the track: it carries its own audio and plays fullscreen
+   for the whole song, sitting ABOVE the scene (z40) but BELOW the HUD/dock/cursor
+   (z55–9998) so the instrument chrome stays legible on top. The opaque video
+   occludes every scene layer (milkdrop, lightshow, grain, both dancers, all page
+   content — all ≤ z2) by z-order. The HUD only vanishes for one authored window
+   (3:00→3:35), via k-video9-solo. kinetic-video9.js toggles both classes. */
+#k-video9-takeover {
+  position: fixed;
+  inset: 0;
+  z-index: 40;               /* above the scene (≤2), below HUD/dock/cursor */
+  background: #000;
+  display: none;             /* not painted until armed */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .3s linear;
+}
+#k-video9-takeover.is-on {
+  display: block;
+  opacity: 1;
+  pointer-events: auto;      /* swallow taps on the hidden scene beneath */
+}
+#k-video9-takeover video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;         /* fill the viewport like the full-screen scene */
+  opacity: 0;                /* ramped inline by kinetic-video9.js */
+  background: #000;
+  will-change: opacity;
+}
+/* #hero (the couple's name) must ride ABOVE the video during the takeover, but
+   it's trapped in #smooth-wrapper's ScrollSmoother transform (a hard stacking
+   context at z2), so no z-index lifts it past the z40 overlay from inside.
+   #smooth-wrapper stays VISIBLE; kinetic-video9.js instead PORTALS #hero out to
+   this body-level host for the duration and restores it after. The opaque video
+   still occludes the whole scene beneath by z-order. */
+#k-hero-portal {
+  position: fixed;
+  inset: 0;
+  z-index: 41;               /* above the video (z40), below HUD/dock/cursor */
+  pointer-events: none;      /* the video / HUD chrome own all interaction */
+}
+#k-hero-portal .hero {
+  position: absolute;
+  inset: 0;
+  opacity: 1 !important;            /* GSAP may have parked it at autoAlpha:0 */
+  visibility: visible !important;
+}
+/* only the names float over the video — the hero's own backdrop (grid/shaft)
+   and scrim would paint over it, so keep those hidden while portaled. */
+#k-hero-portal .hero-media,
+#k-hero-portal .hero-veil {
+  display: none !important;
+}
+/* The one authored solo window (3:00→3:35): hide the HUD chrome AND the portaled
+   names so ONLY the video shows — HUD frame, both kinetic panels, dock, cursor. */
+html.k-video9-solo #k-hero-portal,
+html.k-video9-solo #k-hud,
+html.k-video9-solo #k-panel-menu,
+html.k-video9-solo #k-panel-controls,
+html.k-video9-solo #right-dock,
+html.k-video9-solo #k-cursor {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity .3s linear;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* kinetic-video9.js already bails under reduced-motion; belt-and-braces. */
+  #k-video9-takeover { display: none !important; }
+}

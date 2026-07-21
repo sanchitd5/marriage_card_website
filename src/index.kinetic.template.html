@@ -302,6 +302,17 @@
       <source src="assets/audio/techno/theme-8.mp4" type="video/mp4">
     </video>
   </div>
+  <!-- THEME-9 fullscreen video takeover. Unlike theme-8's muted, synced
+       visualizer, this video carries its OWN audio and plays INSTEAD of the
+       scene for the whole track (z40: above the scene, below the HUD/dock so the
+       chrome stays legible on top), with the HUD also vanishing for one window
+       (3:00→3:35). NOT muted. Idle + preload="none" until kinetic-video9.js
+       arms it (theme-9 only). -->
+  <div id="k-video9-takeover" aria-hidden="true">
+    <video playsinline preload="none" disablepictureinpicture>
+      <source src="assets/audio/techno/theme-9.mp4" type="video/mp4">
+    </video>
+  </div>
   <!-- obsidian→transparent scrim over the dancer's left edge so panel content
        (left column) always reads over the figure; the figure stays clear on the
        far right. -->
