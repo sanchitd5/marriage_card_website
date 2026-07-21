@@ -1316,7 +1316,7 @@ html.k-video-vis #hero .hero-veil {
 #k-video9-takeover {
   position: fixed;
   inset: 0;
-  z-index: 40;               /* above the scene (≤2), below HUD/dock/cursor */
+  z-index: 1;                /* behind #smooth-wrapper (z2) so the scene rides over the video */
   background: #000;
   display: none;             /* not painted until armed */
   opacity: 0;
@@ -1338,33 +1338,9 @@ html.k-video-vis #hero .hero-veil {
   background: #000;
   will-change: opacity;
 }
-/* #hero (the couple's name) must ride ABOVE the video during the takeover, but
-   it's trapped in #smooth-wrapper's ScrollSmoother transform (a hard stacking
-   context at z2), so no z-index lifts it past the z40 overlay from inside.
-   #smooth-wrapper stays VISIBLE; kinetic-video9.js instead PORTALS #hero out to
-   this body-level host for the duration and restores it after. The opaque video
-   still occludes the whole scene beneath by z-order. */
-#k-hero-portal {
-  position: fixed;
-  inset: 0;
-  z-index: 41;               /* above the video (z40), below HUD/dock/cursor */
-  pointer-events: none;      /* the video / HUD chrome own all interaction */
-}
-#k-hero-portal .hero {
-  position: absolute;
-  inset: 0;
-  opacity: 1 !important;            /* GSAP may have parked it at autoAlpha:0 */
-  visibility: visible !important;
-}
-/* only the names float over the video — the hero's own backdrop (grid/shaft)
-   and scrim would paint over it, so keep those hidden while portaled. */
-#k-hero-portal .hero-media,
-#k-hero-portal .hero-veil {
-  display: none !important;
-}
-/* The one authored solo window (3:00→3:35): hide the HUD chrome AND the portaled
-   names so ONLY the video shows — HUD frame, both kinetic panels, dock, cursor. */
-html.k-video9-solo #k-hero-portal,
+/* The one authored solo window (3:00→3:35): hide the HUD chrome AND the hero
+   names — HUD frame, both kinetic panels, dock, cursor. */
+html.k-video9-solo #hero,
 html.k-video9-solo #k-hud,
 html.k-video9-solo #k-panel-menu,
 html.k-video9-solo #k-panel-controls,

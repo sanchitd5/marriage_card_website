@@ -31,30 +31,6 @@ class KineticVideo9Takeover {
     if (on === this.active) return;
     this.active = on;
     this.overlay.classList.toggle('is-on', on);
-    this.portalHero(on);
-  }
-
-  // #hero is trapped in #smooth-wrapper's ScrollSmoother transform (a stacking
-  // context at z2), so no z-index lifts the names past the z40 video from inside.
-  // Move the real #hero node out to a body-level host that CAN sit above the
-  // video, and put it back — at its exact original spot — when the takeover ends.
-  // GSAP holds element references (not selectors), so its ScrollTriggers/scramble
-  // animations survive the move. Idempotent via the setActive guard.
-  portalHero(on) {
-    const hero = this.hero || (this.hero = document.getElementById('hero'));
-    if (!hero) return;
-    if (on) {
-      if (!this.heroHost) {
-        this.heroHost = document.createElement('div');
-        this.heroHost.id = 'k-hero-portal';
-        document.body.appendChild(this.heroHost);
-      }
-      this.heroParent = hero.parentNode;
-      this.heroAnchor = hero.nextSibling; // remember exact restore position
-      this.heroHost.appendChild(hero);
-    } else if (this.heroParent) {
-      this.heroParent.insertBefore(hero, this.heroAnchor);
-    }
   }
 
   setHudHidden(on) {
