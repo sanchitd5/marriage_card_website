@@ -50,8 +50,16 @@ class KineticVideo9Takeover {
   offTrack() {
     this.setActive(false);
     this.setHudHidden(false);
-    this.video.style.opacity = '0';
     this.restoreMusic();
+    // The video carries its OWN audio, so hiding the overlay is not enough —
+    // leaving it playing keeps the theme-9 track audible under the next track.
+    // Pause + rewind so a later re-select starts the takeover from the top.
+    const video = this.video;
+    if (!video.paused || video.currentTime !== 0) {
+      try { video.pause(); } catch (e) {}
+      try { video.currentTime = 0; } catch (e) {}
+    }
+    if (this.lastOpacity !== '0') { video.style.opacity = '0'; this.lastOpacity = '0'; }
   }
 
   frame() {
