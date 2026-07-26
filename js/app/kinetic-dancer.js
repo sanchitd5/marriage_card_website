@@ -8,7 +8,7 @@ import {
 // TWO loaded, rigged glTF humanoids driven by a shared procedural choreography.
 // See the git history / dance-retarget.js for the full design rationale (the
 // portable retargeting engine, the spring-damper secondary motion, the ambient
-// crowd + Way Big presenter). This file is the ENGINE; the choreography itself
+// crowd). This file is the ENGINE; the choreography itself
 // (the 25 move phrases, MOVE_TABLE, the tuning constants, the pure math helpers)
 // lives as module-level values below — they are STATELESS strategy functions of
 // a per-frame context, so they stay plain functions the engine calls, unchanged.
@@ -16,10 +16,10 @@ import {
 // OOP shape:
 //   • class Rig          — one featured dancer's per-rig state (was createRigState)
 //   • class KineticDancer — the whole engine: THREE renderer/scene/camera, the
-//                           shared music clock, the ambient crowd pool, the Way
-//                           Big presenter, and the RAF loop. All the former
-//                           module-`let` state is encapsulated as instance fields
-//                           and the former inner functions are methods.
+//                           shared music clock, the ambient crowd pool, and the
+//                           RAF loop. All the former module-`let` state is
+//                           encapsulated as instance fields and the former inner
+//                           functions are methods.
 //   • initKineticDancer() — thin factory (unchanged call site in main.kinetic.js).
 //
 // Safety & performance notes (unchanged): reduced-motion never runs (factory
@@ -46,28 +46,15 @@ const BAR_WEIGHT = [1.0, 0.35, 0.6, 0.35];   // beat-in-bar accent weighting (do
 const IDLE_BEAT_PERIOD = 0.6;                // synthetic ~100bpm grid while no track is locked
 const FACE_SPIN = 0;      // rotation about the (Z-up) vertical to face the camera
 
-// materials / aura palette
+// materials
 const ARMADRILLO_TINT = 0x22d3ee;   // site accent cyan
-const AURA_CORE = 0xcaf6ff;   // white-hot cyan core (theme)
-const AURA_FLAME = 0x22d3ee;  // site accent cyan flame column
 
 // ambient crowd + featured placement
 const AMBIENT_MIN_WIDTH = 768;       // tablet + desktop only; phones skip entirely
 const AMBIENT_MIN = 5;
 const AMBIENT_SCALE_BASE = 0.34;     // fraction of the armadrillo's duet fit scale → scattered-crowd size
 const MIN_NDC_SEP = 0.36;
-const FEATURED_SCALE_MULT = 0.32;   // featured dancer displayed small; giant sizes off the FULL baseScale, not this
-
-// giant presenter
-const CROWD_START_DELAY = 2;         // seconds after the HUD appears before the first small armadrillo
-const WELCOME_SECONDS = 3;           // HUD appears this long after gate-unlock — a FIXED timer
-const GIANT_FADE_SECONDS = 0.55;     // giant fade in/out duration (opacity ramp)
-const GIANT_SCALE_MULT = 1.5;        // × Way Big's OWN fit → humongous but head + torso stay in frame
-const GIANT_NDC_X = 0;
-const GIANT_HEAD_NDC = 0.05;         // screen NDC-y the head BONE pins to → face reads ~centre
-const GIANT_MAX_OPACITY = 1.0;       // Way Big body FULLY opaque
-const DROP_ON = 0.55, DROP_OFF = 0.42;        // hysteresis band on appState.lightshow.drop (0..1)
-const DROP_BURST_SECONDS = 4.5;               // capped takeover per drop EDGE
+const FEATURED_SCALE_MULT = 0.32;   // featured dancer displayed small
 
 // Which partner shares the featured stage (see git history). false → lone armadrillo.
 const SHOW_FAIRY_PUNK = false;
@@ -106,24 +93,6 @@ const RIG_B = {
   armZSign: 1,
   faceSpin: Math.PI,
   fitH: 0.5, fitW: 0.44,
-};
-const RIG_WAYBIG = {
-  url: 'assets/scene/waybig/scene.gltf',
-  nameOf: {
-    pelvis: 'Hips', spine: 'Spine', chest: 'Spine1', upperChest: 'Spine2',
-    neck: 'Neck', head: 'Head',
-    shoulderL: 'LeftShoulder', upperArmL: 'LeftArm', forearmL: 'LeftForeArm', handL: 'LeftHand',
-    shoulderR: 'RightShoulder', upperArmR: 'RightArm', forearmR: 'RightForeArm', handR: 'RightHand',
-    // L/R legs SWAPPED vs the arms (Way Big's leg-bone axes read mirrored under
-    // the analytic retarget) so a move's left-leg step lands on the leg that
-    // reads as left on screen. (Arms are correct as-is.)
-    thighL: 'RightUpLeg', shinL: 'RightLeg', footL: 'RightFoot',
-    thighR: 'LeftUpLeg', shinR: 'LeftLeg', footR: 'LeftFoot',
-  },
-  extraRoles: ['upperChest', 'shoulderL', 'shoulderR', 'handL', 'handR'],
-  posScale: 0.9,
-  faceSpin: Math.PI / 2,
-  fitH: 0.56, fitW: 0.5,
 };
 
 // Probe proxy rotations for the auto-vs-manual measurement.
@@ -749,9 +718,9 @@ function weightedPick(names, weights) {
 // A plain data holder: the rig-agnostic proxy/adapter set, the loaded model +
 // groups, this rig's move-selection state, its persistent asymmetry, and the
 // calibrated fit placeDuet re-derives from each frame. The ambient crowd clones
-// and the Way Big giant use structurally-identical plain objects (built inline
-// in buildAmbientInstance / onGiantLoaded) since they carry a few extra
-// lifecycle fields; dance()/applyRig()/placeDuet() duck-type across all of them.
+// use structurally-identical plain objects (built inline in buildAmbientInstance)
+// since they carry a few extra lifecycle fields; dance()/applyRig()/placeDuet()
+// duck-type across all of them.
 class Rig {
   constructor(cfg) {
     this.cfg = cfg;
@@ -780,10 +749,9 @@ class KineticDancer {
 
     // shared materials (both rigs): chrome body matcap + wireframe accent
     this.chromeMatcapTex = this.makeChromeMatcap();
-    this.auraTex = this.makeAuraTexture();
     this.chromeMats = [];
     this.wireMat = new THREE.MeshBasicMaterial({ color: 0x66f0ff, wireframe: true, transparent: true, opacity: 0.14, blending: THREE.AdditiveBlending, depthWrite: false, skinning: true });
-    this.disposables = [this.wireMat, this.chromeMatcapTex, this.auraTex];
+    this.disposables = [this.wireMat, this.chromeMatcapTex];
 
     // lifecycle
     this.running = true; this.raf = 0; this.dead = false;
@@ -802,19 +770,7 @@ class KineticDancer {
     this._box = new THREE.Box3();
     this._vec = new THREE.Vector3();
 
-    // giant presenter
-    this.giant = null; this.giantLoading = false; this.giantFailed = false;
-    this.giantOpacity = 0; this.giantDropHi = false; this.dropBurstTimer = 0;
     this.crowdReady = false; this.crowdArmed = false; this.crowdArmTimer = 0;
-    this.presenterShown = false;
-    this.welcomeArmed = false; this.welcomeStarted = false; this.welcomeTimer = 0;
-
-    // Arm the welcome on the gate-open signal kinetic.js dispatches.
-    if (window.__kineticGateOpen) {
-      this.welcomeArmed = true;
-    } else {
-      window.addEventListener('kinetic-gate-open', () => { this.welcomeArmed = true; }, { once: true });
-    }
 
     // shared music-driven state (both rigs read the same beat/energy)
     this.energy = 0.28; this.phase = 0;
@@ -904,21 +860,6 @@ class KineticDancer {
     const tex = new THREE.CanvasTexture(c);
     tex.needsUpdate = true;
     return tex;
-  }
-
-  // Soft radial glow for the giant's aura sprites (one texture, reused).
-  makeAuraTexture() {
-    const THREE = this.THREE;
-    const s = 128, c = document.createElement('canvas');
-    c.width = c.height = s;
-    const x = c.getContext('2d');
-    const g = x.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-    g.addColorStop(0, 'rgba(255,255,255,1)');
-    g.addColorStop(0.25, 'rgba(255,255,255,0.82)');
-    g.addColorStop(0.6, 'rgba(255,255,255,0.22)');
-    g.addColorStop(1, 'rgba(255,255,255,0)');
-    x.fillStyle = g; x.fillRect(0, 0, s, s);
-    const t = new THREE.CanvasTexture(c); t.needsUpdate = true; return t;
   }
 
   // One chrome material PER UNIQUE diffuse texture (or the map-less armadrillo
@@ -1389,7 +1330,6 @@ class KineticDancer {
     } else if (this.ambientEnabled) {
       this.ambientEnabled = false;
       this.despawnAllAmbient();
-      this.resetPresenter();           // never leave the HUD hidden behind a frozen giant
       this.ambientNeedsClear = true;   // one final render to clear the canvas to transparent
     }
   }
@@ -1485,7 +1425,7 @@ class KineticDancer {
   activateInstance(inst) {
     const [ndcX, ndcY] = this.pickSpacedNDC(inst);
     inst.ndcX = ndcX; inst.ndcY = ndcY;                    // remembered so later spawns space off it
-    const dist = 9.5 + Math.random() * 6.0;                // DEEP (9.5–15.5) — behind the giant (~8.4)
+    const dist = 9.5 + Math.random() * 6.0;                // DEEP (9.5–15.5) — background layer
     this.placeAtNDC(inst, ndcX, ndcY, dist);
     inst.rigGroup.rotation.x = 0; inst.rigGroup.rotation.z = 0;
     inst.rigGroup.rotation.y = (Math.random() * 2 - 1) * 1.2;   // scattered facing (mostly toward camera)
@@ -1588,225 +1528,12 @@ class KineticDancer {
       const inst = this.ambientPool[i];
       if (inst.rigGroup && this.ambientScene) { try { this.ambientScene.remove(inst.rigGroup); } catch (_) {} }
     }
-    if (this.giant && this.giant.rigGroup && this.ambientScene) { try { this.ambientScene.remove(this.giant.rigGroup); } catch (_) {} }
-    this.giant = null; this.giantLoading = false; this.giantFailed = false;
-    try { this.resetPresenter(); } catch (_) {}
     for (let i = 0; i < this.ambientDisposables.length; i++) { try { this.ambientDisposables[i].dispose(); } catch (_) {} }
     this.ambientDisposables.length = 0;
     this.ambientPool.length = 0;
     this.ambientEnabled = false;
     try { this.ambientRenderer && this.ambientRenderer.dispose(); } catch (_) {}
     this.ambientRenderer = null;
-  }
-
-  // ── GIANT presenter build + per-frame state machine ─────────────────────
-  // Kick the reserved giant's LAZY, one-shot load (its OWN Way Big glTF).
-  buildGiant() {
-    const THREE = this.THREE;
-    if (this.giant || this.giantLoading || this.giantFailed || this.dead) return this.giant;
-    if (!this.ambientScene || !this.ambientCamera || !THREE.GLTFLoader) return null;
-    this.giantLoading = true;
-    const loader = new THREE.GLTFLoader();
-    try {
-      if (THREE.DRACOLoader) {
-        const draco = new THREE.DRACOLoader();
-        draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
-        loader.setDRACOLoader(draco);
-      }
-    } catch (_) { /* DRACO optional — Way Big is not draco-compressed */ }
-    loader.load(RIG_WAYBIG.url,
-      (gltf) => { try { this.onGiantLoaded(gltf); } catch (_) { this.giantFailed = true; } this.giantLoading = false; },
-      undefined,
-      () => { this.giantFailed = true; this.giantLoading = false; /* load error → presenter stays absent, fail safe */ });
-    return null;
-  }
-
-  // Build the Way Big giant from its loaded glTF (own materials/rig/dance state).
-  onGiantLoaded(gltf) {
-    const THREE = this.THREE;
-    if (this.dead || this.giant || !this.ambientScene || !this.ambientCamera) return;
-    const model = gltf.scene;
-
-    // static placement group. Way Big imports UPRIGHT → only the facing spin.
-    const rigGroup = new THREE.Group();
-    rigGroup.rotation.y = (RIG_WAYBIG.faceSpin != null) ? RIG_WAYBIG.faceSpin : 0;
-    const turnGroup = new THREE.Group();   // b.root — dance()'s slow 3/4 turn pivot
-    rigGroup.add(turnGroup);
-    turnGroup.add(model);
-
-    // Chrome on every mesh (own INSTANCES) — Way Big keeps its OWN colours (real
-    // diffuse texture preserved, __base white so beat-illum modulates brightness).
-    const chromeMats = [], wireMats = [], skinnedMeshes = [];
-    const meshList = [];
-    model.traverse((o) => { if (o.isMesh || o.isSkinnedMesh) meshList.push(o); });
-    for (const o of meshList) {
-      const srcMat = o.material;
-      const map = srcMat && srcMat.map ? srcMat.map : null;
-      const opts = { matcap: this.chromeMatcapTex, color: 0xffffff, skinning: true, transparent: true, opacity: 0 };
-      if (map) opts.map = map;                                   // Way Big's real texture
-      if (srcMat && srcMat.alphaTest) opts.alphaTest = srcMat.alphaTest;
-      if (srcMat && srcMat.side !== undefined) opts.side = srcMat.side;
-      const mat = new THREE.MeshMatcapMaterial(opts);
-      mat.__base = new THREE.Color(0xffffff);   // white → beat-illum modulates brightness, texture colours preserved
-      o.material = mat;
-      o.frustumCulled = false;
-      chromeMats.push(mat); this.ambientDisposables.push(mat);
-      if (o.isSkinnedMesh) skinnedMeshes.push(o);
-      const wireOverlay = o.clone();
-      const w = this.wireMat.clone(); w.transparent = true; w.opacity = 0;
-      wireOverlay.material = w;
-      wireOverlay.frustumCulled = false;
-      wireOverlay.renderOrder = (o.renderOrder || 0) + 1;
-      wireMats.push(w); this.ambientDisposables.push(w);
-      if (o.parent) o.parent.add(wireOverlay);
-    }
-
-    // Retarget via the portable engine, ANALYTIC path (NO axis-map hints).
-    const proxies = createProxyRig(THREE);
-    const driveRoles = RIG_WAYBIG.extraRoles ? CORE_ROLES.concat(RIG_WAYBIG.extraRoles) : CORE_ROLES;
-    const rig = buildRig(THREE, { model, nameOf: RIG_WAYBIG.nameOf, driveRoles, hints: {}, proxies });
-    const bones = { root: turnGroup };
-    for (const role in proxies) bones[role] = proxies[role];
-
-    const inst = {
-      cfg: RIG_WAYBIG,
-      rigGroup, turnGroup, model, skinnedMeshes,
-      proxies, adapters: rig.adapters, pelvisBone: rig.pelvisBone, pelvisBind: rig.pelvisBind,
-      bones, chromeMats, wireMats, retargetReport: rig.report,
-      headBone: (rig.boneByRole && rig.boneByRole.head) || null,   // real head bone → per-frame head-centre pin
-      // dance state (mirrors Rig's animated fields)
-      currentMove: MOVE_TABLE.grooveSway, currentMoveName: 'grooveSway',
-      moveStartBeat: 0, moveMirror: 1, prevDrop: false, moveAmp: 1, movePhaseOfs: 0,
-      headTrail: 0, idlePhase: 2.4, leanSign: -1,
-      baseX: 0, baseY: 0, baseZ: 0, baseScale: 1,
-      fitX: 0, fitY: 0, fitZ: 0, frameBonesCache: null,
-    };
-    rigGroup.visible = false;
-    this.ambientScene.add(rigGroup);
-
-    // Fit Way Big to ITS OWN proportions (frameModel scales rigGroup + captures fit).
-    this.frameModel(inst, rig.boneByRole);
-
-    // Measure the head-top offset ONCE, AFTER frameModel, in UNSCALED rigGroup-local units.
-    rigGroup.updateMatrixWorld(true);
-    this._box.setFromObject(model);
-    const gs = rigGroup.scale.y || 1;
-    inst.headTopLocal = this._box.isEmpty() ? 1.72 : (this._box.max.y - rigGroup.position.y) / gs;
-
-    // Super-Saiyan aura: two additive billboard glows parented to the rig.
-    const H = inst.headTopLocal || 1.72;
-    const mkAura = (color, w, h, y, baseOp) => {
-      const m = new THREE.SpriteMaterial({ map: this.auraTex, color, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false });
-      const sp = new THREE.Sprite(m);
-      sp.scale.set(H * w, H * h, 1);
-      sp.position.set(0, H * y, 0);
-      sp.renderOrder = 20;   // ON TOP — the cyan energy glows OVER the body
-      sp.userData = { bw: H * w, bh: H * h, baseOp };
-      rigGroup.add(sp);
-      this.ambientDisposables.push(m);
-      return sp;
-    };
-    inst.auraSprites = [
-      mkAura(AURA_CORE, 1.5, 1.9, 0.55, 0.9),
-      mkAura(AURA_FLAME, 1.0, 2.8, 0.85, 0.7),
-    ];
-
-    this.giant = inst;
-  }
-
-  // Centre + size the giant against the LIVE camera each frame it shows.
-  placeGiant() {
-    const THREE = this.THREE;
-    const giant = this.giant;
-    if (!giant || !this.ambientCamera) return;
-    const dist = Math.abs(this.ambientCamera.position.z - (giant.fitZ || 0)) || 8.4;
-    const scale = (giant.baseScale || 1) * GIANT_SCALE_MULT;
-    this.placeAtNDC(giant, GIANT_NDC_X, 0, dist);   // centre X (+ baseX/baseZ); Y overridden below
-    giant.rigGroup.scale.setScalar(scale);
-    const worldPerNDC = Math.tan(THREE.MathUtils.degToRad(this.ambientCamera.fov / 2)) * dist;
-    const targetY = this.ambientCamera.position.y + GIANT_HEAD_NDC * worldPerNDC;
-    giant.baseY = targetY - scale * (giant.headTopLocal || 1);   // feet drop so head reaches target
-    giant.rigGroup.position.y = giant.baseY;
-    giant.rigGroup.rotation.y = (giant.cfg.faceSpin != null) ? giant.cfg.faceSpin : 0;
-  }
-
-  // Force the presenter off the stage + restore the HUD.
-  resetPresenter() {
-    this.giantOpacity = 0; this.giantDropHi = false; this.welcomeTimer = 0; this.dropBurstTimer = 0;
-    if (this.giant && this.giant.rigGroup) this.giant.rigGroup.visible = false;
-    if (this.presenterShown) { document.documentElement.classList.remove('hud-hidden'); this.presenterShown = false; }
-  }
-
-  // Presenter state machine (per frame, only while the shared context is live).
-  updateGiant(dt, now, clk) {
-    const THREE = this.THREE;
-    if (this.dead || !this.ambientRenderer) return;
-    if (!this.giant) this.buildGiant();
-
-    // start the (one-shot) welcome once armed AND the model is ready.
-    if (this.welcomeArmed && !this.welcomeStarted && this.giant) {
-      this.welcomeStarted = true; this.welcomeArmed = false; this.welcomeTimer = WELCOME_SECONDS;
-    }
-    let welcomeActive = false;
-    if (this.welcomeTimer > 0) { welcomeActive = true; this.welcomeTimer -= dt; }
-    if (this.welcomeStarted && this.welcomeTimer <= 0 && !this.crowdArmed) { this.crowdArmed = true; this.crowdArmTimer = CROWD_START_DELAY; }
-
-    // The giant is on stage whenever the HUD is HIDDEN: during the welcome, AND
-    // while the mouse is idle. NOT on high beats (that takeover was removed).
-    const idleActive = document.documentElement.classList.contains('hud-idle');
-    const show = !!this.giant && (welcomeActive || idleActive);
-    if (show !== this.presenterShown) {
-      document.documentElement.classList.toggle('hud-hidden', show);
-      this.presenterShown = show;
-      if (!show) { try { window.dispatchEvent(new CustomEvent('kinetic-hud-shown')); } catch (_) {} }
-    }
-    if (!this.giant) return;
-    const giant = this.giant;
-
-    // eased fade toward shown/hidden
-    const stepAmt = dt / GIANT_FADE_SECONDS;
-    const target = show ? 1 : 0;
-    if (this.giantOpacity < target) this.giantOpacity = Math.min(target, this.giantOpacity + stepAmt);
-    else if (this.giantOpacity > target) this.giantOpacity = Math.max(target, this.giantOpacity - stepAmt);
-
-    const vis = this.giantOpacity > 0.001;
-    giant.rigGroup.visible = vis;
-    if (!vis) return;   // fully faded → skip the heavy skinning work
-
-    this.placeGiant();
-    // beat illumination (same formula as the duet/crowd), scaled by the fade
-    const glow = Math.min(1, 0.15 + this.energy * 0.3 + this.beatAccent * 0.4);
-    const wireOp = Math.min(0.5, 0.06 + glow * 0.28);
-    const chromeCol = Math.min(1, 0.62 + glow * 0.38);
-    try {
-      for (let j = 0; j < giant.chromeMats.length; j++) { const m = giant.chromeMats[j]; m.opacity = this.giantOpacity * GIANT_MAX_OPACITY; if (m.__base) m.color.copy(m.__base).multiplyScalar(chromeCol); else m.color.setScalar(chromeCol); }
-      for (let j = 0; j < giant.wireMats.length; j++) giant.wireMats[j].opacity = wireOp * this.giantOpacity * 0.4;   // dim the wire so the SOLID body dominates
-      // Super-Saiyan aura: base glow + a hard FLARE on the beat, fast flicker, and a scale swell.
-      if (giant.auraSprites) {
-        const beat = Number.isFinite(this.beatAccent) ? this.beatAccent : 0;
-        const flick = 0.8 + 0.2 * Math.sin(now * 30);
-        const lvl = this.giantOpacity * (0.3 + 0.9 * beat) * flick;
-        const pulse = 1 + 0.3 * beat;
-        for (const sp of giant.auraSprites) {
-          sp.material.opacity = Math.min(1, lvl * sp.userData.baseOp);
-          sp.scale.set(sp.userData.bw * pulse, sp.userData.bh * pulse, 1);
-        }
-      }
-      this.dance(giant, dt, now, clk);       // same engine, own rigState → own move/phase
-      this.applyRig(giant);                  // proxy joints → real bones (retarget)
-      giant.rigGroup.updateMatrixWorld(true);
-      // HEAD-CENTRE PIN: read the REAL head bone's world position and shift the
-      // whole rig so the head lands at GIANT_HEAD_NDC (self-correcting).
-      if (giant.headBone) {
-        giant.headBone.getWorldPosition(this._vec);
-        const dist = Math.abs(this.ambientCamera.position.z - (giant.fitZ || 0)) || 8.4;
-        const worldPerNDC = Math.tan(THREE.MathUtils.degToRad(this.ambientCamera.fov / 2)) * dist;
-        const targetY = this.ambientCamera.position.y + GIANT_HEAD_NDC * worldPerNDC;
-        giant.rigGroup.position.y += (targetY - this._vec.y);
-        giant.rigGroup.updateMatrixWorld(true);
-      }
-      for (let j = 0; j < giant.skinnedMeshes.length; j++) { const sk = giant.skinnedMeshes[j].skeleton; if (sk) sk.update(); }
-    } catch (_) { /* a giant failure must never take down the RAF */ }
   }
 
   // ── main loop ──────────────────────────────────────────────────────────
@@ -1832,14 +1559,12 @@ class KineticDancer {
     if (!Number.isFinite(clk.tempoScale) || clk.tempoScale <= 0) clk.tempoScale = 1;
     if (!Number.isFinite(clk.strength)) clk.strength = 0.6;
 
-    // ── featured armadrillo + ambient crowd + Way Big giant: ONE shared context ─
+    // ── featured armadrillo + ambient crowd: ONE shared context ─
     if (this.ambientRenderer && this.rigA.modelReady) {
       if (this.ambientEnabled) {
         for (let i = 0; i < this.rigs.length; i++) {
           const rigState = this.rigs[i];
           if (!rigState.modelReady || !rigState.bones) continue;   // that rig's load hasn't landed yet
-          // Hide the featured dancer while the presenter giant holds the stage.
-          if (this.presenterShown) { rigState.rigGroup.visible = false; continue; }
           rigState.rigGroup.visible = true;
 
           this.placeDuet(rigState, now);       // full-screen anchor placement
@@ -1862,8 +1587,6 @@ class KineticDancer {
 
         // Ambient armadrillo crowd — only once the clone-source (rigA) has loaded.
         if (this.rigA.modelReady) this.updateAmbient(dt, now, clk);
-        // Giant "presenter" — runs after the crowd so it paints last.
-        this.updateGiant(dt, now, clk);
       }
       if (this.ambientEnabled || this.ambientNeedsClear) {
         this.ambientRenderer.render(this.ambientScene, this.ambientCamera);
@@ -1913,11 +1636,9 @@ class KineticDancer {
       // current choreography move per dancer (`move` = back-compat name for dancer A)
       get move() { return self.rigA.currentMoveName; },
       get moveB() { return self.rigB.currentMoveName; },
-      get moveGiant() { return self.giant ? self.giant.currentMoveName : null; },   // the Way Big presenter
       get readyA() { return self.rigA.modelReady; },
       get readyB() { return self.rigB.modelReady; },
-      get readyGiant() { return !!self.giant; },   // Way Big glTF loaded + rigged
-      get retargetReport() { return { a: self.rigA.retargetReport, b: self.rigB.retargetReport, giant: self.giant ? self.giant.retargetReport : null }; },
+      get retargetReport() { return { a: self.rigA.retargetReport, b: self.rigB.retargetReport }; },
     };
 
     this.raf = requestAnimationFrame(this.frame);
