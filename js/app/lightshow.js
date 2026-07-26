@@ -69,7 +69,11 @@ class LightShow {
     this.ENV = null;
     fetch('assets/audio/techno/envelopes.json').then(r => r.ok ? r.json() : null).then(j => { this.ENV = j; }).catch(() => {});
 
-    this.state = { energy: 0.3 };
+    // beatSeq is a monotonic counter, bumped once per HIGH beat (an onset landing
+    // in a high-energy section — same gate the strobe uses). Consumers watch it for
+    // change rather than sampling a decaying level, so a beat can be neither missed
+    // between frames nor counted twice. The MilkDrop viz cuts presets on it.
+    this.state = { energy: 0.3, beatSeq: 0 };
     appState.lightshow = this.state;
 
     // The overlay: a fixed, pointer-transparent, pure-white sheet whose opacity is
@@ -585,6 +589,9 @@ class LightShow {
     if (m && m.audio && !m.paused) burst = this.onsetHit(m.audio._trackName, m.audio.currentTime || 0) ? 1 : 0;
     this.beat = Math.max(this.beat * 0.9, burst * ignite); // linger a little so the shimmer reads
     const beat = this.beat;
+    // HIGH beat → bump the sequence. Gated on the same energy threshold as the
+    // strobe, so "high" means the loud sections, not every tick of a quiet intro.
+    if (burst && e >= FLASH_ENERGY_GATE) this.state.beatSeq++;
 
     // expose to the DOM for beat-reactive UI (small-area glow only → flash-safe)
     // Quantize + skip no-op writes: each :root custom-prop write forces a

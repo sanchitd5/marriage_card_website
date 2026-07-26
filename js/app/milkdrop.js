@@ -3,8 +3,9 @@ import { appState } from './state.js';
 
 // ── MilkDrop visualizer (butterchurn) ──────────────────────────────────
 // A classic Winamp-style MilkDrop viz as a tinted background layer that surfaces
-// ONLY on hard musical drops (opacity follows appState.lightshow.drop) and
-// cycles presets. It does NOT tap the live music: routing HTMLAudio through Web
+// ONLY on hard musical drops (opacity follows appState.lightshow.drop) and cuts to
+// a new preset on high beats (appState.lightshow.beatSeq, emitted by the light show
+// on onsets in high-energy sections). It does NOT tap the live music: routing HTMLAudio through Web
 // Audio risked silencing playback (suspended context, iOS silent switch) and
 // leaking source nodes, so butterchurn gets a silent analyser feed instead — its
 // presets animate on their own time, and the drop-gating provides the "reacts to
@@ -28,8 +29,20 @@ const BUTTERCHURN_URL = 'https://cdn.jsdelivr.net/npm/@webamp/butterchurn@3.0.0-
 const PRESETS_URL = 'https://cdn.jsdelivr.net/npm/butterchurn-presets@3.0.0-beta.4/dist/base.min.js';
 const PRESETS_GLOBAL = 'base';
 
-const PRESET_SECONDS = 14;   // change preset every N seconds (while visible)
-const BLEND = 5.5;           // preset crossfade seconds
+// Preset cuts are BEAT-DRIVEN: the viz cuts to the next preset on high beats
+// (appState.lightshow.beatSeq, bumped by the light show once per onset landing in a
+// high-energy section). BLEND is short because a beat-synced cut has to land ON the
+// hit — butterchurn's own 5.5s-style default is for leisurely ambient cycling, and at
+// beat rate it would keep two presets rendering at once (2x GPU) in permanent mush.
+// BEATS_PER_CUT is the cadence dial: 1 = every high beat (as specced); VJ practice
+// (NestDrop, MilkDrop 3) is phrase-aligned 2-4 bars, so raise it to ~4 if the cutting
+// reads as chaos rather than energy. MIN_CUT_MS is a refractory floor — a kick that
+// double-triggers the onset detector must not double-cut, and MilkDrop 3 likewise
+// enforces a minimum gap between hard cuts.
+const BEATS_PER_CUT = 1;     // cut every Nth high beat
+const MIN_CUT_MS = 250;      // ignore beats arriving sooner than this after a cut
+const PRESET_SECONDS = 14;   // fallback: cut anyway if no beat has landed in this long
+const BLEND = 0.4;           // preset crossfade seconds (beat-synced → short)
 const MAX_OPACITY = 0.6;     // opacity at a full drop
 const EPS = 0.02;            // below this the layer is effectively hidden
 
@@ -50,7 +63,9 @@ class Milkdrop {
     this.pi = 0;
     this.running = false;
     this.raf = 0;
-    this.cycleTimer = 0;
+    this.lastSeq = null;   // last beatSeq seen; null = not yet synced (don't cut on join)
+    this.beatsSeen = 0;    // high beats banked since the last cut
+    this.lastCutMs = 0;    // performance.now() of the last cut (refractory + fallback)
     this.lastOp = -1;
     this.resizeTimeoutId = 0;
     this.failedInit = false;
@@ -108,17 +123,10 @@ class Milkdrop {
     if (!this.viz && !this.setup()) return;
     try { const r = this.ctx.resume(); if (r && r.catch) r.catch(() => {}); } catch (e) {} // suspended until a gesture; rejection is fine
     this.running = true;
-    // (Re)arm the preset-cycle timer here rather than in setup() — stop() clears
-    // it, and setup() only runs once, so this is what restores cycling on resume.
-    // Only advances presets while the viz is actually visible (a drop is up).
-    if (!this.cycleTimer) {
-      this.cycleTimer = setInterval(() => {
-        const d = (appState.lightshow && appState.lightshow.drop) || 0;
-        if (!this.running || d < EPS || !this.presets.length) return;
-        this.pi = (this.pi + 1) % this.presets.length;
-        try { this.viz.loadPreset(this.presets[this.pi], BLEND); } catch (e) {}
-      }, PRESET_SECONDS * 1000);
-    }
+    // Beat cuts are driven from the render loop, not a timer: the beat only matters
+    // while the layer is visible, and the loop is already the thing that knows that.
+    this.lastSeq = null;    // resync on resume so a tab-hidden gap can't bank beats
+    this.lastCutMs = performance.now();
     const loop = () => {
       if (!this.running) return;
       const d = Math.min(1, (appState.lightshow && appState.lightshow.drop) || 0);
@@ -128,16 +136,40 @@ class Milkdrop {
       if (op > 0) {
         try { this.viz.render(); } catch (e) {} // render only when visible
         if (this.feedGain) this.feedGain.gain.value = Math.min(1, 0.15 + 0.85 * level); // feed energy level
+        this.beatCut();
+      } else {
+        this.lastSeq = null; // hidden → forget the count, don't cut on the way back in
       }
       this.raf = requestAnimationFrame(loop);
     };
     loop();
   }
 
+  // Cut to the next preset on high beats. Called per frame while visible.
+  beatCut() {
+    if (!this.presets.length) return;
+    const seq = (appState.lightshow && appState.lightshow.beatSeq) || 0;
+    const now = performance.now();
+    if (this.lastSeq === null) { this.lastSeq = seq; return; } // first frame: sync, don't cut
+    if (seq !== this.lastSeq) {
+      // A frame can straddle several beats (or the counter can wrap on a reload), so
+      // bank the delta but clamp it — a stale counter must not fast-forward the deck.
+      const delta = seq - this.lastSeq;
+      this.beatsSeen += delta > 0 && delta <= 4 ? delta : 1;
+      this.lastSeq = seq;
+    }
+    const due = this.beatsSeen >= BEATS_PER_CUT && now - this.lastCutMs >= MIN_CUT_MS;
+    const stale = now - this.lastCutMs >= PRESET_SECONDS * 1000; // no beats (envelope missing) → keep moving
+    if (!due && !stale) return;
+    this.beatsSeen = 0;
+    this.lastCutMs = now;
+    this.pi = (this.pi + 1) % this.presets.length;
+    try { this.viz.loadPreset(this.presets[this.pi], BLEND); } catch (e) {}
+  }
+
   stop() {
     this.running = false;
     cancelAnimationFrame(this.raf);
-    if (this.cycleTimer) { clearInterval(this.cycleTimer); this.cycleTimer = 0; } // don't leak the preset-cycle interval on hidden tabs / after a floor
     if (this.resizeTimeoutId) { clearTimeout(this.resizeTimeoutId); this.resizeTimeoutId = 0; }
   }
 
