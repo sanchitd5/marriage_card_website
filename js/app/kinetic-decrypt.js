@@ -25,7 +25,6 @@
  */
 
 import { REDUCED, $, $$ } from './dom.js';
-import { petalRain } from './celebration.js';
 
 // Same charset as the kinetic scramble-text primitive, so the cipher plate and
 // the heading scrambles read as one system.
@@ -40,6 +39,24 @@ const LATCH_MS = 800;  // "KEY ACCEPTED" dwell before the key retires
 
 const LABEL_IDLE = '[ HOLD TO DECRYPT ]';
 const LABEL_DONE = '[ KEY ACCEPTED ]';
+
+// The countdown ticks toward a date the guest has not been shown yet, which puts
+// the answer above the puzzle. So the counter is held back (CSS hides
+// .count-grid until #countdown carries .kdc-done) and released by the decrypt:
+// crack the date, and the clock to it starts in front of you. initCountdown()
+// runs from page load regardless, so the released cells are already live —
+// nothing is re-initialised here.
+function revealCountdown() {
+  const section = $('#countdown');
+  if (!section || section.classList.contains('kdc-done')) return;
+  section.classList.add('kdc-done');
+  if (!window.gsap || REDUCED) return;
+  gsap.fromTo(
+    $$('.count-cell', section),
+    { opacity: 0, y: 14 },
+    { opacity: 1, y: 0, duration: 0.5, stagger: 0.07, ease: 'power2.out', clearProps: 'transform' },
+  );
+}
 
 // One cipher plate: the scrambling text nodes plus the charge/latch state machine.
 class CipherPlate {
@@ -169,7 +186,11 @@ class CipherPlate {
       const plate = $('.scratch-under', this.root) || this.root;
       gsap.fromTo(plate, { opacity: 0.4 }, { opacity: 1, duration: 0.25, ease: 'expo.out' });
     }
-    if (window.confetti && !REDUCED) petalRain();
+    // No confetti here: a petal/shard burst is the Regency+techno celebration
+    // language and reads as party-popper in a console skin. The payoff is the
+    // CSS flare — one cyan scanline sweep + bloom across the plate (.kdc-flare),
+    // driven by .is-decrypted. Single one-off flash, not a strobe.
+    revealCountdown();
 
     this.setLabel(LABEL_DONE);
     if (this.key) {
@@ -200,6 +221,7 @@ export function initKineticDecrypt() {
   if (REDUCED) {
     plate.settle();
     root.classList.add('is-decrypted');
+    revealCountdown();
     if (key) key.remove();
     return;
   }

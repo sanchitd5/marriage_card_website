@@ -379,13 +379,16 @@
                revealDate=false (the token is the placeholder then). -->
           <div class="scratch kdc fade-up">
             <p class="scratch-prompt">“Some dates drop without warning. This one you get to see coming.”</p>
-            <p class="scratch-hint">Press and hold the key to decrypt</p>
+            <p class="scratch-hint">Press and hold the key — the countdown unlocks with the date</p>
             <div class="scratch-frame">
               <div class="scratch-under" aria-hidden="true">
                 <span class="scratch-date" data-kdc-cipher>{{SCRATCH_DATE}}</span>
                 <span class="scratch-sub" data-kdc-cipher>{{SCRATCH_SUB}}</span>
               </div>
               <p class="kdc-sr">{{SCRATCH_DATE}} — {{SCRATCH_SUB}}</p>
+              <!-- The reveal payoff: one cyan scanline sweep + bloom (CSS only,
+                   no confetti — a shard/petal burst is the wrong register here). -->
+              <span class="kdc-flare" aria-hidden="true"></span>
             </div>
             <button class="kdc-key" id="kdc-key" type="button">
               <span class="kdc-key-label">[ HOLD TO DECRYPT ]</span>
@@ -496,7 +499,9 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollTrigger.min.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js" defer></script>
+<!-- canvas-confetti is deliberately NOT loaded in kinetic: the only caller was the
+     scratch-off reveal, now the hold-to-decrypt plate, whose payoff is a CSS
+     scanline flare. A petal/shard burst reads as party-popper in a console skin. -->
   <script src="https://cdn.jsdelivr.net/npm/vanilla-tilt@1.8.1/dist/vanilla-tilt.min.js" defer></script>
   <!-- three.js drives the techno Path-A WebGL backdrop (reused as the kinetic
        base atmosphere), plus loaders for the drop-triggered 3D scene. -->

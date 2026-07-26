@@ -1436,3 +1436,50 @@ html[data-variant="kinetic"] .kdc.is-nudge .kdc-key { animation: kdc-nudge .26s 
   html[data-variant="kinetic"] .kdc-key { display: none !important; }
   html[data-variant="kinetic"] .kdc .scratch-under { opacity: 1 !important; }
 }
+
+/* ── Reveal payoff: one cyan scanline sweep + bloom across the plate ──────
+   Replaces the shared confetti burst (canvas-confetti is not loaded in kinetic).
+   A single non-repeating flash, local to the ~16/9 plate — well inside the
+   general-flash area threshold, and nothing here strobes. */
+html[data-variant="kinetic"] .kdc-flare {
+  position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: 0;
+  mix-blend-mode: screen;
+  background:
+    linear-gradient(180deg, transparent 0 46%, rgba(var(--accent-rgb), .9) 49% 51%, transparent 54% 100%),
+    radial-gradient(120% 120% at 50% 50%, rgba(var(--accent-rgb), .3), transparent 62%);
+  background-repeat: no-repeat;
+  background-size: 100% 220%, 100% 100%;
+  background-position: 50% -120%, 50% 50%;
+}
+@keyframes kdc-flare {
+  0%   { opacity: 0; background-position: 50% -120%, 50% 50%; }
+  10%  { opacity: 1; }
+  100% { opacity: 0; background-position: 50% 220%, 50% 50%; }
+}
+@keyframes kdc-frame-flash {
+  0%   { border-color: rgba(var(--accent-rgb), .85); box-shadow: 0 0 26px rgba(var(--accent-rgb), .35); }
+  100% { border-color: var(--hairline); box-shadow: var(--shadow-lift); }
+}
+html[data-variant="kinetic"] .kdc.is-decrypted .kdc-flare { animation: kdc-flare .62s cubic-bezier(.16, 1, .3, 1) forwards; }
+html[data-variant="kinetic"] .kdc.is-decrypted .scratch-frame { animation: kdc-frame-flash .5s ease-out; }
+
+/* ── The countdown is the decrypt's payoff, so it does not exist until the
+   date does. Holding it back keeps the answer from sitting above the puzzle:
+   crack the date, and the clock to it materialises. js/app/kinetic-decrypt.js
+   adds .kdc-done to #countdown on latch (and immediately under reduced motion).
+   In the deck path the countdown panel is display:block with the cells in a
+   flex row above the plate, so hiding them leaves no empty column. ── */
+html[data-variant="kinetic"] .countdown .count-grid { display: none; }
+html[data-variant="kinetic"] .countdown.kdc-done .count-grid { display: grid; }
+@media (min-width: 900px) {
+  /* deck path re-flows the released cells into the HUD row (matches the
+     html.k-deck[data-panel="countdown"] .count-grid rule above) */
+  html.k-deck[data-panel="countdown"] .countdown.kdc-done .count-grid { display: flex; }
+  /* non-deck fallback (no GSAP): the techno 2-column split would leave an empty
+     counter column, so the plate takes the full width until it is cracked */
+  html[data-variant="kinetic"]:not(.k-deck) .countdown:not(.kdc-done) .wrap { grid-template-columns: minmax(0, 32rem); }
+  html[data-variant="kinetic"]:not(.k-deck) .countdown:not(.kdc-done) .scratch { grid-column: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-variant="kinetic"] .kdc-flare { display: none !important; }
+}
