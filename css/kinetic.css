@@ -46,16 +46,20 @@
   background: rgba(var(--accent-rgb), .18);
 }
 /* small hairline ring — the "magnetic" element JS eases toward the pointer.
-   Negative margins centre it on the transform origin (JS sets translate(x,y)). */
+   Centring is done ONCE, in JS (kinetic.js sets xPercent/yPercent -50 alongside the
+   quickTo x/y). Do NOT re-centre here with negative margins: that stacked with the
+   JS transform and drew the ring 26px up-and-left of the real pointer, so aiming by
+   the ring missed everything it appeared to be over — the 16px-tall side-menu rows
+   became unclickable. Percent centring also survives the size change on hover,
+   which a hardcoded -13px would not. */
 .k-cursor-ring {
   position: absolute; top: 0; left: 0;
-  width: 26px; height: 26px; margin: -13px 0 0 -13px;
+  width: 26px; height: 26px;
   border: 1px solid rgba(var(--accent-rgb), .55);
   border-radius: 50%;
   /* the ONE transitioned piece — a subtle settle as it catches up to the pointer */
   transition: width var(--k-ease-dur) var(--k-ease),
               height var(--k-ease-dur) var(--k-ease),
-              margin var(--k-ease-dur) var(--k-ease),
               opacity var(--k-ease-dur) var(--k-ease);
 }
 /* tiny mono coordinate label, offset from the ring toward lower-right */
