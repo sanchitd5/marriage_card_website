@@ -45,23 +45,36 @@
   width: 1px; height: 100%;
   background: rgba(var(--accent-rgb), .18);
 }
-/* small hairline ring — the "magnetic" element JS eases toward the pointer.
-   Centring is done ONCE, in JS (kinetic.js sets xPercent/yPercent -50 alongside the
-   quickTo x/y). Do NOT re-centre here with negative margins: that stacked with the
-   JS transform and drew the ring 13px up-and-left of the real pointer (each is a
-   half-box shift of the 26px ring, so they sum to one box-half per axis), so aiming by
-   the ring missed everything it appeared to be over — the 16px-tall side-menu rows
-   became unclickable. Percent centring also survives the size change on hover,
-   which a hardcoded -13px would not. */
-.k-cursor-ring {
+/* The pointer itself — an arrow glyph, since this REPLACES the native cursor
+   (cursor:none below) rather than decorating it. Two rules follow from that:
+
+   1. HOTSPOT AT THE TIP. The arrow's point must sit exactly on the true pointer
+      coordinate, so the shape is drawn with its tip at the box's 0,0 origin and JS
+      translates the box unshifted — NO xPercent/yPercent -50, no negative margins.
+      (Centring a 26px ring on the pointer is what previously drew it 13px up-and-left
+      of the real hit point and made the 16px-tall side-menu rows unclickable.)
+   2. NO EASING. The old ring lagged the pointer by a 0.35s quickTo "settle", which is
+      charming on a decoration and unusable on the thing you aim with. JS writes this
+      element with an instant quickSetter; only the crosshair hairlines and the readout
+      keep their soft character.
+
+   clip-path over inline SVG so the glyph stays in CSS with the rest of the look, and
+   the drop-shadow keeps it legible over the bright MilkDrop presets. */
+.k-cursor-arrow {
   position: absolute; top: 0; left: 0;
-  width: 26px; height: 26px;
-  border: 1px solid rgba(var(--accent-rgb), .55);
-  border-radius: 50%;
-  /* the ONE transitioned piece — a subtle settle as it catches up to the pointer */
-  transition: width var(--k-ease-dur) var(--k-ease),
-              height var(--k-ease-dur) var(--k-ease),
-              opacity var(--k-ease-dur) var(--k-ease);
+  width: 14px; height: 20px;
+  background: rgba(var(--accent-rgb), .92);
+  clip-path: polygon(0 0, 0 80%, 28% 60%, 50% 96%, 74% 86%, 50% 55%, 88% 55%);
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, .85));  /* readable on a lit backdrop */
+  transition: opacity var(--k-ease-dur) var(--k-ease),
+              filter var(--k-ease-dur) var(--k-ease);
+}
+/* over interactive targets: brighten + halo. kinetic.js has always toggled .is-hot
+   here but nothing in css/ styled it, so the hover feedback was dead code. Deliberately
+   NOT a transform — GSAP owns this element's transform for the position write. */
+#k-cursor.is-hot .k-cursor-arrow {
+  background: rgb(var(--accent-rgb));
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, .9)) drop-shadow(0 0 6px rgba(var(--accent-rgb), .55));
 }
 /* tiny mono coordinate label, offset from the ring toward lower-right */
 .k-cursor-read {
@@ -73,10 +86,18 @@
   transition: opacity var(--k-ease-dur) var(--k-ease);
 }
 
-/* hide the native cursor ONLY where the custom crosshair is active (fine pointer
-   with hover) — never on touch, so tap targets keep their default affordance */
+/* Hide the native cursor ONLY where the custom arrow is active (fine pointer with
+   hover) — never on touch, so tap targets keep their default affordance.
+   The universal selector is NOT redundant with the root rule: `cursor` inherits, but
+   any descendant with its OWN cursor wins on specificity — and .k-menu-item, .k-wz-btn
+   and friends all declare `cursor: pointer`. Inheriting `none` from the root therefore
+   left the OS arrow showing over precisely the things you click. Hence `*` + !important,
+   which is the documented pattern for a full cursor replacement. */
 @media (hover: hover) and (pointer: fine) {
-  html[data-variant="kinetic"] { cursor: none; }
+  html[data-variant="kinetic"],
+  html[data-variant="kinetic"] *,
+  html[data-variant="kinetic"] *::before,
+  html[data-variant="kinetic"] *::after { cursor: none !important; }
 }
 /* touch / coarse pointers: no crosshair, restore the native cursor */
 @media (hover: none), (pointer: coarse) {
@@ -260,7 +281,12 @@ html[data-variant="kinetic"] [data-magnetic] { will-change: transform; }
   .k-grain { animation: none; }
   .k-dot { animation: none; }
   #k-cursor { display: none; }
-  html[data-variant="kinetic"] { cursor: auto; }   /* wins over cursor:none above */
+  /* restore the OS cursor — must mirror the universal selector + !important above,
+     or the `*` rule keeps winning and reduced-motion visitors get no cursor at all */
+  html[data-variant="kinetic"],
+  html[data-variant="kinetic"] *,
+  html[data-variant="kinetic"] *::before,
+  html[data-variant="kinetic"] *::after { cursor: auto !important; }
 }
 
 /* ═══ RESPONSIVE — mobile HUD declutter ══════════════════════════

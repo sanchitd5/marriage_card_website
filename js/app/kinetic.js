@@ -525,31 +525,41 @@ class KineticConsole {
       cursor.style.opacity = '0';
       const h = $('.k-cursor-h', cursor);
       const v = $('.k-cursor-v', cursor);
-      const ring = $('.k-cursor-ring', cursor);
+      const arrow = $('.k-cursor-arrow', cursor);
       const read = $('.k-cursor-read', cursor);
-      let ringX = null, ringY = null;
-      if (ring) {
-        gsap.set(ring, { xPercent: -50, yPercent: -50 }); // centre on the pointer
-        ringX = gsap.quickTo(ring, 'x', { duration: 0.35, ease: 'power3' });
-        ringY = gsap.quickTo(ring, 'y', { duration: 0.35, ease: 'power3' });
-      }
+      // The arrow IS the pointer (the native one is hidden), so it is written instantly
+      // and unshifted: its tip is drawn at the element's 0,0, so translate(x,y) puts the
+      // tip on the true coordinate. No xPercent/yPercent centring and no eased quickTo —
+      // both would move the glyph off the actual hit point and make it unaimable.
       const pad4 = n => String(Math.max(0, Math.round(n))).padStart(4, '0');
-      let hTransformSetter, vTransformSetter, readSetter;
+      let hSetY, vSetX, readSetter, arrowSetX, arrowSetY;
       let settersReady = false;
       window.addEventListener('pointermove', e => {
         if (cursor.style.opacity !== '1') cursor.style.opacity = '1';   // reveal on first move
         const { clientX: x, clientY: y } = e;
         if (!settersReady) {
-          if (h) hTransformSetter = gsap.quickSetter(h, 'transform', 'auto');
-          if (v) vTransformSetter = gsap.quickSetter(v, 'transform', 'auto');
-          if (read) readSetter = gsap.quickSetter(read, 'textContent', 'auto');
+          // Set GSAP's OWN transform props (x/y), not a raw `transform` string: CSSPlugin
+          // composes transforms from x/y/rotation/scale and ignores a wholesale transform
+          // value, so `quickSetter(el, 'transform')` wrote nothing. The previous code also
+          // passed 'auto' as the 3rd arg, which is the UNIT — it appended the literal
+          // string ("translateY(450px)auto", "0700 0450auto"). Between the two, the
+          // crosshair hairlines never actually tracked the pointer.
+          if (h) hSetY = gsap.quickSetter(h, 'y', 'px');
+          if (v) vSetX = gsap.quickSetter(v, 'x', 'px');
+          if (arrow) { arrowSetX = gsap.quickSetter(arrow, 'x', 'px'); arrowSetY = gsap.quickSetter(arrow, 'y', 'px'); }
+          if (read) readSetter = gsap.quickSetter(read, 'textContent');
           settersReady = true;
         }
-        if (hTransformSetter) hTransformSetter(`translateY(${y}px)`);
-        if (vTransformSetter) vTransformSetter(`translateX(${x}px)`);
-        if (ringX) { ringX(x); ringY(y); }
+        if (hSetY) hSetY(y);
+        if (vSetX) vSetX(x);
+        if (arrowSetX) { arrowSetX(x); arrowSetY(y); }
         if (readSetter) readSetter(`${pad4(x)} ${pad4(y)}`);
       }, { passive: true });
+
+      // Leaving the window would strand the arrow at the edge — and with the native
+      // cursor suppressed, a stale arrow reads as a frozen page. Hide, then let the
+      // next pointermove reveal it wherever the pointer actually re-entered.
+      document.addEventListener('mouseleave', () => { cursor.style.opacity = '0'; }, { passive: true });
 
       // Grow / recolour the ring over interactive targets (CSS reads .is-hot).
       const HOT = 'a, button, [data-magnetic]';
