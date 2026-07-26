@@ -368,16 +368,29 @@
             <div class="count-cell fade-up"><span class="count-num" id="cd-mins">–</span><span class="count-label">Minutes</span></div>
             <div class="count-cell fade-up"><span class="count-num" id="cd-secs">–</span><span class="count-label">Seconds</span></div>
           </div>
-          <div class="scratch fade-up">
+          <!-- Kinetic replaces the shared foil SCRATCH-OFF with a hold-to-decrypt
+               cipher plate (js/app/kinetic-decrypt.js): a lottery ticket is the
+               wrong metaphor for a console skin. The .scratch/.scratch-frame
+               classes are kept so the techno layout + k-deck HUD brackets apply
+               unchanged; .kdc is the hook for the decrypt layer. The date text
+               ships PLAIN in the markup (and again in the sr-only sibling) — the
+               module ciphers it at runtime, so there is nothing to reveal for
+               no-JS/reduced-motion users, and nothing extra to leak when
+               revealDate=false (the token is the placeholder then). -->
+          <div class="scratch kdc fade-up">
             <p class="scratch-prompt">“Some dates drop without warning. This one you get to see coming.”</p>
-            <p class="scratch-hint">A gentle scratch of your fingertip will do</p>
+            <p class="scratch-hint">Press and hold the key to decrypt</p>
             <div class="scratch-frame">
-              <div class="scratch-under">
-                <span class="scratch-date">{{SCRATCH_DATE}}</span>
-                <span class="scratch-sub">{{SCRATCH_SUB}}</span>
+              <div class="scratch-under" aria-hidden="true">
+                <span class="scratch-date" data-kdc-cipher>{{SCRATCH_DATE}}</span>
+                <span class="scratch-sub" data-kdc-cipher>{{SCRATCH_SUB}}</span>
               </div>
-              <canvas id="scratch-canvas" aria-label="Scratch-off panel hiding the wedding date"></canvas>
+              <p class="kdc-sr">{{SCRATCH_DATE}} — {{SCRATCH_SUB}}</p>
             </div>
+            <button class="kdc-key" id="kdc-key" type="button">
+              <span class="kdc-key-label">[ HOLD TO DECRYPT ]</span>
+              <span class="kdc-bar" aria-hidden="true"></span>
+            </button>
           </div>
         </div>
       </section>
