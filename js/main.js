@@ -32,6 +32,6 @@ window.addEventListener('DOMContentLoaded', () => {
   initGsap();
   initPetals();      // no-ops on the techno skin (no tsParticles / #tsparticles)
   initLightshow();   // no-ops off the techno skin (guards on data-skin + #lightshow)
-  initMilkdrop();    // no-ops off techno / if butterchurn CDN absent
+  initMilkdrop();    // async: lazily imports butterchurn; no-ops off techno / if CDN blocked
   initTilt();
 });

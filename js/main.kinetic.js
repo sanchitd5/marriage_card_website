@@ -47,7 +47,7 @@ class KineticApp {
   bootDeferred() {
     initKinetic();       // ScrollSmoother + fade-up + scramble + cursor + HUD + magnetic
     initLightshow();     // techno light show (data-skin==='techno' → runs)
-    initMilkdrop();      // no-ops if butterchurn CDN absent
+    initMilkdrop();      // async: lazily imports butterchurn; no-ops if CDN blocked
     initTilt();          // vanilla-tilt on the event cards ([data-tilt])
     initKineticDancer(); // persistent side wireframe humanoid, dances to the music (own canvas)
     initKineticVideo();  // theme-8 (Taratata) fullscreen visualizer takeover at authored beats

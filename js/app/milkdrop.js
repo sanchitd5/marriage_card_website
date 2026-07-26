@@ -10,6 +10,23 @@ import { appState } from './state.js';
 // presets animate on their own time, and the drop-gating provides the "reacts to
 // the music" feel. Degrades to nothing if the CDN lib / WebGL / AudioContext is
 // unavailable. Off on reduced-motion, off the techno skin, off the weakest GPUs.
+//
+// Engine: @webamp/butterchurn (the maintained MIT fork — upstream butterchurn@2.6.7
+// was last published 2019; the fork compiles preset EEL to WebAssembly, which is
+// where its rendering win comes from). NOT projectM: libprojectM has no maintained
+// WASM build (upstream closed both web-build requests as "not planned"), needs a
+// local Emscripten cross-compile, and is LGPL-2.1 — and Emscripten can only link
+// statically, so shipping it would drag a relink obligation onto a static site.
+//
+// Both libraries are LAZY — imported here after the guards in initMilkdrop() pass,
+// not via <script> tags in the template. They are ~1.1 MB combined and the viz is
+// declined outright on reduced-motion, off-skin, and weak GPUs, so eager tags were
+// paying full freight for visitors who never see a pixel of it.
+const BUTTERCHURN_URL = 'https://cdn.jsdelivr.net/npm/@webamp/butterchurn@3.0.0-beta.5/dist/butterchurn.min.js';
+// `base` = the curated pack (~115 Flexi/Martin/Geiss/Rovastar presets). UMD, so it
+// is loaded as a classic script and read off the global, not `import`ed.
+const PRESETS_URL = 'https://cdn.jsdelivr.net/npm/butterchurn-presets@3.0.0-beta.4/dist/base.min.js';
+const PRESETS_GLOBAL = 'base';
 
 const PRESET_SECONDS = 14;   // change preset every N seconds (while visible)
 const BLEND = 5.5;           // preset crossfade seconds
@@ -18,18 +35,17 @@ const EPS = 0.02;            // below this the layer is effectively hidden
 
 // The visualizer as an object: it owns its own AudioContext + butterchurn viz +
 // preset carousel + RAF, and exposes a start/stop lifecycle the page toggles on
-// tab-visibility. The butterchurn (BC) + presets (BP) libraries are resolved and
-// gated by initMilkdrop() below and handed in, so the class body assumes them
-// present — everything that can decline (reduced-motion, wrong skin, weak GPU,
-// missing CDN lib) is a guard in the factory, not a branch in here.
+// tab-visibility. The butterchurn factory (BC) + the shuffled preset list are
+// resolved and gated by initMilkdrop() below and handed in, so the class body
+// assumes them present — everything that can decline (reduced-motion, wrong skin,
+// weak GPU, no WebGL2, CDN unreachable) is a guard in the factory, not in here.
 class Milkdrop {
-  constructor(canvas, BC, BP) {
+  constructor(canvas, BC, presets) {
     this.canvas = canvas;
     this.BC = BC;
-    this.BP = BP;
     this.ctx = null;
     this.viz = null;
-    this.presets = [];
+    this.presets = presets;
     this.pi = 0;
     this.running = false;
     this.raf = 0;
@@ -51,12 +67,7 @@ class Milkdrop {
       this.viz = this.BC.createVisualizer(this.ctx, this.canvas, { width: innerWidth, height: innerHeight, pixelRatio: dpr, textureRatio: 1 });
       if (sink) this.viz.connectAudio(sink);
     } catch (e) { this.viz = null; if (this.ctx.close) this.ctx.close().catch(() => {}); this.ctx = null; this.failedInit = true; return false; }
-    try {
-      const all = this.BP.getPresets();
-      this.presets = Object.keys(all).map((k) => all[k]);
-      for (let i = this.presets.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [this.presets[i], this.presets[j]] = [this.presets[j], this.presets[i]]; }
-      if (this.presets.length) this.viz.loadPreset(this.presets[0], 0);
-    } catch (e) { /* presets optional */ }
+    try { if (this.presets.length) this.viz.loadPreset(this.presets[0], 0); } catch (e) { /* presets optional */ }
     return true;
   }
 
@@ -102,7 +113,34 @@ class Milkdrop {
   }
 }
 
-export function initMilkdrop() {
+// Load a classic (non-module) script once. Used for the UMD preset pack, which
+// has no ESM entry — importing it as a module would leave an empty namespace and
+// only work by side effect, so ask for the script semantics it was built for.
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing) { existing.dataset.loaded ? resolve() : existing.addEventListener('load', () => resolve(), { once: true }); return; }
+    const s = document.createElement('script');
+    s.src = src;
+    s.addEventListener('load', () => { s.dataset.loaded = '1'; resolve(); }, { once: true });
+    s.addEventListener('error', () => reject(new Error(`failed to load ${src}`)), { once: true });
+    document.head.appendChild(s);
+  });
+}
+
+// Flatten whatever the preset pack global turned out to be into a shuffled array.
+// `base` is bundled from `export default presets`, so the UMD global is the webpack
+// namespace ({default, __esModule}); the older packs exposed getPresets(). Accept
+// all three shapes so a pack swap doesn't need a code change.
+function collectPresets(g) {
+  const map = (g && typeof g.getPresets === 'function' && g.getPresets()) || (g && g.default) || g;
+  if (!map || typeof map !== 'object') return [];
+  const list = Object.keys(map).map((k) => map[k]).filter(Boolean);
+  for (let i = list.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [list[i], list[j]] = [list[j], list[i]]; }
+  return list;
+}
+
+export async function initMilkdrop() {
   if (REDUCED) return;
   if (document.documentElement.dataset.skin !== 'techno') return;
   const canvas = $('#milkdrop');
@@ -110,11 +148,19 @@ export function initMilkdrop() {
   // Skip the weakest devices — butterchurn is a second full-screen WebGL context.
   const cores = navigator.hardwareConcurrency || 4, mem = navigator.deviceMemory || 4;
   if (cores < 4 || mem < 4) return;
-  const BC = window.butterchurn && (window.butterchurn.createVisualizer ? window.butterchurn : window.butterchurn.default);
-  const BP = window.butterchurnPresets && (window.butterchurnPresets.getPresets ? window.butterchurnPresets : window.butterchurnPresets.default);
-  if (!BC || !BP || typeof BC.createVisualizer !== 'function') return;
+  // butterchurn 3 is WebGL2-only. Probe before pulling ~1.1 MB over the wire.
+  try { if (!document.createElement('canvas').getContext('webgl2')) return; } catch (e) { return; }
+  if (!(window.AudioContext || window.webkitAudioContext)) return;
 
-  const milkdrop = new Milkdrop(canvas, BC, BP);
+  let BC, presets;
+  try {
+    const [mod] = await Promise.all([import(BUTTERCHURN_URL), loadScript(PRESETS_URL)]);
+    BC = mod.default && mod.default.createVisualizer ? mod.default : mod;
+    presets = collectPresets(window[PRESETS_GLOBAL]);
+  } catch (e) { return; } // CDN blocked / offline → no viz, page unaffected
+  if (!BC || typeof BC.createVisualizer !== 'function' || !presets.length) return;
+
+  const milkdrop = new Milkdrop(canvas, BC, presets);
   milkdrop.start();
   document.addEventListener('visibilitychange', () => { if (document.hidden) milkdrop.stop(); else milkdrop.start(); });
   window.addEventListener('resize', () => milkdrop.resize(), { passive: true });
