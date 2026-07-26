@@ -185,12 +185,12 @@ export function initMusicToggle() {
       m.paused = true;
       m.audio.pause();
       if (m.outgoing) m.outgoing.pause();
+      setPlaying(false);
     } else {
       m.paused = false;
-      m.audio.play().catch(() => {});
+      m.audio.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
       if (m.outgoing) m.outgoing.play().catch(() => {});
     }
-    setPlaying(!m.playing);
   });
 }
 

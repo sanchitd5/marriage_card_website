@@ -115,6 +115,10 @@ export function initScratch() {
     if (progress() > 50) reveal();
   });
 
+  // A cancelled pointer (touch scroll / gesture takeover) never fires pointerup —
+  // without this the `down` flag latches on and later moves scratch with no press.
+  window.addEventListener('pointercancel', () => { down = false; });
+
   new ResizeObserver(() => {
     if (!revealed) paintFoil();
   }).observe(frame);

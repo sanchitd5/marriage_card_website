@@ -128,6 +128,10 @@ class LightShow {
     this.lastEQ = ''; this.lastBQ = ''; this.lastDQ = ''; // last :root values written (skip no-op writes)
     this.last = 0;
 
+    // resize debounce + variant cache
+    this.resizeTimeoutId = null;
+    this.variantMode = document.documentElement.dataset.variant;
+
     this.frame = this.frame.bind(this);
   }
 
@@ -178,10 +182,16 @@ class LightShow {
   buildScene() {
     const THREE = this.THREE;
     const canvas = this.canvas;
-    this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: 'high-performance' });
-    // A lost GL context (common after iOS backgrounding) would otherwise freeze a
-    // dead/black backdrop; drop to the CSS fog fallback instead.
-    canvas.addEventListener('webglcontextlost', (ev) => { ev.preventDefault(); this.floor(); }, false);
+    // ONE renderer for the canvas's lifetime. A WebGL context can't be recreated on
+    // the same canvas (dispose() doesn't free it), so a governor rebuild REUSES this
+    // renderer and only rebuilds the scene graph below. The context-loss handler is
+    // attached with it, once, so rebuilds can't stack duplicate handlers.
+    if (!this.renderer) {
+      this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: 'high-performance' });
+      // A lost GL context (common after iOS backgrounding) would otherwise freeze a
+      // dead/black backdrop; drop to the CSS fog fallback instead.
+      canvas.addEventListener('webglcontextlost', (ev) => { ev.preventDefault(); this.floor(); }, false);
+    }
     this.renderer.setPixelRatio(TIERS[this.tier].dpr);
     this.renderer.setSize(innerWidth, innerHeight, false);
     // correct colour + tone mapping so the mecha's PBR chrome reads (without
@@ -400,7 +410,7 @@ class LightShow {
     const THREE = this.THREE;
     // The kinetic skin ships its OWN procedural wireframe dancer (kinetic-dancer.js)
     // as the side figure, so suppress the Regency/techno solid mecha there.
-    if (document.documentElement.dataset.variant === 'kinetic') return;
+    if (this.variantMode === 'kinetic') return;
     if (this.mechaLoading || this.mechaTemplate || !THREE.GLTFLoader || !this.renderer) return; // load on all tiers
     this.mechaLoading = true;
     this.setupMechaScene(); // lights + env on the current scene (idempotent)
@@ -503,6 +513,7 @@ class LightShow {
   }
 
   floor() {
+    if (this.floored) return;   // forceContextLoss() below re-fires webglcontextlost
     this.floored = true; this.measuring = false;
     this.state.drop = 0;              // don't strand the MilkDrop viz visible
     // the RAF is about to stop — clear the white flash so a mid-flash frame
@@ -518,6 +529,12 @@ class LightShow {
     rs.setProperty('--energy', '0.30'); this.lastEQ = '0.30';
     rs.setProperty('--drop', '0.00'); this.lastDQ = '0.00';
     this.disposeGL();
+    // Now really release the context (dispose alone leaves it alive on the canvas).
+    if (this.renderer) {
+      try { this.renderer.forceContextLoss(); } catch (e) {}
+      this.renderer.dispose();
+      this.renderer = null;
+    }
     const amb = $('#ambient'); if (amb) amb.style.display = '';   // CSS fog stands in
     this.canvas.style.display = 'none';
   }
@@ -537,7 +554,8 @@ class LightShow {
     this.dancers = [];
     for (const t of this.sceneTextures) { try { t.dispose(); } catch (e) {} }
     this.sceneTextures = [];
-    if (this.renderer) { this.renderer.dispose(); }
+    // NOT the renderer — it is reused across governor rebuilds (see buildScene).
+    // floor() is what tears it down for good.
     this.scene = this.motes = this.bokeh = this.glow = this.glowCore = null;
   }
 
@@ -674,8 +692,12 @@ class LightShow {
 
   onResize() {
     if (this.floored || !this.renderer) return;
-    this.renderer.setSize(innerWidth, innerHeight, false);
-    this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix();
+    clearTimeout(this.resizeTimeoutId);
+    this.resizeTimeoutId = setTimeout(() => {
+      if (this.floored || !this.renderer) return;
+      this.renderer.setSize(innerWidth, innerHeight, false);
+      this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix();
+    }, 150);
   }
 
   start() { if (!this.running && !this.floored) { this.running = true; this.last = 0; this.raf = requestAnimationFrame(this.frame); } }

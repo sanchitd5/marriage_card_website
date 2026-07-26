@@ -173,6 +173,7 @@ function startHashtagCycle() {
   }
 
   setInterval(() => {
+    if (busy) return;   // a swap is still animating — don't burn this tag's turn
     index = (index + 1) % tags.length;
     sparkleSwap(tags[index]);
   }, 4000);

@@ -27,6 +27,7 @@ export function initGate() {
   window.scrollTo(0, 0);
 
   let opened = false;
+  let fadeDur = 1.3;
 
   // wide (≥768px) breakpoint: serve 16:9 landscape assets for tablet/desktop
   const isWide = () => window.matchMedia('(min-width: 768px)').matches;
@@ -117,7 +118,7 @@ export function initGate() {
     // the hero backdrop already painted underneath.
     if (!hasVideo) {
       gateEl.classList.add('revealing');
-      finish.fadeDur = 1.1;
+      fadeDur = 1.1;
       gsap.timeline()
         .to('.seal', { scale: 1.14, duration: .16, ease: 'power2.in' })
         .to('.seal', { scale: 0, rotate: 26, autoAlpha: 0, duration: .5, ease: 'back.in(1.7)' })
@@ -186,7 +187,7 @@ export function initGate() {
     setTimeout(() => { if (!ending && active.readyState < 2) beginEnd(); }, 1500);
 
     // expose fade duration to finish()
-    finish.fadeDur = FADE;
+    fadeDur = FADE;
   }
 
   function finish(instant) {
@@ -208,7 +209,7 @@ export function initGate() {
     // Pure fade: the gate dissolves out over the hero video already playing
     // behind it. No second video starts here, so nothing to stutter.
     gsap.to(gateEl, {
-      autoAlpha: 0, duration: finish.fadeDur || 1.3, ease: 'power2.inOut',
+      autoAlpha: 0, duration: fadeDur, ease: 'power2.inOut',
       onComplete: () => {
         gateEl.remove();
         unblock();

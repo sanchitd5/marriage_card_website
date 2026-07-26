@@ -35,6 +35,8 @@ class Milkdrop {
     this.raf = 0;
     this.cycleTimer = 0;
     this.lastOp = -1;
+    this.resizeTimeoutId = 0;
+    this.failedInit = false;
   }
 
   setup() {
@@ -48,7 +50,7 @@ class Milkdrop {
     try {
       this.viz = this.BC.createVisualizer(this.ctx, this.canvas, { width: innerWidth, height: innerHeight, pixelRatio: dpr, textureRatio: 1 });
       if (sink) this.viz.connectAudio(sink);
-    } catch (e) { this.viz = null; if (this.ctx.close) this.ctx.close().catch(() => {}); return false; }
+    } catch (e) { this.viz = null; if (this.ctx.close) this.ctx.close().catch(() => {}); this.ctx = null; this.failedInit = true; return false; }
     try {
       const all = this.BP.getPresets();
       this.presets = Object.keys(all).map((k) => all[k]);
@@ -59,7 +61,7 @@ class Milkdrop {
   }
 
   start() {
-    if (this.running) return;
+    if (this.running || this.failedInit) return;
     if (!this.viz && !this.setup()) return;
     this.running = true;
     // (Re)arm the preset-cycle timer here rather than in setup() — stop() clears
@@ -88,10 +90,15 @@ class Milkdrop {
     this.running = false;
     cancelAnimationFrame(this.raf);
     if (this.cycleTimer) { clearInterval(this.cycleTimer); this.cycleTimer = 0; } // don't leak the preset-cycle interval on hidden tabs / after a floor
+    if (this.resizeTimeoutId) { clearTimeout(this.resizeTimeoutId); this.resizeTimeoutId = 0; }
   }
 
   resize() {
-    if (this.viz) { try { this.viz.setRendererSize(innerWidth, innerHeight); } catch (e) {} }
+    if (this.resizeTimeoutId) clearTimeout(this.resizeTimeoutId);
+    this.resizeTimeoutId = setTimeout(() => {
+      this.resizeTimeoutId = 0;
+      if (this.viz) { try { this.viz.setRendererSize(innerWidth, innerHeight); } catch (e) {} }
+    }, 150);
   }
 }
 

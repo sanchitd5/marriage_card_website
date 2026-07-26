@@ -787,6 +787,7 @@ class KineticDancer {
 
     // lifecycle
     this.running = true; this.raf = 0; this.dead = false;
+    this.resizeTimeoutId = null;
 
     // ambient crowd context (shared with the featured duet)
     this.ambientRenderer = null; this.ambientScene = null; this.ambientCamera = null;
@@ -809,7 +810,11 @@ class KineticDancer {
     this.welcomeArmed = false; this.welcomeStarted = false; this.welcomeTimer = 0;
 
     // Arm the welcome on the gate-open signal kinetic.js dispatches.
-    window.addEventListener('kinetic-gate-open', () => { this.welcomeArmed = true; }, { once: true });
+    if (window.__kineticGateOpen) {
+      this.welcomeArmed = true;
+    } else {
+      window.addEventListener('kinetic-gate-open', () => { this.welcomeArmed = true; }, { once: true });
+    }
 
     // shared music-driven state (both rigs read the same beat/energy)
     this.energy = 0.28; this.phase = 0;
@@ -1330,7 +1335,10 @@ class KineticDancer {
   // ── build (evaluate the width gate; the RAF starts in run()) ──────────────
   build() {
     this.evalAmbientGate();
-    window.addEventListener('resize', () => { this.sizeAmbient(); this.evalAmbientGate(); }, { passive: true });
+    window.addEventListener('resize', () => {
+      clearTimeout(this.resizeTimeoutId);
+      this.resizeTimeoutId = setTimeout(() => { this.sizeAmbient(); this.evalAmbientGate(); }, 150);
+    }, { passive: true });
   }
 
   // Lazily create the shared renderer the first time the viewport is wide enough.

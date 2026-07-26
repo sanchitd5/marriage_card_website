@@ -1,6 +1,7 @@
 import { REDUCED, $, $$ } from './dom.js';
 import { appState } from './state.js';
 import { startMusic, attemptAutoFullscreen } from './ui.js';
+import { EASING_CURVE } from './animations.js';
 
 // ── Kinetic layer (saifullah.dev "precision console") ──────────────────
 // A TECHNO-based skin: the heavy engines (lightshow, milkdrop, scratch foil,
@@ -240,6 +241,7 @@ class KineticGate {
       // Signal the gate is fully open so the kinetic dancer can run its giant
       // "presenter" WELCOME (kinetic-dancer.js listens; no-op under reduced
       // motion / no-GSAP, since that module never initialises there).
+      window.__kineticGateOpen = true;
       window.dispatchEvent(new CustomEvent('kinetic-gate-open'));
     };
 
@@ -288,16 +290,9 @@ class KineticConsole {
     return (act.getAttribute('data-hud') || `Panel ${i}`).replace(/^\d+\s*[—-]\s*/, '');
   }
 
-  ringsActive(v) {
-    const r = appState.rings;
-    if (!r) return;
-    if (r.setInView) r.setInView(v); else (v ? r.start : r.stop)?.();
-  }
-
   enterReveals(act) {
     document.documentElement.dataset.panel = this.panelSlug(act);
     if (this.hudSecEl && act.getAttribute('data-hud')) this.hudSecEl.textContent = act.getAttribute('data-hud');
-    if (act.querySelector('#k-rings-stage')) this.ringsActive(true);
     if (this.revealedActs.has(act)) { gsap.set($$('.fade-up', act), { autoAlpha: 1, y: 0 }); return; }
     this.revealedActs.add(act);
     const ups = $$('.fade-up', act);
@@ -306,15 +301,13 @@ class KineticConsole {
     $$('[data-scramble]', act).forEach(el => ScrambleText.run(el, { duration: 1.0 }));
     if (act.querySelector('.interlude-art')) {
       gsap.timeline({ defaults: { ease: 'power3.out' } })
-        .fromTo('.interlude-art', { autoAlpha: 0, y: 60, scale: 0.96 }, { autoAlpha: 1, y: 0, scale: 1, duration: 1.4 })
-        .fromTo('.interlude-line', { autoAlpha: 0, y: 28 }, { autoAlpha: 1, y: 0, duration: 1.0 }, '-=.7');
+        .fromTo($('.interlude-art', act), { autoAlpha: 0, y: 60, scale: 0.96 }, { autoAlpha: 1, y: 0, scale: 1, duration: 1.4 })
+        .fromTo($('.interlude-line', act), { autoAlpha: 0, y: 28 }, { autoAlpha: 1, y: 0, duration: 1.0 }, '-=.7');
     }
     const nums = $$('.count-num', act);
     if (nums.length) gsap.fromTo(nums, { scale: 0.88, autoAlpha: 0 },
       { scale: 1, autoAlpha: 1, duration: 1.2, ease: 'luxe', stagger: 0.12 });
   }
-
-  leaveAct(act) { if (act.querySelector('#k-rings-stage')) this.ringsActive(false); }
 
   go(n) {
     const acts = this.acts;
@@ -322,7 +315,6 @@ class KineticConsole {
     if (n === this.idx || this.busy) return;
     this.busy = true;
     const cur = acts[this.idx], nxt = acts[n];
-    this.leaveAct(cur);
     nxt.classList.add('act-current');
     // Quick console crossfade — no slide, no scroll. The incoming heading
     // scramble-resolves in enterReveals(): a panel switching channels.
@@ -542,13 +534,21 @@ class KineticConsole {
         ringY = gsap.quickTo(ring, 'y', { duration: 0.35, ease: 'power3' });
       }
       const pad4 = n => String(Math.max(0, Math.round(n))).padStart(4, '0');
+      let hTransformSetter, vTransformSetter, readSetter;
+      let settersReady = false;
       window.addEventListener('pointermove', e => {
         if (cursor.style.opacity !== '1') cursor.style.opacity = '1';   // reveal on first move
         const { clientX: x, clientY: y } = e;
-        if (h) h.style.transform = `translateY(${y}px)`;
-        if (v) v.style.transform = `translateX(${x}px)`;
+        if (!settersReady) {
+          if (h) hTransformSetter = gsap.quickSetter(h, 'transform', 'auto');
+          if (v) vTransformSetter = gsap.quickSetter(v, 'transform', 'auto');
+          if (read) readSetter = gsap.quickSetter(read, 'textContent', 'auto');
+          settersReady = true;
+        }
+        if (hTransformSetter) hTransformSetter(`translateY(${y}px)`);
+        if (vTransformSetter) vTransformSetter(`translateX(${x}px)`);
         if (ringX) { ringX(x); ringY(y); }
-        if (read) read.textContent = `${pad4(x)} ${pad4(y)}`;
+        if (readSetter) readSetter(`${pad4(x)} ${pad4(y)}`);
       }, { passive: true });
 
       // Grow / recolour the ring over interactive targets (CSS reads .is-hot).
@@ -570,7 +570,10 @@ export function initKinetic() {
   // The mono clock is cheap and reads well in every path.
   new HudClock().start();
 
-  const noGsap = !window.gsap || !window.ScrollTrigger || !window.ScrollSmoother || !window.SplitText || !window.Flip;
+  // Kinetic deck needs only ScrollTrigger (refresh only; no ScrollSmoother since deck
+  // never scrolls; no SplitText/Flip since unused). Missing optional plugins can't
+  // strand the deck in static fallback.
+  const noGsap = !window.gsap || !window.ScrollTrigger;
   if (noGsap) {
     document.documentElement.classList.add('reduce-motion');
     revealFadeUps();
@@ -579,10 +582,10 @@ export function initKinetic() {
     return;
   }
 
-  gsap.registerPlugin(ScrollTrigger, ScrollSmoother, SplitText, Flip);
+  gsap.registerPlugin(ScrollTrigger);
   gsap.config({ nullTargetWarn: false });
-  // luxury ease from the reference sites: cubic-bezier(.25,1,.5,1)
-  gsap.registerEase('luxe', p => 1 - Math.pow(1 - p, 2.6));
+  // luxury ease: power curve 1-(1-p)^2.6 for smooth elastic deceleration
+  gsap.registerEase('luxe', EASING_CURVE);
 
   if (REDUCED) {
     document.documentElement.classList.add('reduce-motion');

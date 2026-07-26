@@ -1,23 +1,25 @@
 import { REDUCED, $, $$ } from './dom.js';
 import { appState } from './state.js';
 
+export const EASING_CURVE = (p) => 1 - Math.pow(1 - p, 2.6);
+
 export function initGsap() {
   if (!window.gsap) {
     document.documentElement.classList.add('reduce-motion');
     return;
   }
-  // Each scroll/text plugin ships from its own CDN script. If any failed to
-  // load, bail to reduced-motion instead of throwing on a bare global below
+  // Core scroll plugins ship from CDN. If ScrollTrigger or ScrollSmoother failed
+  // to load, bail to reduced-motion instead of throwing on a bare global below
   // (which would also abort initPetals/initTilt in the same DOMContentLoaded).
-  if (!window.ScrollTrigger || !window.ScrollSmoother || !window.SplitText || !window.Flip) {
+  if (!window.ScrollTrigger || !window.ScrollSmoother) {
     document.documentElement.classList.add('reduce-motion');
     return;
   }
 
-  gsap.registerPlugin(ScrollTrigger, ScrollSmoother, SplitText, Flip);
+  gsap.registerPlugin(ScrollTrigger, ScrollSmoother);
   gsap.config({ nullTargetWarn: false });
-  // luxury ease from the reference sites: cubic-bezier(.25,1,.5,1)
-  gsap.registerEase('luxe', p => 1 - Math.pow(1 - p, 2.6));
+  // luxury ease: power curve 1-(1-p)^2.6 for smooth elastic deceleration
+  gsap.registerEase('luxe', EASING_CURVE);
 
   if (REDUCED) {
     document.documentElement.classList.add('reduce-motion');
@@ -285,7 +287,7 @@ export function initGsap() {
     gsap.timeline({ repeat: -1, delay })
       .set(p, { y: '-10vh', x: 0, rotation: 0, opacity: 0 })
       .to(p, { opacity: 0.9, duration: dur * 0.1, ease: 'none' })
-      .to(p, { y: '55vh', x: 30, rotation: 180, opacity: 0.75, duration: dur * 0.4, ease: 'sine.inOut' }, '<')
+      .to(p, { y: '55vh', x: 30, rotation: 180, duration: dur * 0.4, ease: 'sine.inOut' }, '<')
       .to(p, { y: '115vh', x: -20, rotation: 360, opacity: 0, duration: dur * 0.5, ease: 'sine.in' });
   });
 

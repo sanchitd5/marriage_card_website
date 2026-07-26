@@ -23,6 +23,7 @@ class KineticVideo9Takeover {
     this.active = false;      // video currently taking over the scene
     this.hudHidden = false;   // HUD chrome hidden (the 3:00→3:35 solo window)
     this.mutedMusic = null;   // the <audio> we muted, remembered so we can restore it
+    this.lastOpacity = null;   // guard style.opacity writes
     this.frame = this.frame.bind(this);
     try { video.muted = false; } catch (e) {} // it must play its own audio
   }
@@ -50,7 +51,6 @@ class KineticVideo9Takeover {
     this.setActive(false);
     this.setHudHidden(false);
     this.video.style.opacity = '0';
-    if (!this.video.paused) { try { this.video.pause(); } catch (e) {} }
     this.restoreMusic();
   }
 
@@ -65,10 +65,6 @@ class KineticVideo9Takeover {
     // so nothing downloads for other tracks / non-triggering visitors).
     if (!this.loaded) { this.loaded = true; try { video.load(); } catch (e) {} }
 
-    // The video IS the track's audio, so silence the music element (remember it
-    // to restore on track change) and let the video play with sound.
-    if (a.muted !== true) { try { a.muted = true; } catch (e) {} this.mutedMusic = a; }
-
     // Mirror the music element's play/pause so Space / the dock still control it.
     if (a.paused) {
       if (!video.paused) { try { video.pause(); } catch (e) {} }
@@ -76,11 +72,18 @@ class KineticVideo9Takeover {
       try { video.play().catch(() => {}); } catch (e) {}
     }
 
+    // The video IS the track's audio, so silence the music element (remembered so
+    // we can restore it on track change) — but ONLY once the video is genuinely
+    // running. The video plays UNMUTED, so its autoplay can be refused; muting the
+    // music before confirming playback would leave a silent frozen screen.
+    if (!video.paused && a.muted !== true) { try { a.muted = true; } catch (e) {} this.mutedMusic = a; }
+
     // Everything is driven by the VIDEO's own clock.
     const t = video.currentTime;
     this.setActive(true);
     this.setHudHidden(hudHiddenAt(t));
-    video.style.opacity = videoOpacityAt(t).toFixed(3);
+    const opacityStr = videoOpacityAt(t).toFixed(3);
+    if (opacityStr !== this.lastOpacity) { video.style.opacity = opacityStr; this.lastOpacity = opacityStr; }
   }
 
   start() { requestAnimationFrame(this.frame); }

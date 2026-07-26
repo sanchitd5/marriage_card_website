@@ -51,6 +51,7 @@ class KineticVideoTakeover {
     this.loaded = false;    // kick the (preload="none") download once, on track-select
     this.occluding = false; // overlay currently blacking out the UI
     this.videoVis = false;  // video currently painting (opacity > 0)
+    this.lastOpacity = null; // guard style.opacity writes
     this.frame = this.frame.bind(this);
   }
 
@@ -106,7 +107,8 @@ class KineticVideoTakeover {
     const s = takeoverStateAt(t);
     this.setOcclude(s.occlude);
     this.setVideoVis(s.opacity > 0);
-    video.style.opacity = s.opacity.toFixed(3);
+    const opacityStr = s.opacity.toFixed(3);
+    if (opacityStr !== this.lastOpacity) { video.style.opacity = opacityStr; this.lastOpacity = opacityStr; }
   }
 
   start() { requestAnimationFrame(this.frame); }

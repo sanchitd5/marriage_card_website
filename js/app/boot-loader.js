@@ -89,6 +89,13 @@
     if (!vids.length) return [];
 
     return vids.map(function (video) {
+      // The gate reveal clips are owned by gate.js, which picks theme + -wide +
+      // tier itself and calls load(). Rewriting the src here just makes it fetch
+      // the wrong rendition and then fetch again — skip them entirely.
+      if (video.id === 'gate-video-day' || video.id === 'gate-video-night') return Promise.resolve();
+      // preload="none" is a deliberate contract (the kinetic video takeovers): those
+      // clips must not download for visitors who never trigger them. Don't force it.
+      if ((video.getAttribute('preload') || '').toLowerCase() === 'none') return Promise.resolve();
       applyVideoTier(video); // pick rendition before any fetch
       // If metadata is already available, count this video as loaded.
       if (video.readyState >= 1) return Promise.resolve();
