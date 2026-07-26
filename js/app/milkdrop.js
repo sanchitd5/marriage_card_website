@@ -45,6 +45,7 @@ class Milkdrop {
     this.BC = BC;
     this.ctx = null;
     this.viz = null;
+    this.feedGain = null;
     this.presets = presets;
     this.pi = 0;
     this.running = false;
@@ -60,12 +61,43 @@ class Milkdrop {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return false;
     try { this.ctx = new AC(); } catch (e) { return false; }
-    let sink; // silent node — butterchurn needs an audio input, but we never
-    try { sink = this.ctx.createGain(); sink.gain.value = 0; } catch (e) {} // route the music
+    // Synthetic feed: band-limited noise + sine. Real audio risked iOS silence.
+    let feedGain;
+    try {
+      feedGain = this.ctx.createGain();
+      feedGain.gain.value = 0;
+      // 2s of noise, one-pole low-passed (a=0.1 → knee near 800 Hz at 48k) so the
+      // presets' waveform reads as body rather than white-noise hiss.
+      const sr = this.ctx.sampleRate || 48000, len = sr * 2;
+      const buf = this.ctx.createBuffer(1, len, sr);
+      const data = buf.getChannelData(0);
+      let y = 0; const a = 0.1;
+      for (let i = 0; i < len; i++) {
+        const x = Math.random() * 2 - 1;
+        y += (x - y) * a;
+        data[i] = y;
+      }
+      // Loop the noise through feedGain.
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buf;
+      noise.loop = true;
+      noise.connect(feedGain);
+      noise.start(0);
+      // Mix in sub-bass sine (~55 Hz) at quieter gain.
+      const sine = this.ctx.createOscillator();
+      sine.frequency.value = 55;
+      sine.type = 'sine';
+      const sineGain = this.ctx.createGain();
+      sineGain.gain.value = 0.2;
+      sine.connect(sineGain);
+      sineGain.connect(feedGain);
+      sine.start(0);
+      this.feedGain = feedGain;
+    } catch (e) {} // synthetics optional, silent gain fallback OK
     const dpr = Math.min(1.0, window.devicePixelRatio || 1); // cap DPR (perf)
     try {
       this.viz = this.BC.createVisualizer(this.ctx, this.canvas, { width: innerWidth, height: innerHeight, pixelRatio: dpr, textureRatio: 1 });
-      if (sink) this.viz.connectAudio(sink);
+      if (feedGain) this.viz.connectAudio(feedGain);
     } catch (e) { this.viz = null; if (this.ctx.close) this.ctx.close().catch(() => {}); this.ctx = null; this.failedInit = true; return false; }
     try { if (this.presets.length) this.viz.loadPreset(this.presets[0], 0); } catch (e) { /* presets optional */ }
     return true;
@@ -74,6 +106,7 @@ class Milkdrop {
   start() {
     if (this.running || this.failedInit) return;
     if (!this.viz && !this.setup()) return;
+    try { const r = this.ctx.resume(); if (r && r.catch) r.catch(() => {}); } catch (e) {} // suspended until a gesture; rejection is fine
     this.running = true;
     // (Re)arm the preset-cycle timer here rather than in setup() — stop() clears
     // it, and setup() only runs once, so this is what restores cycling on resume.
@@ -89,9 +122,13 @@ class Milkdrop {
     const loop = () => {
       if (!this.running) return;
       const d = Math.min(1, (appState.lightshow && appState.lightshow.drop) || 0);
+      const level = (appState.lightshow && appState.lightshow.energy) || d; // energy drives feed, else drop
       const op = d < EPS ? 0 : +(MAX_OPACITY * d).toFixed(3);
       if (op !== this.lastOp) { this.canvas.style.opacity = op; this.lastOp = op; } // write only on change
-      if (op > 0) { try { this.viz.render(); } catch (e) {} } // render only when it shows pixels
+      if (op > 0) {
+        try { this.viz.render(); } catch (e) {} // render only when visible
+        if (this.feedGain) this.feedGain.gain.value = Math.min(1, 0.15 + 0.85 * level); // feed energy level
+      }
       this.raf = requestAnimationFrame(loop);
     };
     loop();

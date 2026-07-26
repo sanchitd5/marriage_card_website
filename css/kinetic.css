@@ -315,7 +315,7 @@ html[data-variant="kinetic"] .count-cell {
    reactive light wall. (JS drives #milkdrop opacity per frame; a CSS filter
    composes with it without fighting the inline style.) */
 html[data-variant="kinetic"] #milkdrop {
-  filter: saturate(0.35) hue-rotate(155deg) brightness(0.5) contrast(1.02);
+  filter: saturate(0.35) hue-rotate(155deg) brightness(0.5) contrast(1.02) blur(16px); /* blur softens upscale artefact into atmosphere */
 }
 
 /* [#11] Widow/orphan control on the display quotes ("…with us.", "…coming."). */
@@ -1018,7 +1018,11 @@ html.k-deck[data-panel="rsvp"]       #k-dancer-canvas.is-live { opacity: .44; }
 html.k-deck[data-panel="interlude"] #k-dancer-canvas.is-live,
 html.k-deck[data-panel="archive"]   #k-dancer-canvas.is-live,
 html.k-deck[data-panel="rsvp"]       #k-dancer-canvas.is-live { opacity: .5; }
-html[data-variant="kinetic"] #milkdrop { filter: saturate(0.28) hue-rotate(160deg) brightness(0.32) contrast(1.02); }
+/* blur softens artefact; screen preserves blacks */
+html[data-variant="kinetic"] #milkdrop {
+  filter: saturate(0.28) hue-rotate(160deg) brightness(0.32) contrast(1.02) blur(16px);
+  mix-blend-mode: screen;
+}
 
 /* #4 — interlude: nudge the figure right so its forearm clears "BETWEEN THE SETS" */
 html.k-deck[data-panel="interlude"] #k-dancer-canvas { transform: translateX(15%); }
