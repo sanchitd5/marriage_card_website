@@ -15,6 +15,7 @@ import { initKinetic, initKineticGate } from './app/kinetic.js';
 import { initKineticDancer } from './app/kinetic-dancer.js';
 import { initKineticVideo } from './app/kinetic-video.js';
 import { initKineticVideo9 } from './app/kinetic-video9.js';
+import { initNameFit } from './app/name-fit.js';
 import {
   initCountdown,
   initCalendarButtons,
@@ -45,7 +46,8 @@ class KineticApp {
 
   // DOMContentLoaded init set (ScrollSmoother + fade-up + scramble + cursor + HUD).
   bootDeferred() {
-    initKinetic();       // ScrollSmoother + fade-up + scramble + cursor + HUD + magnetic
+    initKinetic();
+    initNameFit();   // equal-measure name lockup (see js/app/name-fit.js)       // ScrollSmoother + fade-up + scramble + cursor + HUD + magnetic
     initLightshow();     // techno light show (data-skin==='techno' → runs)
     initMilkdrop();      // async: lazily imports butterchurn; no-ops if CDN blocked
     initTilt();          // vanilla-tilt on the event cards ([data-tilt])

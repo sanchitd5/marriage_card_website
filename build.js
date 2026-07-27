@@ -162,7 +162,7 @@ export function buildFamilyBlessing(sideA, sideB) {
 // FIRST_A / FIRST_B etc. get HTML-escaped when injected.
 // PAIR_TITLE keeps the raw '&' so <title> renders "A & B"; where the
 // template uses "&amp;", it must remain "&amp;" in the output too.
-export function buildHtmlTokens(names, reveal = revealDate) {
+export function buildHtmlTokens(names, reveal = revealDate, theme = 'regency') {
   const w = reveal ? wedding : null;
   const h = weddingHidden;
   const ev = w ? w.events : null;
@@ -172,7 +172,11 @@ export function buildHtmlTokens(names, reveal = revealDate) {
     // neither the date nor the cities are hinted on the hero).
     HERO_LINE: reveal
       ? `${w.heroDate} <span class="hero-date-sep">·</span> <span class="hero-date-location">${w.heroLocation}</span>`
-      : `<span class="hero-date-location">${h.heroLine}</span>`,
+      // site.config.mjs is shared by both builds, so the suspense line is
+      // per-skin: the kinetic hero shows a total solar eclipse and its line names
+      // that, which would be meaningless on the Regency hero. Falls back to the
+      // neutral line if the kinetic variant is absent.
+      : `<span class="hero-date-location">${theme === 'kinetic' ? (h.heroLineKinetic || h.heroLine) : h.heroLine}</span>`,
     TITLE_DATE: reveal ? w.titleDate : h.titleDate,
     MONTH_YEAR: reveal ? w.monthYear : h.monthYear,
     META_LOCATION: reveal ? w.metaLocation : h.metaLocation,
@@ -250,7 +254,7 @@ function runBuild() {
   const fromGroomSide = parseFromGroomSide(process.env.FROM_GROOM_SIDE);
   const theme = parseTheme(process.env.WEDDING_THEME);
   const names = composeNames(fromGroomSide);
-  const htmlTokens = buildHtmlTokens(names);
+  const htmlTokens = buildHtmlTokens(names, revealDate, theme);
   const manifestTokens = buildManifestTokens(names, theme);
 
   // Couple-photo gate: the photos always ship; the browser reveals the gallery

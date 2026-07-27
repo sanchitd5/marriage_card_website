@@ -1,4 +1,15 @@
-# Techno variant (friends-facing skin)
+# Techno variant (friends-facing skin) — DEPRECATED
+
+> **DEPRECATED. Do not work on this target.** `kinetic` is the updated version of
+> this skin and the only maintained friends-facing build — see
+> [kinetic-variant.md](kinetic-variant.md) and build with
+> `WEDDING_THEME=kinetic node build.js`.
+>
+> This document is kept because the *infrastructure* it describes is still live:
+> `css/techno.css` is kinetic's base stylesheet, `data-skin="techno"` is the skin
+> value kinetic sets, and the techno audio playlist + 3D scene assets are shared
+> with kinetic via `isTechnoBased()`. Read it for that plumbing; do not restyle or
+> refactor the standalone techno template.
 
 A second visual skin of the invitation, shipped as a separate env-flagged build
 (`WEDDING_THEME=techno`), mirroring `FROM_GROOM_SIDE`. Not a runtime toggle, so

@@ -173,6 +173,21 @@ test('applyTokens: leaves unknown tokens intact', () => {
   assert.equal(applyTokens('{{NOPE}}', { K: 'z' }), '{{NOPE}}');
 });
 
+// site.config.mjs is shared by the Regency and kinetic builds, so the hidden-date
+// hero line has one variant per skin. The kinetic line names the eclipse in its
+// hero art; that line on the Regency build would describe a picture that is not
+// there. Guard both the split and the fallback.
+test('buildHtmlTokens: HERO_LINE is per-theme while dates are hidden', () => {
+  const names = composeNames(true, fx);
+  const regency = buildHtmlTokens(names, false).HERO_LINE;
+  const kinetic = buildHtmlTokens(names, false, 'kinetic').HERO_LINE;
+  assert.notStrictEqual(regency, kinetic, 'the two skins must not share one suspense line');
+  assert.match(kinetic, /ring of light/, 'kinetic line should name its eclipse art');
+  assert.ok(!/ring of light/.test(regency), 'the eclipse line must not leak into the Regency build');
+  // default theme argument keeps existing callers on the neutral line
+  assert.strictEqual(buildHtmlTokens(names, false, 'techno').HERO_LINE, regency);
+});
+
 // ---- buildHtmlTokens / buildManifestTokens ----------------------------
 test('buildHtmlTokens: escapes PAIR_TITLE but keeps PAIR_TITLE_RAW raw', () => {
   const t = buildHtmlTokens(composeNames(true, fx));

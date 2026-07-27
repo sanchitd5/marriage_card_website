@@ -72,7 +72,21 @@ export const wedding = {
 // heroLine replaces the whole date+location line with a suspense quote so no
 // date OR place is hinted on the hero.
 export const weddingHidden = {
-  heroLine: '“Some love stories are worth the wait…”',
+  // This file is SHARED by both builds, so the hero's suspense line needs one
+  // variant per skin: the two heroes are not showing the same picture.
+  //
+  //  heroLine        — the Regency/Bridgerton build. Skin-neutral by necessity.
+  //  heroLineKinetic — the friends-facing kinetic build, whose hero art is a total
+  //                    solar eclipse, so the line can name it: two bodies aligning,
+  //                    one ring of light. It doubles as the wedding ring without
+  //                    saying so.
+  //
+  // Both deliberately avoid foregrounding "the wait": on a page that is ALSO
+  // withholding its dates, waiting reads as apology and delay rather than
+  // anticipation. build.js picks between them by theme; if heroLineKinetic is
+  // ever removed, the build falls back to heroLine rather than breaking.
+  heroLine: 'Some stories are written in the stars.',
+  heroLineKinetic: 'Two paths, one ring of light.',
   titleDate: '',
   monthYear: 'coming soon',
   metaLocation: '',

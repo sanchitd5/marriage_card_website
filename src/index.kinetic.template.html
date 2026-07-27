@@ -328,32 +328,54 @@
           <div class="hero-shaft"></div>
         </div>
         <div class="hero-veil"></div>
+        <!-- The hero copy is ONE bottom-anchored, left-aligned block on a 12-col
+             grid (see css/kinetic.css). Centred type under an off-centre art
+             object reads as an accident; the counterweight is a diagonal —
+             eclipse upper-right, type lower-left. -->
         <div class="hero-inner">
-          <div class="hero-top">
-            <p class="invocation hero-invocation">
+          <p class="hero-tag" id="hero-hashtag">
+            <span class="hero-tag-text" data-tags="{{TAG_PRIMARY}},{{TAG_SECONDARY}}">{{TAG_PRIMARY}}</span>
+          </p>
+          <p class="invocation hero-invocation">
               <svg class="invocation-motif" aria-hidden="true" focusable="false"><use href="#nataraja-motif"/></svg>
-              <span class="shloka" lang="sa">तं नुमः सात्त्विकं शिवम्&nbsp;॥</span>
-            </p>
-            <p class="kicker k-eyebrow" data-scramble>Dearest friends, we announce the union of</p>
-          </div>
-          <h1 class="hero-names">
-            <span class="hero-name" data-scramble-name>{{FIRST_A}}</span>
-            <span class="hero-amp" data-scramble-name>&amp;</span>
-            <span class="hero-name" data-scramble-name>{{FIRST_B}}</span>
-          </h1>
-          <div class="hero-bottom">
+              <!-- The verse (Abhinaya Darpaṇa 1, the dancer's salutation to Shiva)
+                   unfolds across the journey: the gate carries quarters 1-2, this
+                   is quarter 3, and the footer closes with quarter 4 + the double
+                   daṇḍa. Previously the hero showed the CLOSING quarter — which is
+                   both a duplicate of the footer and a dangling correlative: the
+                   verse is built on a यस्य…तं pair, so "तं नुमः" ("him we praise")
+                   with its antecedent nowhere on screen is a fragment pointing at
+                   nothing. Quarter 3 is self-contained, and it is the celestial
+                   one: "whose adornment is the moon, the stars and the rest" —
+                   which is literally the art behind it. -->
+              <span class="shloka" lang="sa">आहार्यं चन्द्रतारादि</span>
+            <span class="shloka-gloss">Whose adornment is the moon, the stars<br>and all that is.</span>
+          </p>
+          <div class="hero-copy">
+            <div class="hero-lockup">
+            <p class="hero-blessing">With our families' blessings,</p>
+            <p class="kicker k-eyebrow" data-scramble>Dearest friends, join us for the wedding of</p>
+            <!-- names stack, with the ampersand as its own line: it is the missing
+                 rung between a 12px kicker and a 140px H1, it is the conventional
+                 smaller-and-contrasting ampersand, and it fills vertical space -->
+            <h1 class="hero-names">
+              <span class="hero-name" data-scramble-name>{{FIRST_A}}</span>
+              <span class="hero-amp" data-scramble-name>&amp;</span>
+              <span class="hero-name" data-scramble-name>{{FIRST_B}}</span>
+            </h1>
             <p class="hero-date" data-scramble>{{HERO_LINE}}</p>
-            <div class="hero-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-            <p class="hero-tag" id="hero-hashtag">
-              <span class="hero-tag-text" data-tags="{{TAG_PRIMARY}},{{TAG_SECONDARY}}">{{TAG_PRIMARY}}</span>
+            <!-- one first-person, lowercase line: every other word in the hero is
+                 third-person or imperative, and a reviewer noted the panel has no
+                 human voice anywhere. This is the warmth, at zero palette cost. -->
+            <p class="hero-voice">We'd love you there.</p>
+            <p class="hero-await" {{SECRET_ONLY}}>
+              <span class="hero-await-promise">Dates and venues to be revealed.</span>
+              <button type="button" class="hero-await-cta" data-jump-act="1">The countdown has already started<span aria-hidden="true"> &#8250;</span></button>
             </p>
+            </div>
           </div>
         </div>
-        <div class="scroll-cue">
-          <span class="cue-mouse" aria-hidden="true"><span></span></span>
-          <span class="cue-chevrons" aria-hidden="true"><i></i><i></i></span>
-          <span class="cue-label">Scroll</span>
-        </div>
+
       </header>
 
       <!-- ══════════ COUNTDOWN + SCRATCH ══════════ -->

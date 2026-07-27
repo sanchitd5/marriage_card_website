@@ -1518,3 +1518,752 @@ html[data-variant="kinetic"] .countdown.kdc-done .count-grid { display: grid; }
 @media (prefers-reduced-motion: reduce) {
   html[data-variant="kinetic"] .kdc-flare { display: none !important; }
 }
+
+/* ── Hero centre scrim (kinetic) ──────────────────────────────────────
+   The black hole is anchored off-axis (HOLE_OFS in js/app/lightshow.js) so it no
+   longer sits behind the name lockup, but it is a LIVE scene: the disk drifts,
+   brightens with the music envelope, and the debris cluster orbits. Relying on
+   "the bright thing is somewhere else right now" is not legibility. This gives the
+   centre text stack its own darker ground so the type holds at any frame of the
+   animation, per the type-over-imagery convention (a local scrim, not a
+   full-viewport wash that would flatten the render).
+   Stronger + tighter than the shared techno .hero-veil, and deliberately biased
+   toward the upper half, which is where the disc actually is. */
+html[data-variant="kinetic"] .hero-veil {
+  background:
+    radial-gradient(ellipse 58% 42% at 50% 46%,
+      rgba(4, 8, 12, .74) 0%, rgba(4, 8, 12, .42) 46%, rgba(4, 8, 12, .10) 70%, transparent 84%),
+    linear-gradient(0deg, var(--bg) 0%, rgba(9, 10, 13, .3) 30%, transparent 58%);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   HERO — rebuilt after a three-seat design review scored it 4.5/10
+   ("a WebGL demo that someone typed names onto"). Four findings drive
+   everything below:
+
+   1. BALANCE. The old hero centred a symmetric type stack under an
+      asymmetric art object and left the bottom 40% dead. Centred type
+      beneath off-centre art reads as a mistake, not as negative space.
+      Fixed with a counterweight instead of symmetry: a 12-column grid,
+      art upper-right, copy bottom-LEFT. The diagonal is the balance,
+      and bottom-anchoring the copy is what fills the void.
+   2. HIERARCHY. On a dark page, hierarchy is LUMINANCE, not size — the
+      brightest thing reads as nearest, which is why the artwork was
+      out-shouting the couple on their own invitation. The names are now
+      the brightest mass in frame and the only white one.
+   3. TYPE VOICES. Four (condensed grotesque / mono / rounded humanist /
+      Devanagari) cut to three: Archivo for display, Space Mono for
+      labels, Noto Serif Devanagari for the shloka. Space Grotesk is
+      dropped from the hero entirely.
+   4. RHYTHM. Six near-identical 40-60px gaps between elements of wildly
+      different weight destroyed all grouping. Replaced with a scale
+      whose inter-group gap is >3x the intra-group one, so the hero
+      reads as three groups, not seven orphans.
+   ══════════════════════════════════════════════════════════════════ */
+html[data-variant="kinetic"] {
+  /* fluid type scale, perfect fourth (1.333) from a 15px base */
+  --t-shloka: clamp(1.02rem, 0.88rem + 0.60vw, 1.40rem);
+  --t-gloss:  clamp(0.72rem, 0.68rem + 0.18vw, 0.84rem);
+  --t-kicker: clamp(0.64rem, 0.60rem + 0.19vw, 0.76rem);
+  --t-names:  clamp(2.85rem, 0.55rem + 9.9vw, 8.9rem);
+  --t-amp:    clamp(1.45rem, 1.00rem + 1.85vw, 2.60rem);   /* the missing rung */
+  --t-quote:  clamp(0.98rem, 0.86rem + 0.52vw, 1.30rem);
+  --t-await:  clamp(0.70rem, 0.66rem + 0.19vw, 0.82rem);
+
+  /* spacing: intra-group vs inter-group must differ by >3x or grouping dies */
+  --sp-hair: 0.5rem;
+  --sp-tight: 1rem;
+  --sp-group: 3.25rem;
+}
+
+/* ── grid: art upper-right, copy lower-left ───────────────────────── */
+html[data-variant="kinetic"] .hero-inner {
+  position: absolute; inset: 0; z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  grid-template-rows: auto 1fr auto;
+  align-items: initial; justify-items: initial;
+  padding: clamp(1.5rem, 4vw, 4rem);
+  padding-bottom: clamp(4.5rem, 9vh, 7rem);   /* room for the scroll cue */
+  column-gap: clamp(1rem, 2vw, 2rem);
+  text-align: left;
+}
+html[data-variant="kinetic"] .hero-copy {
+  grid-column: 1 / 9;
+  grid-row: 3;
+  align-self: end;
+  text-align: left;
+  /* an invisible scrim: separation from the live backdrop with no visible box */
+  filter: drop-shadow(0 0 42px rgba(11, 12, 15, .92));
+}
+@media (max-width: 900px) {
+  html[data-variant="kinetic"] .hero-copy { grid-column: 1 / 13; }
+}
+
+/* ── invocation ───────────────────────────────────────────────────── */
+html[data-variant="kinetic"] .hero-invocation {
+  text-align: left;
+  margin: 0 0 var(--sp-group);
+  display: grid; justify-items: start; gap: var(--sp-hair);
+}
+html[data-variant="kinetic"] .hero-invocation .invocation-motif {
+  width: clamp(26px, 4vw, 34px);   /* was a 62px crosshair that read as a HUD reticle */
+  opacity: .5;
+  /* the base rule is `margin: 0 auto`, which kept the motif optically centred in
+     the column while the rest of the invocation moved left — it read as a stray
+     ring floating in the middle of the frame */
+  margin: 0 0 .15rem;
+  justify-self: start;
+}
+html[data-variant="kinetic"] .hero-invocation .shloka {
+  font-size: var(--t-shloka);
+  /* Devanagari has no x-height, so matching the Latin point size renders it
+     optically smaller; ~1.3x against all-caps Latin is the correction. */
+  line-height: 1.85;              /* matras collide between lines below this */
+  letter-spacing: 0;              /* tracking breaks the shirorekha that binds a word */
+  color: #8fe9ff;
+  opacity: .62;                   /* must sit visibly BEHIND the names in depth */
+}
+html[data-variant="kinetic"] .hero-invocation .shloka-roman {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--t-gloss);
+  letter-spacing: .12em;
+  color: var(--label);
+  opacity: .75;
+}
+html[data-variant="kinetic"] .shloka-gloss {
+  display: block;
+  font-family: "Archivo", var(--font-display);
+  font-variation-settings: 'wght' 300, 'wdth' 100;
+  font-size: var(--t-gloss);
+  font-style: italic;
+  line-height: 1.5;
+  color: var(--muted);
+  max-width: 30ch;
+}
+
+/* ── kicker: a label ON the names, so it is bonded to them ────────── */
+html[data-variant="kinetic"] .hero .kicker {
+  margin: 0 0 var(--sp-hair);
+  max-width: none; margin-inline: 0;
+  font-size: var(--t-kicker);
+  letter-spacing: .34em;
+  color: var(--label);
+  text-align: left;
+}
+
+/* ── the names: the brightest, widest, only-white mass in frame ───── */
+html[data-variant="kinetic"] .hero-names {
+  display: grid; justify-items: start;
+  gap: 0;
+  margin: 0;
+  font-family: "Archivo", var(--font-display);
+  /* a REAL width axis, not synthetic stretching. Wide reads confident and
+     luxury and fills the measure; condensed would narrow the column and make
+     the empty band worse. */
+  font-variation-settings: 'wght' 640, 'wdth' 125;   /* 125 = the axis maximum: genuinely extended */
+  font-weight: 600;
+  font-size: var(--t-names);
+  line-height: .86;               /* wide faces need tight leading */
+  letter-spacing: -.02em;         /* and negative tracking at display size */
+  text-transform: uppercase;
+  color: #f2f6f8;                 /* not #fff: harsh, and it clips */
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;   /* light-on-dark optically bolds without it */
+}
+html[data-variant="kinetic"] .hero-name { padding-inline: 0; color: inherit; }
+
+/* the ampersand: smaller and contrasting, per invitation convention, and
+   subordinated by weight + luminance rather than shouted in flat accent.
+   A full-strength cyan "&" at name size puts the accent hue on the least
+   important glyph in the lockup. */
+html[data-variant="kinetic"] .hero-amp {
+  display: block;
+  font-family: "Archivo", var(--font-display);
+  font-variation-settings: 'wght' 300, 'wdth' 100;
+  font-size: var(--t-amp);
+  line-height: 1.15;
+  color: #8fe9ff;
+  opacity: .55;
+  margin: -.06em 0 -.04em .06em;   /* tighten the stack: the lockup is one object */
+}
+html[data-variant="kinetic"] .hero-amp::before,
+html[data-variant="kinetic"] .hero-amp::after { display: none; }
+
+/* ── quote + the dates-are-coming line ────────────────────────────── */
+html[data-variant="kinetic"] .hero-date {
+  margin: var(--sp-tight) 0 0;
+  font-family: "Archivo", var(--font-display);
+  font-variation-settings: 'wght' 300, 'wdth' 104;
+  font-size: var(--t-quote);
+  line-height: 1.5;
+  letter-spacing: .01em;
+  color: var(--body);
+  text-align: left;
+}
+html[data-variant="kinetic"] .hero-await {
+  margin: var(--sp-tight) 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--t-await);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+
+/* ── hashtag: a corner mark, not a second headline ────────────────── */
+html[data-variant="kinetic"] .hero-tag {
+  grid-column: 1 / 6; grid-row: 1;
+  align-self: start; justify-self: start;
+  margin: 0;
+  font-size: .68rem; letter-spacing: .2em;
+  color: var(--muted); opacity: .6;
+}
+
+/* ── scroll cue: kinetic used to hide this outright, which left the page
+      with no affordance at all. It is now the CTA as well as the cue. ── */
+html[data-variant="kinetic"] .scroll-cue,
+html.k-deck[data-variant="kinetic"] .scroll-cue {
+  display: flex; align-items: center; gap: .55rem;
+  position: absolute; left: auto; right: clamp(1.5rem, 4vw, 4rem);
+  bottom: clamp(1.5rem, 4vh, 2.5rem);
+  z-index: 3;
+  text-decoration: none;
+  opacity: .8; transition: opacity .3s var(--ease-luxe);
+}
+html[data-variant="kinetic"] .scroll-cue:hover { opacity: 1; }
+html[data-variant="kinetic"] .scroll-cue .cue-label {
+  font-size: .58rem; letter-spacing: .28em; color: var(--muted);
+}
+html[data-variant="kinetic"] .scroll-cue .cue-mouse { display: none; }
+html[data-variant="kinetic"] .scroll-cue .cue-chevrons { display: grid; width: 16px; height: 16px; }
+
+/* the wireframe polyhedron and the ambient mecha rendered at ~10% opacity,
+   which a reviewer could not distinguish from JPEG compression artefacts.
+   An element read as noise is worse than no element: it makes the frame look
+   dirty rather than deep. They are dimmed further into pure atmosphere here so
+   they never compete with the type. */
+html[data-variant="kinetic"] #k-ambient-dancers { opacity: .3; }
+
+/* ── Hero, revision 2 — after a re-review scored the above 7.2/10 ─────
+   Two classes of fix. First, three COLLISIONS that only appear once the
+   pointer moves (the kinetic deck chrome auto-hides while idle, so no
+   static screenshot ever showed them): the deck's section-index rail
+   printed straight through the invocation, the music dock sat on the
+   hashtag, and the scroll cue landed on the deck's Back/Next. Second,
+   the reviewer's alignment and rhythm defects.                        */
+
+html[data-variant="kinetic"] {
+  --gutter: clamp(1.5rem, 4vw, 5rem);
+  /* column 1 is reserved for the deck's own chrome rail; the copy starts
+     after it so the section index can never overprint the invocation */
+  --rail: clamp(0rem, 7vw, 7.5rem);
+}
+
+html[data-variant="kinetic"] .hero-inner {
+  padding: var(--gutter);
+  padding-left: calc(var(--gutter) + var(--rail));
+  padding-bottom: var(--gutter);   /* was 66px vs an 80px left margin: uneven frame */
+}
+
+/* the invocation becomes a masthead mark at the TOP edge rather than a
+   preamble sitting in the reading path, so the hero reads as three groups:
+   [mark] · void · [kicker + names + quote + reveal] */
+html[data-variant="kinetic"] .hero-copy {
+  grid-row: 1 / 4;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  align-self: stretch;
+}
+html[data-variant="kinetic"] .hero-invocation { grid-row: 1; align-self: start; margin: 0; }
+html[data-variant="kinetic"] .hero-lockup { grid-row: 3; align-self: end; }
+
+/* 1. THE top defect: the H1 was indented ~90px from the column's left edge,
+      breaking the one line the whole layout is built on. Cause: the base rule
+      sets `justify-content: center`, which centres the grid tracks. */
+html[data-variant="kinetic"] .hero-names {
+  justify-content: start;
+  justify-items: start;
+  margin-left: -.055em;            /* optical: round S / R stem flush, not mathematically flush */
+  line-height: .82;
+  /* wght 560 not 640: at 640 the widened S/C/R bowls read as transport signage.
+     The extreme width is fine; the weight was the corporate tell. */
+  font-variation-settings: 'wght' 560, 'wdth' 125;
+  font-optical-sizing: auto;
+}
+/* RIYA is half the length of SANCHIT; a touch more size closes a 2:1 rag */
+/* (removed: a per-name size override would break the equal-size guarantee) */
+
+/* 4. the ampersand as a true rung: aligned to the name stems, upright, tighter */
+html[data-variant="kinetic"] .hero-amp {
+  font-size: .42em;
+  font-variation-settings: 'wght' 400, 'wdth' 118;
+  font-variant-alternates: normal;
+  font-feature-settings: normal;
+  line-height: .8;
+  margin: -.02em 0 .02em;
+  padding-left: .04em;
+}
+
+/* 5. rhythm inside the bottom group was inverted — the quote was glued to RIYA
+      and divorced from the line it belongs with */
+html[data-variant="kinetic"] .hero-date { margin-top: 2.5rem; }
+html[data-variant="kinetic"] .hero-await { margin-top: 1.25rem; }
+
+/* 8/9. gloss: balanced wrap, no stranded article */
+html[data-variant="kinetic"] .shloka-gloss { max-width: 34ch; text-wrap: balance; }
+/* 13. the Devanagari was out-saturating the corona; the eclipse owns the cyan */
+html[data-variant="kinetic"] .hero-invocation .shloka { color: #cfe8ef; opacity: .70; }
+
+/* hashtag: now the last line of the copy column, clear of the music dock */
+html[data-variant="kinetic"] .hero-tag {
+  grid-column: auto; grid-row: auto;
+  margin: 1.75rem 0 0;
+  font-size: .64rem; letter-spacing: .22em;
+  color: var(--muted); opacity: .5;
+}
+
+/* the deck navigates by buttons and a menu sheet — the wheel does nothing — so a
+   "scroll" cue would be an instruction that cannot be obeyed. Restore the skin's
+   original decision to hide it; the deck's NEXT button is the affordance. */
+html.k-deck[data-variant="kinetic"] .scroll-cue { display: none; }
+
+/* 2. the ambient mecha rendered THROUGH the RIYA counters. Texture inside the
+      H1's letterforms is a hygiene failure, and at 30% it was already too faint
+      to be a design element — so it leaves the hero entirely. */
+html[data-variant="kinetic"] #hero ~ #k-ambient-dancers,
+html[data-variant="kinetic"] #k-ambient-dancers { opacity: 0; transition: opacity .6s var(--ease-luxe); }
+html[data-variant="kinetic"]:not([data-panel="invocation"]) #k-ambient-dancers { opacity: .34; }
+
+/* the invocation mark shares the top-left corner with the music dock; drop it
+   clear so the two never crowd (the dock is ~120px tall at its largest) */
+@media (min-width: 900px) {
+  html[data-variant="kinetic"] .hero-invocation { margin-top: 3.25rem; }
+}
+
+/* ── Hero, revision 3 — against an 8.4 / 8.1 pair of re-reviews ───────
+   The theme of this pass is that the deck CHROME has to belong to the
+   same grid as the copy, instead of sitting on top of it.            */
+
+/* 1. rail and copy were two unrelated left edges (45px and 220px). One
+      modular rhythm: rail at 64, a hairline column boundary at 192, copy
+      starting at 256. */
+html[data-variant="kinetic"] { --rail: 12rem; }
+html[data-variant="kinetic"] .hero-inner { padding-left: calc(var(--gutter) + var(--rail)); }
+html.k-deck[data-variant="kinetic"] .k-menu {
+  left: 64px;
+  border-right: 1px solid rgba(255, 255, 255, .06);
+  padding-right: 1.5rem;
+}
+
+/* 2. the crosshair hairlines ran full-bleed at constant alpha, cutting clean
+      through the H1 and the corona. Fade them out from the pointer so they
+      read as instrumentation rather than as two rules drawn over the art. */
+html[data-variant="kinetic"] .k-cursor-h {
+  background: linear-gradient(90deg, transparent, rgba(120, 220, 240, .10) 22%, rgba(120, 220, 240, .10) 78%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 26%, #000 74%, transparent);
+          mask-image: linear-gradient(90deg, transparent, #000 26%, #000 74%, transparent);
+}
+html[data-variant="kinetic"] .k-cursor-v {
+  background: linear-gradient(180deg, transparent, rgba(120, 220, 240, .10) 22%, rgba(120, 220, 240, .10) 78%, transparent);
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 26%, #000 74%, transparent);
+          mask-image: linear-gradient(180deg, transparent, #000 26%, #000 74%, transparent);
+}
+
+/* 7. the bottom-left "00 — INVOCATION" label states what the rail's active item
+      and the 01/06 counter already say. Three statements of one fact. */
+html[data-variant="kinetic"] .k-hud-sec { display: none; }
+
+/* 9. NEXT was the only bordered box on the page and read as a browser default */
+html.k-deck[data-variant="kinetic"] #k-next {
+  border: 0; background: none; padding-inline: .2rem;
+  position: relative;
+}
+html.k-deck[data-variant="kinetic"] #k-next::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -3px; height: 1px;
+  background: currentColor; transform: scaleX(0); transform-origin: left;
+  transition: transform .35s var(--ease-luxe);
+}
+html.k-deck[data-variant="kinetic"] #k-next:hover::after { transform: scaleX(1); }
+
+/* the hero is the one panel where the guest has not yet learned the interaction,
+   so NEXT must not vanish with the rest of the idle chrome. */
+html[data-panel="invocation"] #k-next { opacity: 1 !important; pointer-events: auto !important; }
+
+/* 5. ampersand was too small to hold its counter at 0.42em */
+html[data-variant="kinetic"] .hero-amp {
+  font-size: .52em;
+  font-variation-settings: 'wght' 450, 'wdth' 118;
+}
+
+/* 8. Devanagari overshot to near-white and started reading as body copy */
+html[data-variant="kinetic"] .hero-invocation .shloka {
+  color: #9fd4e2; opacity: .85; letter-spacing: .01em;
+}
+/* the gloss read as a default italic sans; bring it into the verse's voice */
+html[data-variant="kinetic"] .shloka-gloss {
+  font-style: normal;
+  font-variation-settings: 'wght' 320, 'wdth' 100;
+  letter-spacing: .06em;
+  opacity: .58;
+}
+
+/* invocation gets its own vertical slot so the top-left corner is not three
+   elements deep (brand, dock, mark) */
+@media (min-width: 900px) {
+  html[data-variant="kinetic"] .hero-invocation { margin-top: 6.5rem; }
+}
+
+/* hashtag: masthead row, opposite the brand, and legible enough to earn its place */
+html[data-variant="kinetic"] .hero-tag {
+  grid-column: 1 / 13; grid-row: 1;
+  justify-self: end; align-self: start;
+  margin: 0; opacity: .75; color: var(--label);
+}
+
+/* ── the bottom group's hierarchy: five elements, five distinct weights ── */
+html[data-variant="kinetic"] .hero-voice {
+  margin: .5rem 0 0;
+  font-family: "Archivo", var(--font-display);
+  font-variation-settings: 'wght' 300, 'wdth' 104;
+  font-size: var(--t-quote);
+  color: var(--muted);
+  opacity: .8;
+}
+html[data-variant="kinetic"] .hero-await {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: .1rem 1rem;
+  margin-top: 1.6rem;
+}
+html[data-variant="kinetic"] .hero-await-promise { color: var(--label); }
+/* the single most useful sentence in the hero was also the faintest. It is now
+   the one cyan call to action, and it is a real control: it jumps the deck to
+   the countdown act, so the hero has a door that does not auto-hide. */
+html[data-variant="kinetic"] .hero-await-cta {
+  font-family: var(--font-mono);
+  font-size: var(--t-await);
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--accent);
+  cursor: pointer;
+  position: relative;
+}
+html[data-variant="kinetic"] .hero-await-cta::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -4px; height: 1px;
+  background: currentColor; opacity: .45;
+  transform: scaleX(1); transform-origin: left;
+  transition: opacity .3s var(--ease-luxe);
+}
+html[data-variant="kinetic"] .hero-await-cta:hover::after { opacity: 1; }
+
+/* 3. RSVP is the one act where the guest owes an action; it should not look
+      identical to the acts where they only read. */
+html.k-deck[data-variant="kinetic"] .k-menu-item:last-child .k-menu-label { color: #cfe8ef; }
+
+/* the short name sits flush RIGHT so the two lines bracket a rectangle. Both are
+   set at one shared point size (js/app/name-fit.js) so neither partner's name is
+   optically larger — the block is squared by alignment, not by scaling. */
+html[data-variant="kinetic"] .hero-names { justify-items: stretch; }
+html[data-variant="kinetic"] .hero-name { display: block; width: 100%; }
+html[data-variant="kinetic"] .hero-name:first-of-type { text-align: left; }
+html[data-variant="kinetic"] .hero-name:last-of-type { text-align: right; font-size: inherit; }
+html[data-variant="kinetic"] .hero-amp { text-align: center; }
+
+/* ── Hero, revision 4 — against a 9.0. Everything here is alignment ───
+   discipline: at this point the composition is right and what is left is
+   edges that land on nothing.                                          */
+html[data-variant="kinetic"] {
+  --rail-x: 4rem;      /* 64px  — the rail's own left inset          */
+  --copy-x: 16rem;     /* 256px — 4x the rail unit, a real grid step */
+  --gutter-r: 5rem;    /* 80px  — shared right inset for ALL corner marks */
+}
+
+@media (min-width: 1100px) {
+  html[data-variant="kinetic"] .hero-inner {
+    padding-left: var(--copy-x);
+    padding-right: var(--gutter-r);
+  }
+  /* The name rectangle's two vertical edges previously landed on nothing, which
+     is what kept it reading as "two names that happen to end at the same x"
+     rather than as a block. The copy column now carries a visible hairline on
+     its right edge, so both names are flush to something the eye can see. */
+  html[data-variant="kinetic"] .hero-copy {
+    grid-column: 1 / 9;
+    border-right: 1px solid rgba(255, 255, 255, .055);
+    padding-right: clamp(1.5rem, 3vw, 3rem);
+  }
+}
+
+/* the single most visible alignment error in the frame was a 10px near-miss:
+   the motif's artwork is inset ~4% inside its own viewBox, so a flush element
+   box still renders visually indented. Pull it back by that inset. */
+html[data-variant="kinetic"] .hero-invocation .invocation-motif { margin-left: -1.5px; }
+
+/* the middle band was reading as an unfilled row rather than as air. Dropping
+   the invocation group lets the void sit ABOVE it, where the polyhedron already
+   holds the eye, and the band becomes framing for the eclipse. */
+@media (min-width: 900px) {
+  html[data-variant="kinetic"] .hero-invocation { margin-top: clamp(6.5rem, 17vh, 13rem); }
+}
+
+/* two sentences in the same face at the same size read as a duplicate, not a
+   pair: the voice line becomes a subordinate aside tucked under the quote */
+html[data-variant="kinetic"] .hero-voice {
+  margin-top: .625rem;
+  font-size: .95rem;
+  color: rgba(255, 255, 255, .55);
+  opacity: 1;
+}
+
+/* the ampersand sat optically low between the two cap heights */
+html[data-variant="kinetic"] .hero-amp { transform: translateY(-6px); }
+
+/* every corner mark shares one right inset so the masthead reads as a rule */
+html[data-variant="kinetic"] .hero-tag { padding-right: 0; }
+html.k-deck[data-variant="kinetic"] #k-panel-controls { right: var(--gutter-r); }
+html[data-variant="kinetic"] .k-hud-time { right: var(--gutter-r); }
+/* ...and one left inset, so the music dock stops disagreeing with the rail */
+html[data-variant="kinetic"] #right-dock,
+html.k-deck[data-variant="kinetic"] .k-menu { left: var(--rail-x); }
+html[data-variant="kinetic"] .k-hud-brand { left: var(--rail-x); }
+
+/* ── Hero, revision 5 — against a 9.0 / 8.9 pair ──────────────────── */
+
+/* The invocation moves out of the copy column and into the mid-band, sitting
+   under the eclipse and right-aligned. Two problems fall at once: the verse
+   about the moon and the stars was as far from the celestial image as the frame
+   allowed and read as a caption on nothing, and the centre of the composition
+   was an unfilled row on the diagonal between the names and the eclipse. */
+@media (min-width: 1100px) {
+  html[data-variant="kinetic"] .hero-invocation {
+    grid-column: 8 / 13;
+    grid-row: 2;
+    align-self: center;
+    justify-self: end;
+    justify-items: end;
+    text-align: right;
+    margin: 0;
+    max-width: 26rem;
+  }
+  html[data-variant="kinetic"] .hero-invocation .invocation-motif { margin-left: 0; margin-right: -1.5px; justify-self: end; }
+  html[data-variant="kinetic"] .shloka-gloss { max-width: none; }
+}
+
+/* the three copy lines were evenly spaced, so nothing grouped. The quote and the
+   voice line are ONE thought and now sit tight; the blessing closes that block;
+   a full line follows before the dates/CTA row. */
+html[data-variant="kinetic"] .hero-voice { margin-top: .4em; }
+html[data-variant="kinetic"] .hero-blessing {
+  margin: .4em 0 0;
+  font-family: "Archivo", var(--font-display);
+  font-variation-settings: 'wght' 300, 'wdth' 104;
+  font-size: .95rem;
+  color: rgba(255, 255, 255, .45);
+}
+html[data-variant="kinetic"] .hero-await { margin-top: 2.4rem; }
+
+/* the human line was styled identically to the line above it, so the intended
+   change of voice was invisible. It borrows the diamond bead's ~3200K warmth —
+   the only warm token on the page, and the one the eclipse already established.
+   This is a highlight, not a second hue: the obsidian + cyan lock still holds. */
+html[data-variant="kinetic"] .hero-voice { color: #f0e4d6; opacity: .92; }
+
+/* the ampersand read as a superscript connector rather than the hinge of the
+   union the rectangle is built around */
+html[data-variant="kinetic"] .hero-amp { font-size: .65em; }
+
+/* ── Hero, revision 6 — against a 9.2 ─────────────────────────────── */
+
+/* the verse had drifted into the corona's luminance gradient, where delicate
+   type loses its contrast. Drop it clear into true black. */
+@media (min-width: 1100px) {
+  html[data-variant="kinetic"] .hero-invocation { align-self: end; margin-bottom: 12vh; }
+}
+
+/* ragged-left over two near-equal lines reads as an accident; three lines of
+   descending length make the rag a deliberate stair */
+html[data-variant="kinetic"] .shloka-gloss { line-height: 1.65; }
+
+/* the warm colour was carrying the change of voice while the smaller size was
+   undoing it. Match the quote's size and let colour alone do the work. */
+html[data-variant="kinetic"] .hero-voice { font-size: var(--t-quote); }
+
+/* the column hairline was too faint to register, and a stub behind the names
+   only would read as a glitch: full height, and warm-tinted so it belongs to
+   the same light as the bead and the voice line */
+@media (min-width: 1100px) {
+  html[data-variant="kinetic"] .hero-copy { border-right-color: rgba(240, 228, 214, .10); }
+}
+
+/* the ampersand's own left margin is computed in js/app/name-fit.js; keep the
+   CSS from fighting it */
+html[data-variant="kinetic"] .hero-amp { text-align: left; }
+
+/* pull the stack up so the lower-left void reads as margin rather than omission */
+html[data-variant="kinetic"] .hero-copy { padding-bottom: 2.5rem; }
+
+/* the frame claims symmetry, so the corner brackets must match */
+html[data-variant="kinetic"] .k-hud-corner { border-width: 1px; }
+
+/* ── Hero, revision 7 — the last set, against a 9.2 / 9.2 ─────────── */
+
+/* the CTA row was landing ~50px off the deck pager, so the logistics line and
+   "01 / 06" collided optically; the whole stack also sat too low */
+html[data-variant="kinetic"] .hero-copy { padding-bottom: 7rem; }
+html[data-variant="kinetic"] .hero-await { margin-top: 2rem; }
+
+/* the salutation and the logistics footnote were typographic twins — same face,
+   size, tracking and colour. They are not the same kind of sentence: one opens
+   the invitation, the other is a note. Warm the salutation to the page's single
+   warm token and leave the logistics grey. */
+html[data-variant="kinetic"] .hero .kicker { color: #f0e4d6; opacity: .72; }
+
+/* the blessing is a DIFFERENT SPEAKER — the families, not the couple — so it
+   needs signature spacing, not another clause gap */
+html[data-variant="kinetic"] .hero-blessing { margin-top: .9em; }
+
+/* the source verse must lead its own translation */
+html[data-variant="kinetic"] .hero-invocation .shloka { font-size: calc(var(--t-shloka) * 1.15); }
+/* and sit as image-plus-caption, not as a third stacked object */
+html[data-variant="kinetic"] .hero-invocation { gap: .35rem; }
+@media (min-width: 1100px) {
+  html[data-variant="kinetic"] .hero-invocation { margin-bottom: 14vh; }
+}
+
+/* ── Hero, revision 8 — the closing set ───────────────────────────── */
+
+/* Every gap in the stanza was the same, so the speaker changes carried no
+   rhythm: quote and invitation are ONE utterance and now bind; the families'
+   blessing keeps its signature gap. */
+html[data-variant="kinetic"] .hero-voice { margin-top: .55em; }
+html[data-variant="kinetic"] .hero-blessing { margin-top: .9em; }
+
+/* elders should never be the lowest-contrast element on a wedding invitation,
+   techno skin or not: the blessing was fainter than the logistics footnote */
+html[data-variant="kinetic"] .hero-blessing { color: var(--label); }
+
+/* commit to the hang. A 5px offset between the ampersand and the short name's
+   left edge is the one value that reads as an alignment error rather than a
+   decision, so the ampersand now overhangs by a full stem. */
+html[data-variant="kinetic"] .hero-amp { margin-left: 0; transform: translate(-.42em, -6px); }
+
+/* the verse rides the corona's lower arc instead of sitting level with the
+   stanza opposite it */
+@media (min-width: 1100px) {
+  html[data-variant="kinetic"] .hero-invocation { margin-bottom: 22vh; }
+}
+
+/* the hairline was not resolving against near-black */
+@media (min-width: 1100px) {
+  html[data-variant="kinetic"] .hero-copy { border-right-color: rgba(240, 228, 214, .16); }
+}
+
+/* the mark was small enough to read as a UI affordance rather than a motif */
+html[data-variant="kinetic"] .hero-invocation .invocation-motif { width: clamp(34px, 5vw, 44px); }
+
+/* 7rem overshot: the block was top-heavy over a void */
+html[data-variant="kinetic"] .hero-copy { padding-bottom: 4.5rem; }
+
+/* the pager was occluding the bottom-right corner bracket */
+html.k-deck[data-variant="kinetic"] #k-panel-controls { right: calc(var(--gutter-r) + 2.5rem); }
+
+/* ── Hero, revision 9 — closing pass (seat scores 9.4 / 9.6) ──────── */
+
+/* the mass had settled below the geometric centre; optical centre wants to sit
+   marginally above it */
+html[data-variant="kinetic"] .hero-copy { padding-bottom: 6rem; }
+
+/* the verse had drifted down until it shared a band with RIYA's baseline across
+   the gutter, so the two read as one line of type. Lock it to the corona's arc. */
+@media (min-width: 1100px) {
+  html[data-variant="kinetic"] .hero-invocation { margin-bottom: 30vh; }
+}
+
+/* the three name lines were breathing apart rather than interlocking */
+html[data-variant="kinetic"] .hero-names { line-height: .76; }
+
+/* the blessing is a third beat, not a footnote to the invitation */
+html[data-variant="kinetic"] .hero-blessing {
+  font-size: var(--t-quote);
+  color: rgba(240, 228, 214, .52);   /* one more degree of the page's warm token */
+}
+
+/* the hairline entered at the top, disappeared behind the lockup's scrim and
+   resumed below, which read as a rendering fault. Draw it as one full-bleed rule
+   behind the content instead of as a border on the text column. */
+@media (min-width: 1100px) {
+  html[data-variant="kinetic"] .hero-copy { border-right: 0; }
+  html[data-variant="kinetic"] .hero-inner::after {
+    content: "";
+    position: absolute;
+    top: 0; bottom: 0;
+    left: calc(var(--copy-x) + ((100% - var(--copy-x) - var(--gutter-r)) * 8 / 12));
+    width: 1px;
+    background: linear-gradient(180deg, transparent, rgba(240, 228, 214, .16) 12%, rgba(240, 228, 214, .16) 88%, transparent);
+    pointer-events: none;
+    z-index: 0;
+  }
+}
+
+/* ── Hero, revision 10 — final ────────────────────────────────────── */
+
+/* At .76 leading the ampersand's strokes started overlapping SANCHIT's baseline
+   zone and RIYA's cap line: it read as a glyph wedged between them rather than
+   the pivot of the lockup. Smaller, with its own line box, so it NESTS in the
+   counter space instead of colliding. */
+html[data-variant="kinetic"] .hero-amp {
+  font-size: .62em;
+  line-height: 1;
+  letter-spacing: -.01em;
+}
+
+/* The hairline is back on the copy column itself, which is the only way it can
+   be guaranteed to sit exactly on the column's right edge — the free-standing
+   rule was computed from the grid and drifted, so RIYA overran it and the one
+   violation read as an accident. The reason it previously vanished mid-run was
+   the lockup's scrim, so the scrim moves to the lockup alone. */
+@media (min-width: 1100px) {
+  html[data-variant="kinetic"] .hero-inner::after { content: none; }
+  html[data-variant="kinetic"] .hero-copy {
+    border-right: 1px solid rgba(240, 228, 214, .16);
+    filter: none;
+  }
+  html[data-variant="kinetic"] .hero-lockup { filter: drop-shadow(0 0 42px rgba(11, 12, 15, .92)); }
+}
+
+/* the lower stack should breathe, not the page floor */
+html[data-variant="kinetic"] .hero-copy { padding-bottom: 4.5rem; }
+html[data-variant="kinetic"] .hero-blessing { margin-top: 1.4em; }
+
+/* ── Hero, revision 11 — final polish ─────────────────────────────── */
+
+/* Giving the ampersand its own line box fixed the stroke collision but added
+   leading on both sides, so the lockup spread back out into three stacked lines.
+   The collision came from OVERLAP, not from proximity, so the density can be
+   recovered with negative block margin while keeping lh:1. */
+html[data-variant="kinetic"] .hero-amp {
+  margin-block: -.10em;
+  transform: none;   /* horizontal anchor is computed in js/app/name-fit.js */
+}
+
+/* The border could not be faded, so its lower end stopped in a bare stub just
+   above the deck chrome. As a pseudo-element pinned to the column's right edge
+   it keeps the exact alignment a border gave AND can resolve at both ends. */
+@media (min-width: 1100px) {
+  html[data-variant="kinetic"] .hero-copy { border-right: 0; position: relative; }
+  html[data-variant="kinetic"] .hero-copy::after {
+    content: "";
+    position: absolute; top: 0; bottom: 0; right: -1px; width: 1px;
+    background: linear-gradient(180deg,
+      transparent, rgba(240, 228, 214, .16) 10%, rgba(240, 228, 214, .16) 82%, transparent);
+    pointer-events: none;
+  }
+}
+
+/* The families' line now PRECEDES the names rather than trailing the CTA stack.
+   On a real Indian invitation the families issue the invitation before the couple
+   are named, and a reviewer identified this position (not its styling) as the last
+   thing keeping the panel reading as an announcement rather than an invitation. */
+html[data-variant="kinetic"] .hero-blessing {
+  margin: 0 0 .5rem;
+  font-size: var(--t-quote);
+  color: rgba(240, 228, 214, .58);
+}

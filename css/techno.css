@@ -18,6 +18,22 @@
 @font-face { font-family: "Space Mono"; font-style: italic; font-weight: 400; font-display: swap; src: url("../assets/fonts/space-mono-400italic.woff2") format("woff2"); }
 @font-face { font-family: "Space Mono"; font-style: normal; font-weight: 700; font-display: swap; src: url("../assets/fonts/space-mono-700.woff2") format("woff2"); }
 /* display:block so the sacred Devanagari line never flashes tofu */
+/* Archivo Variable — the hero display face. Space Grotesk is a proportional
+   companion to Space Mono: an engineered neo-grotesk with no display cut and no
+   width axis, which is exactly why the names read as generic Helvetica at 130px.
+   Archivo carries a REAL wdth axis (62-125), so the lockup can be set genuinely
+   EXTENDED rather than synthetically stretched. Wide, not condensed: two short
+   first names set condensed make a narrow column and worsen the hero's empty
+   lower band, where extended fills the measure and counterweights the artwork.
+   Latin subset, both axes, 90KB. SIL OFL 1.1. */
+@font-face {
+  font-family: "Archivo";
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  font-display: swap;
+  src: url("../assets/fonts/archivo-var.woff2") format("woff2-variations");
+}
 @font-face { font-family: "Noto Serif Devanagari"; font-style: normal; font-weight: 500; font-display: block; src: url("../assets/fonts/noto-serif-devanagari-500.woff2") format("woff2"); }
 
 :root {
@@ -213,6 +229,21 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
   background: linear-gradient(180deg, transparent, rgba(var(--accent-soft-rgb), .16) 46%, transparent);
   filter: blur(30px);
   mix-blend-mode: screen;
+}
+/* The black hole (js/app/blackhole.js) sits dead-centre of the fixed light-show
+   backdrop, and a LIT INTERIOR is the single biggest "portal, not black hole"
+   tell — the shadow disc has to be the darkest thing on screen. The shared rule
+   above peaks at 46% of the shaft's height, which lands almost exactly on the
+   horizon, so the hero copy is re-ramped to peak high and die out above the
+   disc: the shaft now reads as being swallowed by the hole rather than shining
+   through it. The gate copy keeps the original ramp (the gate is opaque, no hole
+   behind it). */
+.hero-shaft {
+  background: linear-gradient(180deg,
+    transparent,
+    rgba(var(--accent-soft-rgb), .17) 20%,
+    rgba(var(--accent-soft-rgb), .05) 34%,
+    transparent 44%);
 }
 .gate-scanlines, .ambient-scanlines {
   position: absolute; inset: 0;

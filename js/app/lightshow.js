@@ -1,6 +1,7 @@
 import { REDUCED, $ } from './dom.js';
 import { appState } from './state.js';
 import { MAX_FLASHES_PER_SEC, MIN_FLASH_INTERVAL_S, FlashGovernor } from './flash-cap.js';
+import { Eclipse } from './eclipse.js';
 
 // ── Techno light show (Phase 2, Path A: procedural WebGL) ──────────────
 // A haze-filled tunnel of receding light motes with a single cyan accent glow —
@@ -61,6 +62,45 @@ const TIERS = {
 // Dancer placement — see the DANCER config comment below.
 const DANCER = { size: 0.12, z: -450, y: 0, xDesktop: 9, xMobile: 0 };
 
+// ── Black hole (js/app/blackhole.js) ──────────────────────────────────
+// z=-58 is deliberate: it clears the flash cluster at z=-30 (which orbits rather
+// than sitting centred) and swallows the accent glow at z≈-72, whose wide bloom is
+// dimmed while the hole is up so it can't read as a lit portal behind the shadow.
+// rs is the Schwarzschild radius in world units; the VISIBLE shadow is 2.6×
+// that (photon capture cross-section), so ≈7.5 units ⇒ ~27% of the frame height
+// at this depth.
+//
+// The hole is deliberately OFF the optical axis. It is the hero's one supporting
+// visual, but the name lockup is centred DOM text, so a centred hole drove the
+// photon ring and the bright inner disk straight through the letterforms. It now
+// sits on the upper-right third — the composition convention for a dense dark
+// hero is one dominant focal point (the names) with supporting geometry demoted
+// onto a third-line, never stacked in the same column.
+//
+// Offsets are fractions of the VIEWPORT (not fixed world units) so the hole
+// holds its share of the frame across aspect ratios; they are converted to world
+// units at HOLE.z and re-applied on resize. Portrait collapses the x push (there
+// is no horizontal room to spare) and lifts the hole higher instead, clearing the
+// stacked mobile name block underneath it.
+// rs trimmed to 2.6 so the film-accurate disk (outer = 9.35 r_s = 3.60 shadow
+// radii) stays INSIDE the frame now that the hole is anchored off the optical axis
+// by HOLE_OFS. At 2.9 the annulus ran off the right edge on wide screens.
+const HOLE = { z: -58, rs: 3.15 };
+// z is an absolute depth override, not an offset. The disk's outer radius is 3.6×
+// the shadow radius (OUTER_K/SHADOW_K in blackhole.js) ≈ 27 world units, against a
+// half-frame of only ~42 at z=-58 — fine in landscape, but in PORTRAIT that disk
+// swallowed the top third and grazed the invocation + kicker. Pushing the hole
+// deeper shrinks its angular size (~64% → ~44% of the half-frame) instead of
+// rescaling geometry the physics constants depend on.
+const HOLE_OFS = {
+  // Pushed further right and scaled up so the corona CROPS on the right edge.
+  // A luminous object floating with clear margin on all sides reads as placed in
+  // emptiness; one that bleeds off the frame defines the edge, which is what turns
+  // the right-hand void into negative space instead of dead space.
+  wide:     { x: 0.415, y: 0.145, z: -58 },  // crops on the right; dropped so the top-left corona arc is not clipped too
+  portrait: { x: 0.05, y: 0.30, z: -86 },
+};
+
 class LightShow {
   constructor(canvas) {
     this.canvas = canvas;
@@ -118,6 +158,9 @@ class LightShow {
     this.mechaTemplate = null; this.mechaLoading = false;
     this.mechaRawH = 1;            // model's un-scaled height (for the fit)
     this.mechaCenter = null;       // model's raw bounding-box centre
+
+    // black hole (centre singularity)
+    this.hole = null;
 
     // flash-cut geometric accent
     this.flashGrp = null; this.flashPolys = []; this.flashSpiral = null; this.flashSpiralMat = null;
@@ -256,8 +299,12 @@ class LightShow {
     // The single accent glow, the convergence point the tunnel funnels toward:
     // a wide soft cyan bloom + a tight hot white core (clearly the brightest,
     // most saturated event in the frame).
-    this.glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glowTexture(), color: 0x22d3ee, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }));
-    this.glow.scale.set(46, 46, 1);
+    this.glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glowTexture(), color: 0x22d3ee, transparent: true, opacity: 0.30, blending: THREE.AdditiveBlending, depthWrite: false }));
+    // 26 not 46: at 46 the bloom crested the black hole's rim as a vertical cyan
+    // plume that read as a smoke column / searchlight / jet — the exact portal tell
+    // the hole is built to avoid. Small enough now that the depth-writing shadow
+    // disc swallows it.
+    this.glow.scale.set(26, 26, 1);
     this.glow.position.set(0, 0, -74);
     this.scene.add(this.glow);
     this.glowCore = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glowTexture(), color: 0xd8fbff, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false }));
@@ -266,6 +313,20 @@ class LightShow {
     this.scene.add(this.glowCore);
 
     this.buildFlashCluster();
+
+    // The centre singularity. Built AFTER the motes/glow/cluster so its shadow
+    // disc (the only depth-writing thing in the scene) can occlude them.
+    try {
+      const ofs = this.holeOffset();
+      this.hole = new Eclipse(THREE, this.scene, this.camera, this.tier, HOLE.rs, ofs.z, ofs.x, ofs.y);
+      this.hole.resize(TIERS[this.tier].dpr);
+    } catch (e) {
+      // Never fail the whole light show over the black hole — but do NOT swallow the
+      // reason: a silent catch here turned a one-line shader/build error into
+      // "the hole mysteriously does not render" during development.
+      console.error('[eclipse] build failed, continuing without it:', e);
+      this.hole = null;
+    }
 
     // The drop dancer (mecha glTF) is instanced once loaded; on a governor
     // rebuild its lights/env and instances are recreated for the new scene.
@@ -368,13 +429,17 @@ class LightShow {
     const THREE = this.THREE;
     if (this.tier === 0) return; // perf ladder: skip entirely on the lowest device tier
     this.flashGrp = new THREE.Group();
-    this.flashGrp.position.set(0, 0, -30); // close enough to camera to read as a real focal shape,
-    // not just haze — the accent glow already owns -70..-74, so this sits well in front of it
+    this.flashGrp.position.set(9, 0, -30); // close enough to camera to read as a real focal shape,
+    // not just haze — the accent glow already owns -70..-74, so this sits well in front of it.
+    // NB it is no longer CENTRED: the black hole (HOLE.z) owns the centre now, and a centred
+    // wireframe cluster subtends a slightly LARGER angle than the shadow disc from here, so it
+    // would sit on top of the hole. It is now walked around the hole in frame() instead, which
+    // reads as debris on a wide orbit rather than a competing focal point.
     const RADII = this.tier === 2 ? [4.6, 3.4, 2.4] : [3.9, 2.7];
     this.flashPolys = RADII.map((r, i) => {
       const geo = new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(r, 1)); // detail 1: more edges read as a "cluster", not a single diamond
       const mat = new THREE.LineBasicMaterial({
-        color: 0x8fe9ff, transparent: true, opacity: 0.16, fog: false,
+        color: 0x8fe9ff, transparent: true, opacity: 0.06, fog: false,
         blending: THREE.AdditiveBlending, depthWrite: false,
       });
       const mesh = new THREE.LineSegments(geo, mat);
@@ -544,6 +609,7 @@ class LightShow {
   }
 
   disposeGL() {
+    if (this.hole) { this.hole.dispose(); this.hole = null; }
     if (this.motes) { this.motes.geometry.dispose(); this.motes.material.dispose(); }
     if (this.bokeh) { this.bokeh.geometry.dispose(); this.bokeh.material.dispose(); }
     if (this.glow) this.glow.material.dispose();
@@ -647,7 +713,11 @@ class LightShow {
     // accent glow: rate-limit brightness change (flash safety backstop)
     const targetGlow = 0.2 + e * 0.6 + beat * 0.12;
     this.glowBright += Math.max(-0.05, Math.min(0.05, targetGlow - this.glowBright)); // ≤0.05/frame
-    this.glow.material.opacity = this.glowBright * 0.7 * (0.35 + 0.65 * ignite) * haze;
+    // Keep the wide accent bloom down while the eclipse is up: the corona is the
+    // one light source in frame and a second unrelated glow behind it muddies the
+    // silhouette. The tight core is swallowed by the lunar disc anyway.
+    const holeDim = this.hole ? (1 - 0.6 * ignite) : 1;
+    this.glow.material.opacity = this.glowBright * 0.7 * (0.35 + 0.65 * ignite) * haze * holeDim;
     this.glowCore.material.opacity = (0.3 + this.glowBright * 0.5) * (0.3 + 0.7 * ignite);
     this.glow.position.z = this.glowCore.position.z = -72 + Math.sin(now * 0.2) * 6;
     this.glow.material.rotation += 0.002;
@@ -660,14 +730,48 @@ class LightShow {
         mesh.rotation.y += mesh.userData.spin * 0.7 * dt * (0.6 + e);
       }
       this.flashSpiral.rotation.z += 0.12 * dt * (0.6 + e);
+      // wide, slow orbit around the singularity — keeps the centre clear for the
+      // hole while the cluster still passes through frame as infalling debris
+      // Orbit radius is set so the cluster never overlaps the accretion disk: at
+      // z=-30 it subtends a LARGER angle than the shadow at z=-58, so anything
+      // closer than this reads as a wireframe net thrown over the disk.
+      // ONE phase for both axes → a closed ellipse that never reaches (0,0).
+      // Two independent frequencies (0.075 / 0.055) made this a Lissajous figure:
+      // the axes beat against each other and the cluster periodically drifted
+      // through dead centre, over the name lockup — the opposite of what the
+      // comment above promises. A single phase guarantees a minimum radius of the
+      // semi-minor axis (9.5 world units at z=-30), so the centre column stays clear.
+      // Orbit CENTRE is biased opposite the black hole. The hole is anchored off the
+      // optical axis (HOLE_OFS, upper-right on wide screens) while this cluster
+      // orbits the axis, so with the film-accurate disk radii the two kept landing
+      // on each other — the wireframe read as a net thrown over the accretion disk
+      // again. Mirroring the orbit to the far side balances the frame (hole
+      // upper-right, cluster left) and still leaves the centre column clear for the
+      // name lockup, which is what the single-phase ellipse below is for.
+      const orbit = now * 0.065;
+      // Orbit centre moved UP and slightly right. The hero copy is now a
+      // bottom-left block (see css/kinetic.css), so a cluster orbiting the
+      // left-centre sat directly on the names; and the eclipse owns the upper
+      // right. This parks it in the empty upper-middle between the two.
+      // off the names-to-eclipse diagonal, cropping the top-left edge
+      this.flashGrp.position.x = -21 + Math.cos(orbit) * 5;
+      this.flashGrp.position.y = 21 + Math.sin(orbit) * 3;
       if (burst && appState.ignited) {
         this.flashDominant = 1 - this.flashDominant;         // HARD CUT, no ease
         this.flashPulse = 1;
         for (const mesh of this.flashPolys) mesh.rotation.x += (Math.random() - 0.5) * 2.4; // jump, not a tween
       }
       this.flashPulse *= 0.80; // fast, uncapped decay (flash-safety exception)
-      const polyOp = (this.flashDominant === 0 ? 0.85 : 0.12) + this.flashPulse * 0.6;
-      const spiralOp = (this.flashDominant === 1 ? 0.85 : 0.12) + this.flashPulse * 0.5;
+      // These are the REAL brightness of the cluster — the base opacity set in
+      // buildFlashCluster is overwritten every frame here, so it is these numbers
+      // that have to come down. Measured against the black hole, the old 0.85
+      // dominant value made the wireframe ~2x brighter than the hole's brightest
+      // pixel, i.e. the cluster was the hero and the singularity was its backdrop.
+      // Now it stays under the photon ring while keeping the hard flash-cut edit.
+      // Down again now the names are the hero: the wireframe was the second
+      // brightest mass in frame and pulled focus off the lockup.
+      const polyOp = (this.flashDominant === 0 ? 0.11 : 0.025) + this.flashPulse * 0.10;
+      const spiralOp = (this.flashDominant === 1 ? 0.11 : 0.025) + this.flashPulse * 0.09;
       for (const mesh of this.flashPolys) mesh.material.opacity = Math.min(1, polyOp);
       this.flashSpiralMat.opacity = Math.min(1, spiralOp);
       this.flashGrp.visible = ignite > 0.02; // dormant pre-tap, like the drop dancer
@@ -693,8 +797,29 @@ class LightShow {
     this.camera.lookAt(0, 0, -60);
     this.fog.density = 0.058 + (1 - e) * 0.02;
 
+    // black hole: disk shear / beaming brightness / lens strength ride the same
+    // energy+beat drive as everything else, and it stays dormant pre-tap
+    if (this.hole) this.hole.update(dt, now, e, beat, ignite);
+
+    // Straight to the canvas. The eclipse needs no gravitational lensing, so the
+    // render-target + fullscreen-warp-quad pass that the black hole required is
+    // gone entirely — one less full-screen fill per frame on every tier.
     this.renderer.render(this.scene, this.camera);
     this.raf = requestAnimationFrame(this.frame);
+  }
+
+  // Viewport-fraction → world-unit offset for the hole at HOLE.z. The frustum
+  // half-height at that depth is |z|·tan(fov/2) and the half-width is that times
+  // the aspect, so an x fraction stays a constant share of the visible frame at
+  // any aspect instead of drifting off-screen on wide monitors.
+  holeOffset() {
+    const aspect = Math.max(0.2, innerWidth / Math.max(1, innerHeight));
+    const f = aspect < 1 ? HOLE_OFS.portrait : HOLE_OFS.wide;
+    // Frustum is measured at the hole's OWN depth (f.z), not HOLE.z — portrait
+    // moves the hole deeper, and the offsets must scale with that frame or the
+    // anchor would land in the wrong place.
+    const halfH = Math.abs(f.z) * Math.tan((this.camera.fov * Math.PI / 180) / 2);
+    return { x: f.x * halfH * aspect * 2, y: f.y * halfH * 2, z: f.z };
   }
 
   onResize() {
@@ -704,6 +829,11 @@ class LightShow {
       if (this.floored || !this.renderer) return;
       this.renderer.setSize(innerWidth, innerHeight, false);
       this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix();
+      if (this.hole) {
+        const ofs = this.holeOffset();                        // aspect changed → re-derive the third-line anchor
+        this.hole.setCenterOffset(ofs.x, ofs.y, ofs.z);   // portrait↔landscape also changes depth
+        this.hole.resize(TIERS[this.tier].dpr);
+      }
     }, 150);
   }
 

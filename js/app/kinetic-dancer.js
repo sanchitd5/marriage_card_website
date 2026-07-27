@@ -54,6 +54,15 @@ const AMBIENT_MIN_WIDTH = 768;       // tablet + desktop only; phones skip entir
 const AMBIENT_MIN = 5;
 const AMBIENT_SCALE_BASE = 0.34;     // fraction of the armadrillo's duet fit scale → scattered-crowd size
 const MIN_NDC_SEP = 0.36;
+// Centre KEEP-OUT (NDC half-extents). The ambient canvas is fixed inset:0, so a
+// spawn near (0,0) lands on top of the hero's centred text lockup — that is how a
+// dancer ended up standing behind the hashtag and waveform. Spawns are rejected
+// inside this ellipse and pushed radially out onto its boundary, which also gives
+// the crowd the edge-anchored placement a background tier wants. Sized to the
+// widest text block (the name headline at 13vw) plus its descenders, not to the
+// viewport.
+const KEEPOUT_NDC_X = 0.62;
+const KEEPOUT_NDC_Y = 0.58;
 const FEATURED_SCALE_MULT = 0.32;   // featured dancer displayed small
 
 // Which partner shares the featured stage (see git history). false → lone armadrillo.
@@ -788,9 +797,16 @@ class KineticDancer {
     this.rigB = new Rig(RIG_B);
     this.rigA.leanSign = 1;  this.rigA.idlePhase = 0;
     this.rigB.leanSign = -1; this.rigB.idlePhase = 1.7;
+    // Anchors are full-screen NDC. The LONE armadrillo used to stand at
+    // (-0.06, -0.02) — dead centre, which put it directly behind the hero's
+    // waveform and hashtag. It now holds the lower-LEFT third, diagonally
+    // opposite the black hole's upper-right anchor (HOLE_OFS in lightshow.js), so
+    // the two supporting visuals balance across the frame instead of both
+    // fighting the centred name lockup. driftY is trimmed so the slow drift can
+    // never walk it back up into the text block.
     this.rigA.duetAnchor = hasPartner
       ? { x: -0.46, y: -0.03, driftX: 0.05, driftY: 0.03,  speed: 0.05, phase: 0.0 }
-      : { x: -0.06, y: -0.02, driftX: 0.06, driftY: 0.035, speed: 0.05, phase: 0.0 };
+      : { x: -0.60, y: -0.34, driftX: 0.05, driftY: 0.025, speed: 0.05, phase: 0.0 };
     this.rigB.duetAnchor = { x: 0.47, y: 0.04, driftX: 0.05, driftY: 0.03, speed: 0.045, phase: 1.9 };
     this.rigs = [this.rigA, ...(SHOW_FAIRY_PUNK ? [this.rigB] : [])];
 
@@ -1412,13 +1428,32 @@ class KineticDancer {
     for (let i = 0; i < this.rigs.length; i++) { const r = this.rigs[i]; if (r.modelReady && r.duetAnchor) others.push({ ndcX: r.duetAnchor.x, ndcY: r.duetAnchor.y }); }
     let best = null, bestD = -1;
     for (let k = 0; k < 8; k++) {
-      const x = (Math.random() * 2 - 1) * 0.85, y = (Math.random() * 2 - 1) * 0.85;
+      const [x, y] = this.clearOfCentre((Math.random() * 2 - 1) * 0.85, (Math.random() * 2 - 1) * 0.85);
       let dmin = Infinity;
       for (let i = 0; i < others.length; i++) { const dx = x - others[i].ndcX, dy = y - others[i].ndcY; const d = Math.sqrt(dx * dx + dy * dy); if (d < dmin) dmin = d; }
       if (dmin >= MIN_NDC_SEP) return [x, y];
       if (dmin > bestD) { bestD = dmin; best = [x, y]; }
     }
-    return best || [(Math.random() * 2 - 1) * 0.85, (Math.random() * 2 - 1) * 0.85];
+    return best || this.clearOfCentre((Math.random() * 2 - 1) * 0.85, (Math.random() * 2 - 1) * 0.85);
+  }
+
+  // Push an NDC point out of the centre text keep-out, radially, so it lands on
+  // the ellipse boundary instead of being resampled (resampling could loop, and
+  // biases the crowd toward whichever quadrant happens to be sampled first).
+  // Points already outside are returned untouched.
+  clearOfCentre(x, y) {
+    const nx = x / KEEPOUT_NDC_X, ny = y / KEEPOUT_NDC_Y;
+    const r = Math.sqrt(nx * nx + ny * ny);
+    if (r >= 1) return [x, y];
+    if (r < 1e-4) {                                   // dead centre: no direction to push along
+      const a = Math.random() * Math.PI * 2;
+      return [Math.cos(a) * KEEPOUT_NDC_X, Math.sin(a) * KEEPOUT_NDC_Y];
+    }
+    const k = 1 / r;                                  // scale onto the boundary
+    return [
+      Math.max(-0.96, Math.min(0.96, x * k)),
+      Math.max(-0.96, Math.min(0.96, y * k)),
+    ];
   }
 
   // (Re)activate a pooled instance at a fresh spaced spot / facing / scale.

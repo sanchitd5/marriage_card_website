@@ -10,12 +10,18 @@ A heavily animated, mobile-first wedding invitation (Sanchit & Riya). Plain HTML
 >
 > **Rule: snapshot and verify visuals before calling a UI change done.** After any change that alters how the page *looks*, **render a screenshot and have a subagent judge whether it looks good** — don't trust the diff. Build (`node build.js`), then drive headless Chromium (Playwright is installed; reuse the launch pattern in `gen-share-cards.mjs` — `chromium` is on `pw.default`, `CHROME_PATH`/`PLAYWRIGHT_PATH` overridable) to open `dist/index.html` with `reducedMotion: 'reduce'`, strip the entry gate + unlock scroll + force `.fade-up` visible via `page.evaluate`, then element-screenshot the target section. Read the PNG yourself, then hand it to a review subagent (give it the file path; it Reads the image). **The review subagent's job is adversarial: research the relevant convention/best practice, then criticize — point out mistakes, gaps, and what's missing. It must not praise or pad; only surface problems and concrete fixes.** Score + ranked fixes. Iterate until it reads as luxury, not template. Keep before/after PNGs for comparison.
 
+> **Rule: `techno` is DEPRECATED — never work on it. `kinetic` is its updated version.**
+> The friends-facing skin has two build targets. **`kinetic` is the live, maintained one; treat `techno` as frozen legacy.** Do not fix, restyle, refactor or "improve" the techno target, and do not spend a research or screenshot pass on it. When a request concerns the friends-facing skin, it means **kinetic** — build with `WEDDING_THEME=kinetic node build.js` and verify against that.
+>
+> The two are **not** siblings, so deprecated does not mean deletable: `src/index.kinetic.template.html` loads **`css/techno.css` as its base stylesheet** and sets **`data-skin="techno"`**, which ~12 JS modules gate on (`animations`, `hero`, `ui`, `gallery`, `scratch`, `celebration`, `lightshow`, `milkdrop`, `boot-loader`, …), plus `build.js`'s `isTechnoBased()` which routes the techno audio playlist and 3D scene assets to both targets. So `css/techno.css`, the `techno` skin value, and the shared asset plumbing are all **live kinetic infrastructure — keep them**. What is deprecated is the standalone target: `src/index.techno.template.html`, `docs/techno-variant.md`, and the `theme === 'techno'` branch. Editing `css/techno.css` is normal and expected (it is kinetic's base); editing the techno *template* is not.
+
 ## Commands
 
 ```sh
 node build.js                        # build → dist/ (groom-first, default Regency skin)
 FROM_GROOM_SIDE=false node build.js  # bride-first build (or: npm run build:bride)
-WEDDING_THEME=techno node build.js   # friends-facing techno skin (see docs/techno-variant.md)
+WEDDING_THEME=kinetic node build.js  # friends-facing skin — THE one to work on (docs/kinetic-variant.md)
+WEDDING_THEME=techno node build.js   # DEPRECATED — see below. Do not work on this.
 npm test                             # node --test "test/**/*.test.mjs" (build-helper unit tests)
 node --test test/build.test.mjs      # run a single test file
 python3 -m http.server -d dist 8642  # serve locally after a build → http://127.0.0.1:8642

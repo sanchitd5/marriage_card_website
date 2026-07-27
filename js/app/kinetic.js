@@ -406,6 +406,18 @@ class KineticConsole {
     });
     document.body.appendChild(menu);
 
+    // The hero's cyan "the countdown has already started" line is a real deck
+    // control, not decoration. The deck's own Back/Next chrome auto-hides while
+    // the pointer is idle, so without this the first panel's steady state has no
+    // visible call to action at all — a guest who pauses to read the invocation
+    // watches their only exit disappear. This gives the hero a second door that
+    // is part of the copy and never hides.
+    for (const jump of $$('[data-jump-act]')) {
+      const idx = parseInt(jump.getAttribute('data-jump-act'), 10);
+      if (!Number.isFinite(idx)) continue;
+      jump.addEventListener('click', () => { if (this.entered) this.go(idx); });
+    }
+
     const controls = document.createElement('div');
     controls.id = 'k-panel-controls';
     this.controls = controls;
