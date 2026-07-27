@@ -2679,3 +2679,18 @@ html[data-variant="kinetic"] .event-gate-note {
     opacity: .55;
   }
 }
+
+@media (max-width: 1099.98px) {
+  /* Panels were centred in the FULL viewport while a ~95px nav bar occupies the
+     bottom, so every act's optical centre sat above the true centre of the
+     visible area and left a 200-300px dead band just above the bar. Centre in
+     the viewport MINUS the bar instead. */
+  html.k-deck[data-variant="kinetic"] .band,
+  html[data-variant="kinetic"] .hero {
+    padding-block: 5svh calc(95px + 3svh);
+  }
+  /* the eclipse must never be able to paint over a kicker or headline */
+  html[data-variant="kinetic"] #lightshow { z-index: 0; }
+  html[data-variant="kinetic"] .hero-inner,
+  html.k-deck[data-variant="kinetic"] .band > .wrap { position: relative; z-index: 2; }
+}

@@ -103,7 +103,11 @@ const HOLE_OFS = {
   // over the corona — grey text on a cyan bloom, the least legible thing in the
   // deck. On desktop the eclipse is a margin object in dialogue with the type
   // across a gutter; centring it on mobile silently demoted it to wallpaper.
-  portrait: { x: 0.34, y: 0.34, z: -86 },
+  // Pushed hard into the TOP-RIGHT CORNER. At y:0.34 the disc had stopped
+  // printing under body copy but landed exactly at kicker/H1 altitude, so it was
+  // overprinting the headline on four of six acts. The corner is the only place
+  // on a 390px panel where no text lives.
+  portrait: { x: 0.46, y: 0.62, z: -86 },
 };
 
 class LightShow {
