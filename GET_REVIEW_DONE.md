@@ -85,8 +85,11 @@ things that are deliberate:
 
 - Dates and venues are **gated on purpose**. "To be announced", the sealed
   archive and the cipher plate are intentional suspense, not unfinished work.
-- **Theme-9 is out of scope.** It is a full-screen video takeover on one track.
-  If a capture looks like video frames, it is; re-run rather than review it.
+- **Theme-9 can no longer appear.** It is a full-screen video takeover on one
+  track, and the harness now drops that track from the playlist at BUILD time
+  via `EXCLUDE_TRACKS=theme-9`. Excluding it in the build is deterministic;
+  pausing or skipping it in the page is a race against autoplay. If you build by
+  hand for a review, pass the same flag.
 - Say which viewport they are looking at, and that the kinetic build is a
   **panel deck** — a "scroll" instruction would be an affordance that cannot be
   obeyed, and reviewers have recommended one.
@@ -97,6 +100,71 @@ Ask for a **score out of 10 per act plus a ranked defect list with concrete
 fixes** (element, property, value). Ask them not to inflate — a generous review
 is worthless. Run seats in parallel as separate agents; independent seats
 disagreeing is a useful signal in itself.
+
+## The panel prompt
+
+Run seats **in parallel as separate subagents**. Independent seats disagreeing is
+a useful signal; one agent wearing two hats averages its own opinion.
+
+Two seats have worked well:
+
+- **Seat A — composition / typography / art direction**
+- **Seat B — guest experience / brand fit / mobile and one-handed usability**
+
+Paste the block below, filling the four bracketed parts. Everything in it is
+there because omitting it has produced a wasted review at least once.
+
+```
+You are PANEL SEAT [A: COMPOSITION / TYPOGRAPHY / ART DIRECTION
+                  | B: GUEST EXPERIENCE / BRAND FIT / MOBILE & ONE-HANDED USABILITY]
+reviewing [WHAT] of a wedding invitation.
+
+Captures: [PATHS — name each file; say which viewport and which variant]
+Reference for the quality bar: review-out/<variant>/desktop/01-hero.png
+
+Read every image listed before answering.
+
+SCOPE — score against these and nothing else:
+- Obsidian + cyan, techno/Anyma, friends-facing (kinetic) OR ivory + gold,
+  painted palace, family-facing (regency).
+- Kinetic is a PANEL DECK: fixed Back/Next bar plus a section rail, no scrolling
+  between panels, the wheel does nothing — so a "scroll" affordance would be an
+  instruction that cannot be obeyed. Regency is a scrolling page.
+- Dates and venues are DELIBERATELY gated. "To be announced", the sealed archive
+  and the masked countdown are intentional suspense, NOT unfinished work. Judge
+  whether the gated state reads as deliberate.
+- OUT OF SCOPE, do not score or report:
+  * the RSVP reply mechanism (no form/link is a known product decision);
+  * theme-9 — the harness excludes it at build time, so it should not appear
+    at all; if you see video frames, the capture was not made by the harness;
+  * the EVENT LIST itself — which functions run, who hosts them, who is invited.
+    That is still being decided and a management panel will own it. See
+    DESIGN.md "Pending event decisions".
+  * on DESKTOP, controls under 44px. 44px is a touch guideline; applied to a
+    pointer viewport it flags the entire desk chrome.
+- Known and accepted, do not re-report: no swipe gesture; no browser-history
+  integration; hold-to-decrypt has no progress fill.
+
+TARGET IS ABOVE [N]/10. Do not inflate — a generous review is worthless. If a
+surface is 8.3, say 8.3.
+
+Deliver:
+(a) A score /10 per surface (and per viewport where both were captured).
+(b) Ranked defects per surface, each with a concrete implementable fix:
+    element, property, value, direction. Specific enough to apply without
+    guessing.
+(c) VARIANT-SPECIFIC defects — what breaks only when dates reveal, only when the
+    couple photos reveal, or only on the bride-first build. Name the variant per
+    finding. This is the entire point of reviewing a matrix.
+(d) Global defects across surfaces; one fix here lifts several scores.
+(e) [Seat B only] One-handed use on 844px: thumb reach, whether the round trip
+    land -> countdown -> back works, anything needing a stretch or two hands.
+Terse. No praise except where it changes a score.
+```
+
+Adjust the target upward between rounds rather than asking for perfection at the
+start: a seat asked for ">9.9" on a first pass tends to produce a long list of
+hygiene nits and miss the structural fault.
 
 ## Verify before you act
 
@@ -110,6 +178,17 @@ much: a contrast flood *was* real — `#milkdrop` screen-blends the music
 visualiser at an opacity driven per-frame by the track's drop level, so the same
 panel is legible on a quiet passage and washed out on a loud one. A single
 screenshot cannot tell you which you are looking at.
+
+Concrete cases from this project, both directions:
+
+| Reported | Reality |
+|---|---|
+| "Stray red/blue blobs on the copy" | Frames of the theme-9 video takeover. |
+| "The couple's names are missing" | Lockup at `opacity:0` awaiting the scramble reveal. |
+| "No deck navigation on mobile" | Chrome existed at `opacity:0` awaiting a `pointermove` a touch screen never sends. Half right: real defect, wrong cause. |
+| "Hero and footer show different hashtags" | The hero hashtag is a deliberate rotator; a still frame catches one of two. The prescribed fix would have deleted the feature. |
+| "A pale-cyan wash makes this panel unreadable" | **True.** `#milkdrop` screen-blends at an opacity driven by the music's drop level. Dismissed twice before being confirmed. |
+| "The revealed build shows the dates AND 'to be revealed'" | **True.** The `hidden` attribute was set, but a `display:flex` rule overrode it. Checking the HTML was not enough; the computed style was. |
 
 So: measure before you implement. Read the computed style, sample the pixels, or
 capture the state again. Two of the biggest fixes in this project came from

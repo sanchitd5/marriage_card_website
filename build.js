@@ -409,6 +409,23 @@ function runBuild() {
         .sort((a, b) => Number(a[2]) - Number(b[2]))
         .map((m) => songPrefix + m[1])
     : [];
+  // EXCLUDE_TRACKS=theme-9[,theme-3...] drops tracks from the playlist for one
+  // build. It exists for the review harness: theme-9 triggers a full-viewport
+  // VIDEO TAKEOVER that replaces the entire scene for the length of the song,
+  // so any capture taken while it plays is video frames, not the design. A
+  // panel already wasted a whole review critiquing those frames. Excluding it
+  // at build time is more reliable than trying to pause or skip the track in
+  // the page afterwards.
+  const excluded = (process.env.EXCLUDE_TRACKS || '')
+    .split(',').map((t) => t.trim()).filter(Boolean);
+  const kept = excluded.length
+    ? songs.filter((name) => !excluded.some((ex) => name === ex || name.endsWith('/' + ex)))
+    : songs;
+  if (excluded.length) {
+    console.log(`build: EXCLUDE_TRACKS=${excluded.join(',')} → dropped ${songs.length - kept.length} track(s)`);
+  }
+  songs.length = 0;
+  songs.push(...kept);
   console.log(`build: discovered ${songs.length} music track(s)`);
 
   // Emit dist/js/app/couple.mjs (build-generated, imported by config.js/ui.js).

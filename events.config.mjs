@@ -22,6 +22,20 @@
 // anything under js/ that ships to the browser — the build reads it, gates it,
 // and emits only what is allowed to be public. See CLAUDE.md.
 
+// STATUS: the event list is NOT final. Which functions run, who hosts each one,
+// and which guests are invited to what are all still being decided, and a
+// management panel is planned to own that editing rather than hand-edits here.
+// Treat everything below as provisional data behind a stable shape:
+//
+//   - keep the shape (id / name / side / dress / blurb / venueNote) stable, so
+//     the future panel can write to it without touching the renderer;
+//   - the selectors at the bottom are pure and unit-tested, so a UI can call
+//     them directly;
+//   - reviewers should not report the event list as a design defect. Open
+//     cultural questions are recorded in DESIGN.md under "Pending event
+//     decisions", including whether the Baraat is genuinely groom-side-only
+//     (the bride's family receives it) and whether a Sangeet is missing.
+
 // Which side hosts an event. 'both' = a joint function that appears on every
 // build; 'groom' / 'bride' = a side-specific function that appears only on that
 // side's build (FROM_GROOM_SIDE), because the other side's guests are not

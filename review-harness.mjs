@@ -101,6 +101,13 @@ function build(v) {
       FROM_GROOM_SIDE: String(v.side),
       REVEAL_DATE: String(v.revealDate),
       REVEAL_COUPLE: String(v.revealCouple),
+      // theme-9 triggers a full-viewport VIDEO TAKEOVER that replaces the whole
+      // scene for the length of the track, so a capture taken while it plays is
+      // video frames rather than the design — a panel already spent an entire
+      // review critiquing those frames. Dropping the track from the playlist at
+      // BUILD time is deterministic; pausing or skipping it in the page is a
+      // race against autoplay.
+      EXCLUDE_TRACKS: [process.env.EXCLUDE_TRACKS, 'theme-9'].filter(Boolean).join(','),
     },
   });
 }
@@ -116,7 +123,16 @@ function serve(port) {
       if (!file.startsWith(path.join(root, 'dist'))) { res.writeHead(403).end(); return; }
       if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'index.html');
       const body = await readFile(file);
-      res.writeHead(200, { 'content-type': types[path.extname(file)] || 'application/octet-stream' });
+      // NO CACHING. The harness rebuilds dist/ in place between variants and
+      // serves every one from the same origin and port, so without this the
+      // browser happily reuses the previous variant's index.html and CSS. That
+      // is how a kinetic cell rendered the Regency skin: the loop builds regency
+      // first, and the cached document survived the rebuild.
+      res.writeHead(200, {
+        'content-type': types[path.extname(file)] || 'application/octet-stream',
+        'cache-control': 'no-store, no-cache, must-revalidate',
+        'pragma': 'no-cache',
+      });
       res.end(body);
     } catch { res.writeHead(404).end(); }
   });
@@ -129,12 +145,14 @@ async function capture(pw, v, vpName, args) {
     executablePath: CHROME,
     args: ['--use-gl=angle', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
   });
-  const page = await browser.newPage({ ...VIEWPORTS[vpName] });
+  const page = await browser.newPage({ ...VIEWPORTS[vpName], bypassCSP: true });
+  await page.route('**/*', (route) => route.continue({ headers: { ...route.request().headers(), 'cache-control': 'no-cache' } }));
   const problems = [];
   page.on('pageerror', (e) => problems.push('PAGEERROR ' + e.message.slice(0, 180)));
   page.on('console', (m) => { if (m.type() === 'error') problems.push('CONSOLE ' + m.text().slice(0, 180)); });
 
-  const dir = path.join(root, args.out, slug(v), vpName);
+  const outBase = path.isAbsolute(args.out) ? args.out : path.join(root, args.out);
+  const dir = path.join(outBase, slug(v), vpName);
   fs.mkdirSync(dir, { recursive: true });
 
   await page.goto(`http://127.0.0.1:${args.port}/`, { waitUntil: 'load' });
@@ -295,7 +313,7 @@ async function main() {
   const pw = await import(PW);
   const list = variants(args);
   const vps = args.viewport ? [args.viewport] : Object.keys(VIEWPORTS);
-  const outRoot = path.join(root, args.out);
+  const outRoot = path.isAbsolute(args.out) ? args.out : path.join(root, args.out);
   fs.mkdirSync(outRoot, { recursive: true });
 
   const report = [];

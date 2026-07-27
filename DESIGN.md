@@ -225,6 +225,30 @@ The hero hashtag is a deliberate rotator (`hero.js: startHashtagCycle`) cycling
 prescribed fix (point both at one field, add a test asserting hero == footer)
 would have deleted a working feature.
 
+## Pending event decisions (out of scope for review)
+
+The programme is **not final**. Which functions run, who hosts them, and which
+guests see which subset are still being decided, and a **management panel is
+planned** to own that editing. `events.config.mjs` holds provisional data behind
+a stable shape so the panel can write to it without touching the renderer.
+
+Do not report these as design defects. Recorded so they are not lost:
+
+- **Is the Baraat groom-side-only?** It is currently modelled that way, so a
+  bride-first build omits it. A reviewer argues that is culturally wrong: the
+  bride's family *receives* the baraat, and the milni and the dancing at the
+  gate are their moment as much as the groom's.
+- **No Sangeet**, which for a Punjabi wedding is the function friends most
+  expect — and the one a techno-skinned card is best placed to sell. If it is
+  folded into "Cocktail & Engagement", the card should say so.
+- **Engagement listed after Haldi.** Confirmed correct by the couple, but elders
+  may read a future-tense engagement beside the wedding as odd.
+- **The Wedding row is thin** for the central event: a guest cannot tell whether
+  to arrive for the baraat, the phere or dinner.
+- **Bride-first shows three events and reads as short.** Whatever the final list,
+  either fill the panel at n=3 or state the split explicitly, so it reads as a
+  choice rather than missing data.
+
 ## Known open items
 
 - **RSVP has no reply mechanism.** The act named RSVP offers no way to respond.

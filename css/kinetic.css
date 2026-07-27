@@ -2694,3 +2694,29 @@ html[data-variant="kinetic"] .event-gate-note {
   html[data-variant="kinetic"] .hero-inner,
   html.k-deck[data-variant="kinetic"] .band > .wrap { position: relative; z-index: 2; }
 }
+
+/* [hidden] must win. The build gates this line with the `hidden` attribute when
+   revealDate flips, but `display: flex` above silently overrode it, so the
+   revealed build showed the real dates AND "DATES AND VENUES TO BE REVEALED"
+   on the same panel. Any element given a display value must restore this, or
+   the attribute is decorative. */
+html[data-variant="kinetic"] [hidden] { display: none !important; }
+
+/* Run of show, REVEALED state. Adding a date, venue and two action buttons to
+   every row roughly doubles the block, and this is a fixed-panel deck with no
+   scroll — a reviewer found the headline clipped off the top edge and the last
+   event's venue and buttons cut by the nav bar, i.e. genuinely unreachable
+   content. The list becomes its own scroll region, with a gradient mask so the
+   overflow is announced rather than looking severed. */
+html.k-deck[data-variant="kinetic"] .events .event-grid {
+  max-height: calc(100svh - 22rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 44px), transparent);
+          mask-image: linear-gradient(to bottom, #000 calc(100% - 44px), transparent);
+  padding-bottom: 1.5rem;
+}
+/* compact the revealed row so it needs the scroll less often */
+html.k-deck[data-variant="kinetic"] .events .event-when,
+html.k-deck[data-variant="kinetic"] .events .event-venue { line-height: 1.35; }
+html.k-deck[data-variant="kinetic"] .events .event-actions { gap: .75rem; margin-top: .5rem; }

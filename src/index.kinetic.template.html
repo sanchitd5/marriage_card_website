@@ -399,7 +399,12 @@
                module ciphers it at runtime, so there is nothing to reveal for
                no-JS/reduced-motion users, and nothing extra to leak when
                revealDate=false (the token is the placeholder then). -->
-          <div class="scratch kdc fade-up">
+          <!-- The whole decrypt ritual is SECRET_ONLY. Once revealDate flips, the
+               date is public and a cipher plate, a "hold to decrypt" control and
+               the line "the clock starts when the date drops" all become theatre
+               performed over an answer the guest can already read — a reviewer
+               called it stale copy running beside a live clock. -->
+          <div class="scratch kdc fade-up" {{SECRET_ONLY}}>
             <p class="scratch-prompt">“Some dates drop without warning. This one you get to see coming.”</p>
             <p class="scratch-hint">The clock starts when the date drops.</p>
             <div class="scratch-frame">
