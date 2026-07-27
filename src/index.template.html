@@ -424,7 +424,13 @@
       <!-- ══════════ PORTRAIT INTERLUDE ══════════ -->
       <section class="band band--tint interlude">
         <div class="wrap wrap--narrow">
-          <div class="interlude-art"><img src="assets/images/art-couple.jpg" alt="Regency-style oil painting of the couple beneath a gilded jharokha arch" loading="lazy"></div>
+          <!-- data-speed is ScrollSmoother's parallax (effects:true in animations.js).
+               0.9 gives ~14vh of drift over a 100svh band — inside the 12-20vh
+               "tasteful" band; past ~30vh it reads cheap. clamp() keeps it from
+               being pre-offset before the element has been scrolled to. Depth is
+               applied to PAINTED ART ONLY, never to a text layer: drifting copy is
+               what makes parallax read as a gimmick rather than as depth. -->
+          <div class="interlude-art" data-speed="clamp(0.9)"><img src="assets/images/art-couple.jpg" alt="Regency-style oil painting of the couple beneath a gilded jharokha arch" loading="lazy"></div>
           <p class="interlude-line">“Written in the stars, long before they ever met.”</p>
         </div>
       </section>
@@ -441,7 +447,11 @@
       <!-- ══════════ FAMILY ══════════ -->
       <section class="band band--tint family" id="family">
         <div class="wrap wrap--narrow">
-          <img class="family-motif fade-up" src="assets/images/art-peacock.jpg" alt="" aria-hidden="true" loading="lazy">
+          <!-- Slower than the interlude art (0.94 vs 0.9) so the two painted
+               panels separate in depth rather than drifting as one plane. The
+               peacock is decorative and aria-hidden, so motion here costs the
+               reader nothing. -->
+          <img class="family-motif fade-up" src="assets/images/art-peacock.jpg" data-speed="clamp(0.94)" alt="" aria-hidden="true" loading="lazy">
           <p class="kicker fade-up">With the blessings of our elders</p>
           <div class="family-quote-mark fade-up" aria-hidden="true">❖</div>
           <p class="family-quote fade-up">{{FAMILY_BLESSING_NAMES}}</p>

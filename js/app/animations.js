@@ -18,6 +18,10 @@ export function initGsap() {
 
   gsap.registerPlugin(ScrollTrigger, ScrollSmoother);
   gsap.config({ nullTargetWarn: false });
+  // Every band is min-height:100svh, so an iOS address bar collapsing changes svh
+  // and fires a resize — which would otherwise refresh every trigger mid-scroll
+  // and re-measure the pinned/scrubbed ranges under the reader's finger.
+  ScrollTrigger.config({ ignoreMobileResize: true });
   // luxury ease: power curve 1-(1-p)^2.6 for smooth elastic deceleration
   gsap.registerEase('luxe', EASING_CURVE);
 
@@ -38,13 +42,45 @@ export function initGsap() {
       { y: 0, autoAlpha: 1, scale: 1, duration: 1.1, stagger: 0.12, ease: 'power3.out', overwrite: true }),
   });
 
-  // interlude: portrait eases in and the quote follows, one choreography
-  gsap.timeline({
-    defaults: { ease: 'power3.out' },
-    scrollTrigger: { trigger: '.interlude-art', start: 'top 80%', once: true },
-  })
-    .fromTo('.interlude-art', { autoAlpha: 0, y: 60, scale: .96 }, { autoAlpha: 1, y: 0, scale: 1, duration: 1.6 })
-    .fromTo('.interlude-line', { autoAlpha: 0, y: 28 }, { autoAlpha: 1, y: 0, duration: 1.1 }, '-=.8');
+  // INTERLUDE — the page's ONE cinematic moment.
+  //
+  // Everything else on the page uses the quiet .fade-up register; a panel scored
+  // the page down because every band was animated the same way, so uniform motion
+  // read as no hierarchy at all. The contrast is the point: one loud act works
+  // only because the rest stay quiet. Do not promote a second band to this
+  // treatment without demoting this one.
+  //
+  // A curtain wipe rather than another fade: the gate already opens on a drape,
+  // so the panel un-veiling is the same gesture returning. clip-path is
+  // compositor-capable (like transform/opacity) so it is safe to scrub.
+  //
+  // scrub: 0.5 adds catch-up lag that reads as weight — 1:1 (`scrub: true`) feels
+  // mechanical on a trackpad. The range CLOSES EARLY on purpose: fully open by the
+  // time the panel reaches mid-viewport, so it settles to a composed static state
+  // and scrolling back up cannot un-reveal it. Content resolves; only atmosphere
+  // stays scroll-linked.
+  const curtain = gsap.matchMedia();
+  curtain.add('(prefers-reduced-motion: no-preference)', () => {
+    gsap.fromTo('.interlude-art',
+      { clipPath: 'inset(0% 0% 100% 0%)', autoAlpha: 1 },
+      {
+        clipPath: 'inset(0% 0% 0% 0%)',
+        ease: 'none',                       // scrubbed: the scroll IS the easing
+        scrollTrigger: {
+          trigger: '.interlude-art',
+          start: 'top 88%',
+          end: 'top 45%',
+          scrub: 0.5,
+        },
+      });
+    // The quote still resolves discretely — scrubbing text makes a reader chase
+    // the words, and this line is the emotional payoff of the panel above it.
+    gsap.fromTo('.interlude-line', { autoAlpha: 0, y: 28 },
+      {
+        autoAlpha: 1, y: 0, duration: 1.1, ease: 'power3.out',
+        scrollTrigger: { trigger: '.interlude-art', start: 'top 62%', once: true },
+      });
+  });
 
   // scrolling in does the scratching: fully swept once half the section is in
   let scratched = 0;
