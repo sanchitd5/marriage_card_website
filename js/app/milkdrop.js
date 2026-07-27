@@ -43,7 +43,18 @@ const BEATS_PER_CUT = 1;     // cut every Nth high beat
 const MIN_CUT_MS = 250;      // ignore beats arriving sooner than this after a cut
 const PRESET_SECONDS = 14;   // fallback: cut anyway if no beat has landed in this long
 const BLEND = 0.4;           // preset crossfade seconds (beat-synced → short)
-const MAX_OPACITY = 0.6;     // opacity at a full drop
+// Opacity at a FULL drop. This is the real contrast ceiling for the visualiser:
+// the layer screen-blends over every panel, so at 0.6 a loud passage washed
+// hero/invocation, countdown, interlude and archive to flat grey-teal and put
+// white body copy at roughly 1.2-1.5:1. Four independent review seats reported
+// it as unreadable. Bounding it HERE keeps the level proportional to the drop —
+// still zero on a quiet passage, still a visible pulse on a loud one. Do not
+// "fix" this from CSS with `opacity: N !important`: that pins the layer at N
+// through the quiet passages too, which reads as a permanent wash and is worse
+// than the flood it replaces. A 390px screen has no dark field to dilute the
+// wash, so mobile gets a lower ceiling than desktop.
+const MAX_OPACITY = (typeof matchMedia === 'function'
+  && matchMedia('(max-width: 1099.98px)').matches) ? 0.16 : 0.26;
 const EPS = 0.02;            // below this the layer is effectively hidden
 
 // The visualizer as an object: it owns its own AudioContext + butterchurn viz +

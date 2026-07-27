@@ -223,9 +223,15 @@ async function capture(pw, v, vpName, args) {
       // descendant and set opacity:1, which also un-hid chrome that ships
       // hidden at that breakpoint (the desktop section rail on mobile) and made
       // the audit report targets a real guest never sees.
+      // .count-num is listed explicitly: the digit spans carry their OWN GSAP
+      // entrance state (visibility:hidden; opacity:0; scale .88) which is not
+      // cleared by forcing the .fade-up .count-cell around them. Without this a
+      // desktop capture shows DAYS/HOURS/MINUTES/SECONDS with nothing above
+      // them, and a panel reports the countdown as a broken widget — verified
+      // against a live scroll, where the digits render at opacity 1.
       const sel = '.fade-up, .hero-names, .hero-name, .hero-amp, .hero-invocation,'
         + ' .hero-invocation *, .kicker, .hero-date, .hero-voice, .hero-blessing,'
-        + ' .hero-await, .hero-await *, .hero-tag, .hero-tag *';
+        + ' .hero-await, .hero-await *, .hero-tag, .hero-tag *, .count-num';
       document.querySelectorAll(sel).forEach((el) => {
         el.classList.add('is-visible');
         const cs = getComputedStyle(el);

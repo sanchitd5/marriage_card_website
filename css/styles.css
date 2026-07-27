@@ -73,7 +73,10 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
 .band--tint { background: hsl(var(--parchment)); }
 /* every act of the story gets its own full stage, at every viewport */
 .band, .footer { min-height: 100svh; display: flex; align-items: center; }
-.band > .wrap, .footer > .wrap { width: 100%; }
+/* Content sits ABOVE the fixed ambience layers (.ambient / #tsparticles, z 40-41)
+   so falling petals can never paint over type — they drift behind the words and
+   through the transparent band background. Don't drop this z-index. */
+.band > .wrap, .footer > .wrap { width: 100%; position: relative; z-index: 45; }
 
 .kicker {
   font-family: var(--font-body);
@@ -350,7 +353,10 @@ html[data-theme="dark"] .hero-veil {
     radial-gradient(ellipse at center 58%, hsl(263 28% 9% / .45) 0%, hsl(263 24% 11% / .2) 70%);
 }
 .hero-inner {
-  position: absolute; inset: 0; z-index: 2; width: 100%;
+  /* z 45 (not 2): clears the fixed petal/particle layers (40-41) so nothing
+     drifts across the names or the Ganesha invocation roundel. Petals still
+     float over the hero video, which sits below at z 0-1. */
+  position: absolute; inset: 0; z-index: 45; width: 100%;
   display: grid;
   grid-template-rows: 1fr auto 1fr;   /* names row centred → "&" at 50svh */
   align-items: center; justify-items: center;
@@ -391,6 +397,8 @@ html[data-theme="dark"] .hero-veil {
   font-family: var(--font-display); font-weight: 400;
   font-size: clamp(1.35rem, 4.5vw, 2rem);
   letter-spacing: .14em;
+  /* same oldstyle fault as the countdown: "II & I2 December 2o26" */
+  font-variant-numeric: lining-nums;
 }
 .hero-date .hero-amp span { color: hsl(var(--gold)); }
 @media (max-width: 600px) {
@@ -407,7 +415,8 @@ html[data-theme="dark"] .hero-veil {
 .hero-tag-text {
   display: inline-block;
 }
-.scroll-cue { position: absolute; bottom: 3.5vh; left: 0; right: 0; z-index: 2; margin-inline: auto; display: grid; place-items: center; gap: .3rem; }
+/* z 45 for the same reason as .hero-inner: above the fixed petal layer. */
+.scroll-cue { position: absolute; bottom: 3.5vh; left: 0; right: 0; z-index: 45; margin-inline: auto; display: grid; place-items: center; gap: .3rem; }
 
 /* floating scroll cue — compact circle, same style as music-toggle */
 #floating-cue {
@@ -470,15 +479,24 @@ html[data-theme="dark"] .hero-veil {
   display: flex; justify-content: center; gap: clamp(1rem, 5vw, 3.5rem);
   margin-bottom: clamp(3rem, 7vw, 4.5rem);
 }
-.count-cell { display: flex; flex-direction: column; align-items: center; }
+.count-cell {
+  display: flex; flex-direction: column; align-items: center;
+  gap: clamp(.55rem, 1.4vw, .9rem);
+}
 .count-num {
   font-family: var(--font-display); font-weight: 300;
-  font-size: clamp(2.7rem, 11vw, 6rem); line-height: 1;
-  font-variant-numeric: tabular-nums;
+  font-size: clamp(2.7rem, 11vw, 6rem);
+  /* >1 so the oldstyle descenders (3, 7, 9) stay inside the line box and
+     cannot ride down onto the label beneath */
+  line-height: 1.16;
+  /* Cormorant defaults to oldstyle figures — elegant for the 01/02 event
+     ordinals, wrong here where the digits ARE the content ("I38 o7").
+     Lining fixes the shapes; tabular stops the row jittering per tick. */
+  font-variant-numeric: lining-nums tabular-nums;
 }
 .count-label {
   font-size: .62rem; letter-spacing: .26em; text-transform: uppercase;
-  color: hsl(var(--ink) / .55); margin-top: .5rem;
+  color: hsl(var(--ink) / .55);
 }
 .scratch { max-width: 24rem; margin-inline: auto; }
 .scratch-prompt { font-style: italic; font-size: .92rem; color: hsl(var(--ink) / .7); margin-bottom: .5rem; }
@@ -593,11 +611,20 @@ html[data-theme="dark"] .hero-veil {
 /* Couple gate closed: a single veiled panel replaces the masonry (photos are
    absent from the build entirely — see gallery.js / build.js). */
 .gallery-grid--veiled { grid-template-columns: 1fr; place-items: center; }
+/* The plate must read as SEALED, not as a frame waiting for images that failed
+   to load. So it collapses to its content: mark + note are one centred optical
+   group (flex column, explicit gap), and the box is only as tall as a closed
+   plate needs to be. Do not restore a tall min-height — the empty gold rule was
+   read by reviewers as a broken image container. */
 .gframe--veiled {
-  display: grid; place-items: center; gap: 1rem;
-  width: 100%; min-height: 42svh;
-  padding: clamp(2rem, 8vw, 4rem) 1.5rem;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: clamp(1rem, 3vw, 1.5rem);
+  width: 100%; min-height: 220px;
+  padding: clamp(2rem, 6vw, 3rem) 1.5rem;
   text-align: center;
+}
+@media (min-width: 760px) {
+  .gframe--veiled { min-height: 320px; max-width: 46rem; margin-inline: auto; }
 }
 .gframe--veiled .veil-motif { font-size: 2rem; color: hsl(var(--gold)); line-height: 1; }
 .gframe--veiled .veil-note {
@@ -625,12 +652,17 @@ html[data-theme="dark"] .family-motif {
   font-size: clamp(.9rem, 3vw, 1.15rem);
   margin: clamp(1.4rem, 5vw, 2.2rem) 0 clamp(1rem, 3.5vw, 1.5rem);
 }
+/* Measure is tuned, not arbitrary: the surname group is a nowrap token, so too
+   narrow a measure strands "Batra" from the noun "families" and leaves "united
+   in love" as a two-word orphan. 42ch lets the first surname group + "families"
+   sit on one line, and text-wrap:balance then evens the rest. If you widen or
+   narrow this, re-check the mobile wrap before committing. */
 .family-quote {
-  max-width: 32ch;
+  max-width: 42ch;
   margin: 0 auto;
   font-family: var(--font-display);
   font-weight: 400;
-  font-size: clamp(1.2rem, 4vw, 1.6rem);
+  font-size: clamp(1.12rem, 4vw, 1.6rem);
   line-height: 1.6;
   letter-spacing: .01em;
   color: hsl(var(--ink) / .82);

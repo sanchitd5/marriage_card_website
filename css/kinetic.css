@@ -1503,8 +1503,18 @@ html[data-variant="kinetic"] .kdc.is-decrypted .scratch-frame { animation: kdc-f
    crack the date, and the clock to it materialises. js/app/kinetic-decrypt.js
    adds .kdc-done to #countdown on latch (and immediately under reduced motion).
    In the deck path the countdown panel is display:block with the cells in a
-   flex row above the plate, so hiding them leaves no empty column. ── */
-html[data-variant="kinetic"] .countdown .count-grid { display: none; }
+   flex row above the plate, so hiding them leaves no empty column.
+
+   EVERY rule below is scoped with :has(.kdc:not([hidden])) — it applies ONLY
+   WHEN A LIVE DECRYPT PLATE IS ON SCREEN. {{SECRET_ONLY}} resolves to the
+   `hidden` ATTRIBUTE, not to removal (build.js: SECRET_ONLY = reveal ?
+   "hidden" : ""), so with revealDate=true the plate is still in the DOM — a
+   bare :has(.kdc) matches it and keeps hiding the counter. Without the
+   :not([hidden]) the countdown stays display:none forever on desktop once the
+   dates publish (mobile escaped only via the max-width:1099.98px override
+   further down). Do not drop either half of the scoping. Failure direction is
+   safe: if :has() is unsupported the digits simply show. ── */
+html[data-variant="kinetic"] .countdown:has(.kdc:not([hidden])) .count-grid { display: none; }
 html[data-variant="kinetic"] .countdown.kdc-done .count-grid { display: grid; }
 @media (min-width: 900px) {
   /* deck path re-flows the released cells into the HUD row (matches the
@@ -1512,8 +1522,8 @@ html[data-variant="kinetic"] .countdown.kdc-done .count-grid { display: grid; }
   html.k-deck[data-panel="countdown"] .countdown.kdc-done .count-grid { display: flex; }
   /* non-deck fallback (no GSAP): the techno 2-column split would leave an empty
      counter column, so the plate takes the full width until it is cracked */
-  html[data-variant="kinetic"]:not(.k-deck) .countdown:not(.kdc-done) .wrap { grid-template-columns: minmax(0, 32rem); }
-  html[data-variant="kinetic"]:not(.k-deck) .countdown:not(.kdc-done) .scratch { grid-column: 1; }
+  html[data-variant="kinetic"]:not(.k-deck) .countdown:has(.kdc:not([hidden])):not(.kdc-done) .wrap { grid-template-columns: minmax(0, 32rem); }
+  html[data-variant="kinetic"]:not(.k-deck) .countdown:has(.kdc:not([hidden])):not(.kdc-done) .scratch { grid-column: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
   html[data-variant="kinetic"] .kdc-flare { display: none !important; }
@@ -2620,15 +2630,18 @@ html[data-variant="kinetic"] .event-gate-note {
 
 @media (max-width: 1099.98px) {
   /* CONTRAST GUARD. #milkdrop screen-blends the music visualiser over the whole
-     page and its opacity is driven per-frame by the track's drop level, so on a
-     loud passage it floods the panel and body copy falls to roughly 1.2:1
-     against the ground — measured, and confirmed on acts 01/03/05. On desktop
-     the wash is diluted by a much larger dark field; a 390px screen has nowhere
-     to hide it. The cap is !important because the level is written inline by
-     js/app/milkdrop.js each frame, and it must never be able to win over
-     legibility. Atmosphere is kept, the flood is not. */
+     page and floods body copy to roughly 1.2:1 on a loud passage — measured, and
+     confirmed on acts 01/03/05. On desktop the wash is diluted by a much larger
+     dark field; a 390px screen has nowhere to hide it.
+
+     The LEVEL is bounded in js/app/milkdrop.js (MAX_OPACITY), not here. An
+     `opacity: N !important` rule cannot cap an inline value that is rewritten
+     every frame — it PINS it, so the layer sits at N even through the quiet
+     passages where the visualiser should be at zero, and the guard becomes a
+     permanent wash instead of a ceiling. That is exactly what a previous
+     revision of this block did. Bound it where it is computed; only the colour
+     treatment belongs here. */
   html[data-variant="kinetic"] #milkdrop {
-    opacity: .14 !important;
     filter: saturate(0.30) hue-rotate(158deg) brightness(0.22) contrast(1.02) blur(18px);
   }
 }
