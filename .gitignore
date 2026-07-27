@@ -22,3 +22,4 @@ js/app/couple.mjs
 # review harness output (screenshots + audit.json; regenerate with node review-harness.mjs)
 review-out/
 tmp/
+review-before/
