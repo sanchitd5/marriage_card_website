@@ -422,7 +422,10 @@
       </section>
 
       <!-- ══════════ PORTRAIT INTERLUDE ══════════ -->
-      <section class="band band--tint interlude">
+      <!-- id is load-bearing for review: review-harness.mjs enumerates
+           `section[id]` to capture the acts, so a band without one is silently
+           never screenshotted and no panel ever scores it. -->
+      <section class="band band--tint interlude" id="interlude">
         <div class="wrap wrap--narrow">
           <!-- data-speed is ScrollSmoother's parallax (effects:true in animations.js).
                0.9 gives ~14vh of drift over a 100svh band — inside the 12-20vh
