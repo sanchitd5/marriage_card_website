@@ -568,6 +568,35 @@ html[data-theme="dark"] .hero-veil {
 }
 .btn-quiet:hover, .btn-quiet:focus-visible { color: hsl(var(--gold)); border-color: hsl(var(--wisteria)); }
 
+@media (max-width: 600px) {
+  /* #right-dock is position:fixed at right:1.1rem with 44px controls, so it owns
+     a ~62px band down the right edge of the VIEWPORT. Anything full-width passes
+     under that band at some scroll offset — measured: the music toggle lands on
+     top of ADD TO CALENDAR, and a right thumb reaching for directions hits the
+     music button instead. Padding the card alone cannot fix it, because the
+     collision follows the scroll position, not the card. Keeping the actions out
+     of the dock's band is what actually fixes it at every offset.
+
+     Stacked rather than side-by-side: at 390px two side-by-side labels already
+     wrap to two lines each, and reserving the gutter would squeeze them further.
+     Directions and calendar are the two highest-value actions for a guest (and
+     this skin's audience skews older), so they also get a real ~48px target
+     instead of an 18px text baseline. */
+  .event-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: .6rem;
+    padding-right: 3.9rem;   /* clears the fixed right dock */
+  }
+  .btn-quiet {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 48px;
+    padding: .5rem .9rem;
+    border: 1px solid hsl(var(--gold-soft));
+    border-bottom-color: hsl(var(--gold));
+  }
+}
+
 /* ═══ INTERLUDE ══════════════════════════════════════════════ */
 .interlude { text-align: center; }
 .interlude-art {
