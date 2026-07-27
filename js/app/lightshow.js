@@ -98,7 +98,12 @@ const HOLE_OFS = {
   // emptiness; one that bleeds off the frame defines the edge, which is what turns
   // the right-hand void into negative space instead of dead space.
   wide:     { x: 0.415, y: 0.145, z: -58 },  // crops on the right; dropped so the top-left corona arc is not clipped too
-  portrait: { x: 0.05, y: 0.30, z: -86 },
+  // Portrait pushes the eclipse into the TOP-RIGHT corner rather than near the
+  // axis. At x:0.05 it sat mid-measure on a phone, so body copy printed straight
+  // over the corona — grey text on a cyan bloom, the least legible thing in the
+  // deck. On desktop the eclipse is a margin object in dialogue with the type
+  // across a gutter; centring it on mobile silently demoted it to wallpaper.
+  portrait: { x: 0.34, y: 0.34, z: -86 },
 };
 
 class LightShow {

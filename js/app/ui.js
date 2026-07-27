@@ -308,16 +308,29 @@ export function initCountdown() {
     // Techno reads as a sealed counter (dim dots), Regency as a gilt shimmer
     // (stars). Neither uses digits, so the date can never leak.
     const techno = document.documentElement.dataset.skin === 'techno';
-    const GLYPHS = techno ? ['·', '•', '◦', '•'] : ['✦', '✧', '·', '•'];
     const cells = [els.d, els.h, els.m, els.s];
+
+    // MASKED NUMERALS, not dots. A single small glyph per unit occupies none of
+    // the space the real value will, so it reads as "nothing here yet" — and a
+    // row of three filled dots plus one hollow one is literally the vocabulary
+    // of a loading spinner or a carousel pager, which is the one thing a gated
+    // countdown must not look like. Two dashes sit in the digits' own footprint,
+    // so the eye reads "a number lives here and is being withheld".
+    // Still non-alphanumeric, so the date can never leak.
+    const MASK = techno ? '––' : '✦✦';
     if (REDUCED) {
-      cells.forEach(el => { el.textContent = techno ? '·' : '✦'; });
+      cells.forEach(el => { el.textContent = MASK; });
       return;
     }
-    let i = 0;
+    // The mask breathes rather than cycling through different glyphs: a shape
+    // change per second implied the value itself was changing.
+    let on = true;
     const shimmer = () => {
-      cells.forEach((el, offset) => { el.textContent = GLYPHS[(i + offset) % GLYPHS.length]; });
-      i++;
+      cells.forEach((el) => {
+        el.textContent = MASK;
+        el.style.opacity = on ? '0.42' : '0.30';
+      });
+      on = !on;
     };
     shimmer();
     setInterval(shimmer, 1000);

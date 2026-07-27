@@ -2427,3 +2427,255 @@ html[data-variant="kinetic"] .event-gate-note {
   color: var(--label);
   margin-bottom: var(--sp-group);
 }
+
+/* ── MOBILE REPAIR ────────────────────────────────────────────────────
+   The hero rebuild introduced desktop insets (--rail 12rem, --copy-x 16rem,
+   a 12-column grid placement, a right-hand hairline) as UNSCOPED rules. They
+   exist to clear the deck's section-index rail, which only renders on wide
+   viewports — so on a 390px phone they were pure damage: padding-left resolved
+   to 216px and squeezed the copy column to 176px, with the name lockup
+   overhanging it. Desktop is deliberately untouched; everything below only
+   applies under the 1100px breakpoint where the rail does not exist. */
+@media (max-width: 1099.98px) {
+  html[data-variant="kinetic"] {
+    --rail: 0rem;                 /* no section-index rail to clear */
+    --copy-x: 0rem;
+    --gutter-r: var(--gutter);    /* symmetric gutters on a phone */
+  }
+  html[data-variant="kinetic"] .hero-inner {
+    display: block;               /* the 12-col placement is desktop-only */
+    padding: var(--gutter);
+    padding-bottom: calc(var(--gutter) * 1.5);
+  }
+  html[data-variant="kinetic"] .hero-copy {
+    display: block;
+    grid-column: auto; grid-row: auto;
+    border-right: 0;              /* the column hairline is a desktop device */
+    padding-right: 0;
+    filter: none;                 /* drop-shadow scrim costs paint on mobile */
+  }
+  html[data-variant="kinetic"] .hero-copy::after { content: none; }
+
+  /* the invocation returns to the top of the flow rather than being parked in a
+     right-hand column that does not exist at this width */
+  html[data-variant="kinetic"] .hero-invocation {
+    grid-column: auto; grid-row: auto;
+    justify-self: start; justify-items: start;
+    text-align: left;
+    max-width: none;
+    margin: 0 0 var(--sp-group);
+  }
+  html[data-variant="kinetic"] .hero-invocation .invocation-motif {
+    justify-self: start; margin: 0 0 .15rem -1.5px;
+  }
+  html[data-variant="kinetic"] .shloka-gloss { max-width: 32ch; }
+
+  /* hashtag rejoins the flow instead of being pinned to a masthead row */
+  html[data-variant="kinetic"] .hero-tag {
+    grid-column: auto; grid-row: auto;
+    justify-self: start; margin-top: var(--sp-tight);
+  }
+
+  /* the name lockup: still one shared size and a flush-right short name, but
+     sized to the phone's measure. js/app/name-fit.js re-fits on resize, so it
+     picks this up without a reload. */
+  html[data-variant="kinetic"] .hero-names {
+    font-size: clamp(2.5rem, 15vw, 4.5rem);
+    font-variation-settings: 'wght' 600, 'wdth' 112;   /* 125 is too wide to fit a phone measure */
+  }
+  html[data-variant="kinetic"] .hero-amp { font-size: .5em; }
+
+  /* the acts: bottom-anchoring and the rail inset are equally desktop-only */
+  html.k-deck[data-variant="kinetic"] .band {
+    display: block;
+    padding-left: var(--gutter);
+    padding-right: var(--gutter);
+    padding-bottom: 7rem;         /* still clears the Back/Next chrome */
+  }
+  html.k-deck[data-variant="kinetic"] .events .event-grid { max-width: none; }
+}
+
+@media (max-width: 1099.98px) {
+  /* The deck's Back/Next chrome is revealed by pointermove, which a touch screen
+     never sends: verified sitting at opacity 0 until the guest happens to tap.
+     So on a phone the deck's only navigation was invisible, and the round trip
+     from the hero to the countdown and back had no visible return control.
+     Touch gets it permanently. */
+  html.k-deck[data-variant="kinetic"] #k-panel-controls {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+  /* and it lands in the thumb arc, clear of the home indicator */
+  html.k-deck[data-variant="kinetic"] #k-panel-controls {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Panels were top-anchored, leaving 24-36% dead at the bottom of a FIXED
+     panel — no scroll exists to justify a hanging bottom, so it read as
+     unfinished and pushed the content up out of thumb reach. */
+  html.k-deck[data-variant="kinetic"] .band,
+  html[data-variant="kinetic"] .hero {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding-block: 8svh 13svh;      /* slight top bias = optical centring */
+  }
+  /* the run of show is the one act that can exceed a panel; let it scroll
+     inside itself and ANNOUNCE the overflow rather than implying a cut row */
+  html.k-deck[data-variant="kinetic"] .events .event-grid {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), transparent);
+            mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), transparent);
+  }
+  html.k-deck[data-variant="kinetic"] .events .event-card:last-child { border-bottom: 0; }
+
+  /* mono kickers kept tracking tuned for a 1200px measure and wrapped to a
+     single orphan word */
+  html[data-variant="kinetic"] .kicker { letter-spacing: .16em; text-wrap: balance; }
+}
+
+@media (max-width: 1099.98px) {
+  /* The deck controls were being given a desktop right-offset
+     (`right: calc(var(--gutter-r) + 2.5rem)`) that I left unscoped, so on a
+     phone the bar floated inset from the right edge with the page showing
+     through beside it. On mobile it is not a floating cluster, it is a bar:
+     full-bleed, pinned to the bottom, with its own ground so the content
+     scrolling under it stays legible. */
+  html.k-deck[data-variant="kinetic"] #k-panel-controls {
+    left: 0; right: 0; bottom: 0;
+    width: 100%;
+    justify-content: space-between;
+    gap: 0;
+    padding: .75rem clamp(1rem, 4vw, 1.5rem);
+    padding-bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
+    background: rgba(6, 8, 12, .82);
+    -webkit-backdrop-filter: blur(12px);
+            backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(240, 228, 214, .10);
+    border-radius: 0;
+    box-shadow: none;
+  }
+  /* the corner brackets are a desktop frame device; at this width they collide
+     with the bar's own top border */
+  html[data-variant="kinetic"] .k-hud-bl,
+  html[data-variant="kinetic"] .k-hud-br { display: none; }
+}
+
+@media (max-width: 1099.98px) {
+  /* BACK kept the desktop button box while NEXT had already had its border
+     stripped, so the two halves of one bar disagreed. Match them. */
+  html.k-deck[data-variant="kinetic"] #k-panel-controls .k-wz-btn {
+    border: 0;
+    background: none;
+    box-shadow: none;
+    padding-inline: .25rem;
+    min-height: 48px;
+  }
+}
+
+@media (max-width: 1099.98px) {
+  /* Hold-to-decrypt sat at exactly 44px — the accessibility FLOOR, not a target,
+     and this is the deck's only sustained-press interaction, which is far more
+     error-prone one-handed than a tap. */
+  html[data-variant="kinetic"] .kdc-hold,
+  html[data-variant="kinetic"] [data-kdc-hold] { min-height: 56px; }
+
+  /* the end-of-deck NEXT was disabled by opacity alone, so it still looked
+     tappable and the dead tap was unexplained */
+  html.k-deck[data-variant="kinetic"] #k-next[disabled],
+  html.k-deck[data-variant="kinetic"] #k-next[aria-disabled="true"] {
+    opacity: .28;
+    pointer-events: none;
+  }
+
+  /* the ampersand was optically stranded in the three-line stack at this
+     measure: desktop's wider column earns the gap, 390px does not */
+  html[data-variant="kinetic"] .hero-amp { margin-block: -.18em; }
+
+  /* the hero column is taller than the others, so centring left ~300px under
+     the CTA before the bar */
+  html[data-variant="kinetic"] .hero { padding-block: 6svh 11svh; }
+}
+
+@media (max-width: 1099.98px) {
+  /* Corrected selector: the hold control is .kdc-key (my earlier rule guessed
+     .kdc-hold and silently did nothing — measured still 44px). 44 is the
+     accessibility FLOOR and this is a sustained press, the least forgiving
+     gesture one-handed. */
+  html[data-variant="kinetic"] .kdc-key { min-height: 56px; }
+
+  /* The hero's primary call to action measured 297x19 — a text link with no
+     touch padding, less than half the 44px minimum, and it is the one control
+     the whole hero funnels into. Give it a real target without turning it into
+     a button: the underline stays, the hit area grows. */
+  html[data-variant="kinetic"] .hero-await-cta {
+    display: inline-flex;
+    align-items: center;
+    min-height: 48px;
+    padding-block: .5rem;
+  }
+  html[data-variant="kinetic"] .hero-await-cta::after { bottom: 10px; }
+}
+
+@media (max-width: 1099.98px) {
+  /* CONTRAST GUARD. #milkdrop screen-blends the music visualiser over the whole
+     page and its opacity is driven per-frame by the track's drop level, so on a
+     loud passage it floods the panel and body copy falls to roughly 1.2:1
+     against the ground — measured, and confirmed on acts 01/03/05. On desktop
+     the wash is diluted by a much larger dark field; a 390px screen has nowhere
+     to hide it. The cap is !important because the level is written inline by
+     js/app/milkdrop.js each frame, and it must never be able to win over
+     legibility. Atmosphere is kept, the flood is not. */
+  html[data-variant="kinetic"] #milkdrop {
+    opacity: .14 !important;
+    filter: saturate(0.30) hue-rotate(158deg) brightness(0.22) contrast(1.02) blur(18px);
+  }
+}
+
+@media (max-width: 1099.98px) {
+  /* The 4-up row existed only above 900px, so mobile fell back to a stacked
+     ladder: four units down the page, ~350px of an 844px screen, and the
+     countdown lost the horizontal DD:HH:MM:SS silhouette that is the whole
+     reason a guest recognises it as a clock. That silhouette matters MORE when
+     the values are masked, because the shape is carrying the meaning the digits
+     cannot. */
+  html.k-deck[data-panel="countdown"] .count-grid,
+  html[data-variant="kinetic"] .countdown .count-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .5rem;
+    margin: 1.5rem 0 2rem;
+  }
+  html[data-variant="kinetic"] .countdown .count-cell {
+    display: grid;
+    justify-items: center;
+    gap: .35rem;
+    padding: .6rem .1rem 0;
+    background: none;
+    /* the per-cell cyan rule produced one hairline above DAYS attached to
+       nothing, none under SECONDS, and spent the deck's single accent on
+       separators. One quiet hairline under the whole row instead. */
+    border: 0;
+    border-top: 0;
+  }
+  html[data-variant="kinetic"] .countdown .count-grid {
+    border-bottom: 1px solid rgba(255, 255, 255, .08);
+    padding-bottom: 1rem;
+  }
+  /* the mask must sit in the digits' own footprint */
+  html[data-variant="kinetic"] .countdown .count-num {
+    font-family: var(--font-mono);
+    font-size: clamp(1.6rem, 8.5vw, 2.4rem);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .02em;
+    text-shadow: none;
+    transition: opacity .6s var(--ease-luxe);
+  }
+  html[data-variant="kinetic"] .countdown .count-label {
+    font-size: .58rem;
+    letter-spacing: .18em;
+    opacity: .55;
+  }
+}
