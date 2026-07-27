@@ -2267,3 +2267,163 @@ html[data-variant="kinetic"] .hero-blessing {
   font-size: var(--t-quote);
   color: rgba(240, 228, 214, .58);
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   DECK-WIDE, after a panel reviewed acts 01-05 (scores 3.4-7.9 against
+   the hero's 9.8). The per-act notes are worth little until the global
+   faults are gone, so these come first.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* G1. ONE display face across the deck. The hero was rebuilt in Archivo while
+   every act heading still resolved --font-display to Space Grotesk, so the deck
+   changed typeface between panels. Overriding the variable flips all 18 call
+   sites at once rather than chasing them individually. */
+html[data-variant="kinetic"] {
+  --font-display: "Archivo", "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Archivo", "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+}
+/* act headings pick up the hero's extended cut so the display voice is one voice */
+html[data-variant="kinetic"] .script-head {
+  font-variation-settings: 'wght' 560, 'wdth' 118;
+  letter-spacing: -.022em;
+  line-height: .96;
+}
+
+/* G5 was a MISDIAGNOSIS and is withdrawn. A reviewer flagged drifting red and
+   blue blooms sitting on the copy and I attributed them to the ambient dancer
+   canvas. They were frames of the THEME-9 VIDEO TAKEOVER (js/app/kinetic-video9.js),
+   which replaces the whole scene for the duration of that track — the capture
+   happened to be on TRK 09/09. Nothing about the dancers was at fault, so their
+   opacity is left as it was. */
+
+/* ── DECK ACTS: the global faults, in the panel's own priority order ──
+   The per-act notes are worth little until these land, because every act
+   inherited the same four problems: a different type face from the hero,
+   no shared grid, top-anchored content over a dead lower half, and no
+   spacing or type scale.                                              */
+@media (min-width: 1100px) {
+  /* G2 + G3. One grid with the hero, and content anchored to the BOTTOM.
+     The hero earned its score on a bottom-anchored block; the acts dumped
+     everything into the top 60% and left 400-700px of dead black beneath,
+     which is the loudest "unfinished" signal in the deck. */
+  html.k-deck[data-variant="kinetic"] .band {
+    display: grid;
+    align-content: end;
+    padding-left: calc(var(--gutter) + var(--rail));
+    padding-right: var(--gutter-r);
+    padding-bottom: 9.5rem;      /* clears the Back/Next chrome */
+    padding-top: var(--gutter);
+  }
+  html.k-deck[data-variant="kinetic"] .band > .wrap,
+  html.k-deck[data-variant="kinetic"] .band > .wrap--narrow {
+    max-width: none;
+    margin-inline: 0;
+    padding-inline: 0;
+    width: 100%;
+  }
+}
+
+/* G7. One type scale with the hero. Act headings were ~64px against a 170px
+   hero display, with no rung between them and 11px mono labels. */
+html[data-variant="kinetic"] .script-head {
+  font-size: clamp(2.6rem, 5.4vw, 4.75rem);
+}
+
+/* G6. A spacing scale with a >3x inter-group ratio, so the eyebrow binds to its
+   heading and the content block separates from both. Every gap in every act was
+   previously 30-50px, which groups nothing. */
+html[data-variant="kinetic"] .band .kicker { margin-bottom: var(--sp-hair); }
+html[data-variant="kinetic"] .band .script-head { margin-bottom: var(--sp-group); }
+
+/* G9. Uncontrolled measure: body copy ran to ~660px on one act and ~260px on
+   another. */
+html[data-variant="kinetic"] .band p:not(.kicker):not(.k-index) { max-inline-size: 46ch; }
+
+/* G8/G11. The section rail floated vertically centred while all content was
+   top-anchored; with the acts now bottom-anchored it reads against the copy. */
+html.k-deck[data-variant="kinetic"] .k-menu { align-self: end; }
+
+/* ── DECK ACTS: the global faults, in the panel's priority order ──────
+   A clean re-review (theme-9's video takeover excluded) put the acts at
+   8.0-9.3 against the hero's 9.8. Its top finding: the acts abandoned the
+   three moves the hero earned its score with — bottom-anchored copy, a
+   shared grid, and art cropping an edge.                              */
+@media (min-width: 1100px) {
+  /* G1. Bottom-anchor, like the hero. The acts were top-anchored with
+     400-700px of dead black beneath, which is the loudest "unfinished"
+     signal in the deck and the single biggest per-act lift available. */
+  html.k-deck[data-variant="kinetic"] .band {
+    display: grid;
+    align-content: end;
+    padding-left: calc(var(--gutter) + var(--rail));
+    padding-right: var(--gutter-r);
+    padding-top: var(--gutter);
+    padding-bottom: 9.5rem;          /* clears the Back/Next chrome */
+  }
+  /* G5. …and honour the hero's 256px content column instead of inventing a
+     different inset per act. */
+  html.k-deck[data-variant="kinetic"] .band > .wrap,
+  html.k-deck[data-variant="kinetic"] .band > .wrap--narrow {
+    max-width: none; margin-inline: 0; padding-inline: 0; width: 100%;
+  }
+}
+
+/* G4. The repeating wireframe figure. It rendered at an identical position and
+   scale on four acts, unlabelled, competing with the accent colour and reading
+   as debug geometry left in the build. (An earlier attempt to cut this was
+   withdrawn because I had misattributed the reviewer's complaint to the
+   theme-9 video; the figure itself is a real and separate finding.) The hero
+   already suppressed it; now the whole deck does. */
+html[data-variant="kinetic"] #k-ambient-dancers { opacity: 0; }
+
+/* G7. One type scale with the hero: act headings were ~64px against a 170px
+   hero display with no rung between them and the 11px mono labels. */
+html[data-variant="kinetic"] .script-head { font-size: clamp(2.6rem, 5.4vw, 4.75rem); }
+
+/* G6/G9. A spacing scale with a >3x inter-group ratio, and a controlled measure
+   (body copy ran to ~660px on one act and ~260px on another). */
+html[data-variant="kinetic"] .band .kicker { margin-bottom: var(--sp-hair); }
+html[data-variant="kinetic"] .band .script-head { margin-bottom: var(--sp-group); }
+html[data-variant="kinetic"] .band p:not(.kicker):not(.k-index) { max-inline-size: 46ch; }
+
+/* G9. Micro-copy opacity was drifting across four values; two tiers only. */
+html.k-deck[data-variant="kinetic"] .k-menu-item { opacity: .6; }
+html.k-deck[data-variant="kinetic"] .k-menu-item.is-current { opacity: 1; }
+
+/* Two corrections, both found by reading computed styles rather than the diff.
+
+   1. `.band` became a grid with no explicit column, so its single implicit
+      column sized to max-content and the child's `width:100%` resolved against
+      that content width — circular, leaving the copy stuck mid-frame at ~354px
+      instead of filling the 256px column. An explicit 1fr column fixes it. */
+@media (min-width: 1100px) {
+  html.k-deck[data-variant="kinetic"] .band { grid-template-columns: minmax(0, 1fr); }
+}
+/* 2. The ambient-dancer suppression was silently losing to an earlier
+      `:not([data-panel="invocation"])` rule, which carries higher specificity —
+      which is why the wireframe figure kept rendering on every act after I
+      "removed" it. Match that specificity so the cut actually applies. */
+html[data-variant="kinetic"]:not([data-panel="invocation"]) #k-ambient-dancers { opacity: 0; }
+
+/* ── Run of show, after the events module made the list variable-length ──
+   Four alignment faults visible once five events render. */
+@media (min-width: 1100px) {
+  /* the rows were indented off the heading's left edge, giving the act two
+     left margins; and the rules ran ~470px past the last content, pointing at
+     nothing. Both come from the grid keeping the old three-card proportions. */
+  html.k-deck[data-variant="kinetic"] .events .event-grid {
+    margin-left: 0;
+    max-width: 52rem;
+  }
+  /* the number column was sized for the words "TRACK 01"; it now holds two
+     digits, so the gutter before the event name was ~160px of nothing */
+  html.k-deck[data-variant="kinetic"] .events .event-card { grid-template-columns: 4rem minmax(0, 1fr); }
+}
+/* the single gated statement was breaking mid-phrase ("here / first.") because
+   it inherited the body measure */
+html[data-variant="kinetic"] .event-gate-note {
+  max-inline-size: 40ch;
+  text-wrap: balance;
+  color: var(--label);
+  margin-bottom: var(--sp-group);
+}

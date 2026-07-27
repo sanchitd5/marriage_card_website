@@ -25,13 +25,13 @@ function veiledHTML() {
     return `<figure class="gframe gframe--veiled fade-up">
        <svg class="veil-seal" aria-hidden="true" focusable="false"><use href="#nataraja-motif"/></svg>
        <span class="veil-motif" aria-hidden="true">Sealed</span>
-       <p class="veil-note">Their story is kept close, to be unveiled after the celebration</p>
-       <span class="veil-count" aria-hidden="true">00 / ${total} frames</span>
+       <p class="veil-note">Our story stays close, until the celebration lets it out</p>
+       <span class="veil-count" aria-hidden="true">${total} frames, sealed</span>
      </figure>`;
   }
   return `<figure class="gframe gframe--veiled fade-up">
      <span class="veil-motif" aria-hidden="true">&#10022;</span>
-     <p class="veil-note">Their story is kept close, to be unveiled after the celebration</p>
+     <p class="veil-note">Our story stays close, until the celebration lets it out</p>
    </figure>`;
 }
 

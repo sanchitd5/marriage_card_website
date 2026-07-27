@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { groom, bride, siteUrls, revealDate, wedding, weddingHidden, gallery, coupleRevealOffsetHours } from './site.config.mjs';
+import { eventsForInvite, resolveVariant, DEFAULT_VARIANT } from './events.config.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -158,11 +159,56 @@ export function buildFamilyBlessing(sideA, sideB) {
   return s.charAt(0).toUpperCase() + s.slice(1); // "the …" → "The …"
 }
 
+// ---- Run of show ------------------------------------------------------
+// Renders the event cards from events.config.mjs instead of three hardcoded
+// blocks per template. The programme is now variable-length (each side hosts
+// its own functions) and variant-dependent (a guest sees only what they are
+// invited to), so neither template can carry a fixed list.
+//
+// Gated fields (when / datetime / venue / map) are looked up from
+// site.config.mjs's `wedding.events` and emitted ONLY when reveal is true —
+// same leak-proofing rule as every other date token. Events with no entry there
+// yet simply render the hidden placeholders.
+export function buildEventCards(names, reveal = revealDate, fromGroomSide = true, variant = DEFAULT_VARIANT) {
+  const h = weddingHidden;
+  const gated = (reveal && wedding && wedding.events) ? wedding.events : null;
+  const list = eventsForInvite(variant, fromGroomSide);
+  return list.map((ev, i) => {
+    const g = gated ? gated[ev.id] : null;
+    const dt = g ? g.datetime : '';
+    const map = g ? g.map : '';
+    // While gated, the cards carry NO date/venue lines at all. Repeating
+    // "Date & time to be announced / Venue to be announced" once per card was
+    // six grey lines at three events and is ten at five — the gate ends up
+    // dominating the act and reading as an unpopulated CMS. The programme states
+    // it ONCE, above the list (EVENT_GATE_NOTE), and each card keeps only what is
+    // actually known: its name, its dress code, and any standing venue note.
+    const whenLine = g ? `<p class="event-when"><time datetime="${dt}">${g.when}</time></p>` : '';
+    const venueText = g ? htmlEscape(g.venue) : (ev.venueNote ? htmlEscape(ev.venueNote) : '');
+    const venueLine = venueText ? `<p class="event-venue">${venueText}</p>` : '';
+    const no = String(i + 1).padStart(2, '0');
+    const directions = g
+      ? `<a class="btn-quiet" href="${map}" target="_blank" rel="noopener">Get directions</a>`
+      : '';
+    return `<article class="event-card" data-tilt data-magnetic>
+              <p class="event-no">${no}</p>
+              <h3 class="event-name">${htmlEscape(ev.name)}</h3>
+              ${whenLine}
+              ${venueLine}
+              <p class="event-dress"><span>Dress code</span> ${htmlEscape(ev.dress)}</p>
+              <div class="event-actions">
+                ${directions}
+                <button class="btn-quiet" data-ics="${ev.id}">Add to calendar</button>
+              </div>
+            </article>`;
+  }).join('\n\n            ');
+}
+
 // ---- Tokens for the HTML template -------------------------------------
 // FIRST_A / FIRST_B etc. get HTML-escaped when injected.
 // PAIR_TITLE keeps the raw '&' so <title> renders "A & B"; where the
 // template uses "&amp;", it must remain "&amp;" in the output too.
-export function buildHtmlTokens(names, reveal = revealDate, theme = 'regency') {
+export function buildHtmlTokens(names, reveal = revealDate, theme = 'regency', fromGroomSide = true, variant = DEFAULT_VARIANT) {
   const w = reveal ? wedding : null;
   const h = weddingHidden;
   const ev = w ? w.events : null;
@@ -183,6 +229,8 @@ export function buildHtmlTokens(names, reveal = revealDate, theme = 'regency') {
     DATE_RANGE: reveal ? w.dateRange : h.dateRange,
     SCRATCH_DATE: reveal ? w.scratchDate : h.scratchDate,
     SCRATCH_SUB: reveal ? w.scratchSub : h.scratchSub,
+    EVENT_CARDS: buildEventCards(names, reveal, fromGroomSide, variant),
+    EVENT_GATE_NOTE: reveal ? '' : 'All dates and venues drop together. You will get them here first.',
     EVENT_HALDI_WHEN: reveal ? ev.haldi.when : h.eventWhen,
     EVENT_HALDI_DT: reveal ? ev.haldi.datetime : '',
     EVENT_HALDI_VENUE: reveal ? htmlEscape(ev.haldi.venue) : h.eventVenue,
@@ -254,7 +302,10 @@ function runBuild() {
   const fromGroomSide = parseFromGroomSide(process.env.FROM_GROOM_SIDE);
   const theme = parseTheme(process.env.WEDDING_THEME);
   const names = composeNames(fromGroomSide);
-  const htmlTokens = buildHtmlTokens(names, revealDate, theme);
+  // WEDDING_INVITE selects which events the card shows (see events.config.mjs).
+  const variant = resolveVariant(process.env.WEDDING_INVITE).id;
+  const htmlTokens = buildHtmlTokens(names, revealDate, theme, fromGroomSide, variant);
+  console.log(`build: WEDDING_INVITE=${variant} → ${eventsForInvite(variant, fromGroomSide).length} event(s)`);
   const manifestTokens = buildManifestTokens(names, theme);
 
   // Couple-photo gate: the photos always ship; the browser reveals the gallery
