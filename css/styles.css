@@ -584,11 +584,17 @@ html[data-theme="dark"] .hero-veil {
      instead of an 18px text baseline. */
   .event-actions {
     flex-direction: column;
-    align-items: stretch;
+    align-items: center;
     gap: .6rem;
-    padding-right: 3.9rem;   /* clears the fixed right dock */
   }
   .btn-quiet {
+    /* Narrowed-and-CENTRED, not padded to one side. An earlier revision cleared
+       the dock with `padding-right` on the row, which works when there are two
+       buttons but visibly shifts a lone ADD TO CALENDAR off the card's centre
+       (the gated build has no directions link). Symmetric inset keeps the button
+       optically centred in the card while still ending before the fixed dock's
+       ~62px band at the right edge of the VIEWPORT. */
+    width: min(100%, 15rem);
     display: flex; align-items: center; justify-content: center;
     min-height: 48px;
     padding: .5rem .9rem;
@@ -598,8 +604,35 @@ html[data-theme="dark"] .hero-veil {
 }
 
 /* ═══ INTERLUDE ══════════════════════════════════════════════ */
-.interlude { text-align: center; }
+/* This band overrides .band's generous padding-block. At the shared value the
+   art + frame + caption exceeded the viewport, the group overflowed, and
+   align-items:center clipped it upward — which read to every panel seat as
+   "art pinned to the top, caption exiled to the bottom". Smaller padding plus
+   the 66svh cap below lets the whole group sit optically centred instead.
+   The lilac wash is deliberate: the painting's wisteria/lilac is the only
+   chromatic event on an otherwise ivory page, and three seats independently
+   said the fault was that it appears exactly ONCE, reading as accident rather
+   than accent. One faint echo behind the frame makes it read as chosen. */
+.interlude {
+  text-align: center;
+  padding-block: clamp(3rem, 6vh, 4.5rem);
+  background-image: radial-gradient(ellipse 62% 56% at 50% 44%, hsl(264 30% 62% / .10), transparent 70%);
+}
+/* The painted portrait is a PORTRAIT-aspect asset in a LANDSCAPE viewport. Left
+   uncapped it grew to ~100svh, which pushed .interlude-line below the fold: the
+   band then delivered the painting with its caption amputated, on a page whose
+   whole premise is one act per screenful. All four desktop panel seats scored it
+   8.3-8.6 for exactly this and independently prescribed a 72-76svh cap. The cap
+   must stay on the IMG (the frame wraps it), and width:auto lets the height drive
+   the width so the aspect ratio is preserved. */
+.interlude-art img {
+  max-height: 66svh;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+}
 .interlude-art {
+  display: inline-block;
   border: 1px solid hsl(var(--gold-soft));
   box-shadow: inset 0 0 0 6px hsl(var(--parchment)), inset 0 0 0 7px hsl(var(--gold-soft) / .55), var(--shadow-lift);
   padding: .9rem;
@@ -608,8 +641,20 @@ html[data-theme="dark"] .hero-veil {
 .interlude-line {
   font-family: var(--font-display); font-style: italic;
   font-size: clamp(1.2rem, 3.6vw, 1.6rem); line-height: 1.5;
-  max-width: 34rem; margin: 2.4rem auto 0;
+  max-width: 34rem; margin: 2.5rem auto 0;
   color: hsl(var(--wisteria-deep));
+}
+@media (max-width: 600px) {
+  /* Mobile seats (8.7-9.1) reported the opposite fault to desktop: the caption ran
+     nearly edge-to-edge as one long line, which reads as a caption rather than an
+     epigraph and is the tightest text on the page for an older reader. A ~24ch
+     measure wraps it to two centred lines under the plate, and the lighter tone
+     lifts it off the deep aubergine in night mode. */
+  .interlude-line {
+    max-width: 24ch;
+    font-size: clamp(1.15rem, 5vw, 1.35rem);
+    margin-top: 1.7rem;
+  }
 }
 
 /* ═══ GALLERY ════════════════════════════════════════════════ */

@@ -231,12 +231,28 @@ async function capture(pw, v, vpName, args) {
       // against a live scroll, where the digits render at opacity 1.
       const sel = '.fade-up, .hero-names, .hero-name, .hero-amp, .hero-invocation,'
         + ' .hero-invocation *, .kicker, .hero-date, .hero-voice, .hero-blessing,'
-        + ' .hero-await, .hero-await *, .hero-tag, .hero-tag *, .count-num';
+        + ' .hero-await, .hero-await *, .hero-tag, .hero-tag *, .count-num,'
+        // .interlude-line is trigger-gated like .count-num was: it waits on its own
+        // ScrollTrigger, which scrollIntoView does not fire (see the clip-path note
+        // below). Omitting it made four desktop seats score the interlude as "the
+        // caption is below the fold / the act is amputated" when the caption was
+        // simply never revealed in the capture. Content the guest WILL see must be
+        // forced visible, or the panel scores a frame the guest never gets.
+        + ' .interlude-line';
       document.querySelectorAll(sel).forEach((el) => {
         el.classList.add('is-visible');
         const cs = getComputedStyle(el);
         if (cs.opacity === '0') { el.style.opacity = '1'; el.style.transform = 'none'; el.style.visibility = 'visible'; }
       });
+      // SCRUBBED clip-path reveals must be forced to their resolved state.
+      // The interlude curtain is driven by ScrollTrigger scrub, i.e. by SCROLL
+      // POSITION — and this harness navigates with scrollIntoView, which moves
+      // the native scroller but NOT ScrollSmoother's virtual scroll on desktop.
+      // Progress therefore stays 0, the panel stays clipped to zero height, and
+      // the capture is an empty coloured field. Three panel seats independently
+      // reported "the interlude is blank" before this was added. Anything else
+      // that scrubs a clip-path must be cleared here too.
+      document.querySelectorAll('.interlude-art').forEach((el) => { el.style.clipPath = 'none'; });
     });
     await page.waitForTimeout(700);
   };

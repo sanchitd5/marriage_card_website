@@ -35,6 +35,14 @@ export function petalRain() {
           gravity: 0.5, drift: (Math.random() - 0.5) * 1.4, ticks: 500, scalar: 1.6,
           shapes: [appState.petalShape], colors, origin: { x, y: -0.08 },
           disableForReducedMotion: true,
+          // canvas-confetti defaults its canvas to z-index 100, which is ABOVE the
+          // z-index:45 content layer (.band > .wrap). Petals were landing on top of
+          // body copy and, worst of all, across the couple's faces in the painted
+          // interlude portrait — the one image the whole page builds to. 42 sits
+          // above the page ground and the tsparticles layer (41) but below content,
+          // so petals drift BEHIND the words and the painting. Below the gate (60)
+          // and the fixed toggles (55/65) too.
+          zIndex: 42,
         });
       }
     }, wave * 380);
