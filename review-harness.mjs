@@ -264,7 +264,7 @@ async function capture(pw, v, vpName, args) {
   // Objective checks a reviewer should never have to eyeball. Scoped to what is
   // actually ON SCREEN and hit-testable: this deck stacks every act in the DOM,
   // so an unscoped sweep measures controls inside panels the guest cannot see.
-  const audit = await page.evaluate(() => {
+  const audit = await page.evaluate((touch) => {
     const vw = innerWidth, vh = innerHeight;
     const small = [];
     document.querySelectorAll('button, a[href], [role=button]').forEach((el) => {
@@ -280,10 +280,11 @@ async function capture(pw, v, vpName, args) {
       const cy = Math.min(vh - 1, Math.max(0, r.top + r.height / 2));
       const hit = document.elementFromPoint(cx, cy);
       if (!hit || !(el === hit || el.contains(hit) || hit.contains(el))) return;
+      if (!touch) return;   // 44px is a TOUCH guideline; a pointer viewport flags the whole desk chrome
       if (r.width < 44 || r.height < 44) small.push(`${(el.textContent || el.id || '').trim().slice(0, 24)} ${Math.round(r.width)}x${Math.round(r.height)}`);
     });
     return { overflowX: document.documentElement.scrollWidth > vw, undersizedTargets: small.slice(0, 8) };
-  });
+  }, !!VIEWPORTS[vpName].hasTouch);
 
   await browser.close();
   return { ...audit, problems: problems.slice(0, 8) };
