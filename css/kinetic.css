@@ -2414,6 +2414,12 @@ html.k-deck[data-variant="kinetic"] .k-menu-item.is-current { opacity: 1; }
       which is why the wireframe figure kept rendering on every act after I
       "removed" it. Match that specificity so the cut actually applies. */
 html[data-variant="kinetic"]:not([data-panel="invocation"]) #k-ambient-dancers { opacity: 0; }
+/* ...but that cut also outranked the PRESENTER TAKEOVER rule (`html.hud-hidden
+   #k-ambient-dancers.is-live`, same (1,2,1) specificity, earlier in the file),
+   so a WELCOME/DROP takeover on any act faded the chrome and then showed an
+   empty stage: the giant performed at opacity 0. G4 retires the RESTING
+   figure, not the performance. One step up in specificity ends the arms race. */
+html.hud-hidden[data-variant="kinetic"] #k-ambient-dancers.is-live { opacity: 1; }
 
 /* ── Run of show, after the events module made the list variable-length ──
    Four alignment faults visible once five events render. */
