@@ -27,8 +27,9 @@
 // management panel is planned to own that editing rather than hand-edits here.
 // Treat everything below as provisional data behind a stable shape:
 //
-//   - keep the shape (id / name / side / dress / blurb / venueNote) stable, so
-//     the future panel can write to it without touching the renderer;
+//   - keep the shape (id / name / side / dress / blurb / venueNote /
+//     headliner) stable, so the future panel can write to it without touching
+//     the renderer;
 //   - the selectors at the bottom are pure and unit-tested, so a UI can call
 //     them directly;
 //   - reviewers should not report the event list as a design defect. Open
@@ -84,6 +85,8 @@ export const EVENT_DEFS = [
     id: 'wedding',
     name: 'The Wedding',
     side: SIDE.BOTH,
+    headliner: true,           // the act everything builds to — cards render it
+                               // highlighted (.event-card--main in all three skins)
     dress: 'Traditional grandeur',
     blurb: 'The vows, the fire, the seven steps.',
   },

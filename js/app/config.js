@@ -12,23 +12,38 @@ export { NAMES, SONGS, WEDDING_TS, REVEAL_DATE, COUPLE_REVEAL_TS, GALLERY };
 const D = EVENT_DATES || {};
 const V = EVENT_VENUES || {};
 
-// Only non-identifying copy (blurb + dress code) lives here; venue name, map
-// link and dates come from the generated module and are absent while hidden.
+// Only non-identifying copy (title + blurb + dress code) lives here; venue
+// name, map link and dates come from the generated module and are absent
+// while hidden. This module ships verbatim and must NOT import
+// events.config.mjs (leak-proofing), so the copy is duplicated by hand —
+// test/events.test.mjs fails when an EVENT_DEFS id is missing from TITLES,
+// because that event's "Add to calendar" button could never activate.
+const TITLES = {
+  mehndi: `Mehndi — ${NAMES.pairTitle}`,
+  haldi: `Haldi — ${NAMES.pairTitle}`,
+  cocktail: `Cocktail & Engagement — ${NAMES.pairTitle}`,
+  baraat: `Baraat — ${NAMES.pairTitle}`,
+  wedding: `Wedding of ${NAMES.pairTitle}`,
+};
 const BLURB = {
+  mehndi: 'Henna, dholki and a late start to the week. Dress code: colour, and plenty of it.',
   haldi: 'The first affair of the celebrations. Dress code: shades of yellow.',
   cocktail: 'An evening of toasts and rings. Dress code: dazzling as you dare.',
+  baraat: 'The procession. Bring noise. Dress code: dancing shoes, no exceptions.',
   wedding: 'The grand affair: baraat, pheras and forever. Dress code: traditional grandeur.',
 };
-const mkEvent = (key, title) => ({
-  title,
+const mkEvent = (key) => ({
+  title: TITLES[key] || `${NAMES.pairTitle} — Wedding`,
   ...(D[key] || {}),
   ...(V[key]
-    ? { location: V[key].location, description: `${BLURB[key]} Directions: ${V[key].map}` }
+    ? { location: V[key].location, description: [BLURB[key], `Directions: ${V[key].map}`].filter(Boolean).join(' ') }
     : {}),
 });
-export const EVENTS = {
-  haldi: mkEvent('haldi', `Haldi — ${NAMES.pairTitle}`),
-  cocktail: mkEvent('cocktail', `Cocktail & Engagement — ${NAMES.pairTitle}`),
-  wedding: mkEvent('wedding', `Wedding of ${NAMES.pairTitle}`),
-};
+// One entry per event we have copy for, PLUS any id the build revealed dates
+// or venues for: a newly revealed event must never render a dead
+// "Add to calendar" button just because this map went stale.
+export const EVENTS = Object.fromEntries(
+  [...new Set([...Object.keys(TITLES), ...Object.keys(D), ...Object.keys(V)])]
+    .map((key) => [key, mkEvent(key)]),
+);
 

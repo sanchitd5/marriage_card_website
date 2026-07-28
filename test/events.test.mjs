@@ -83,7 +83,9 @@ test('buildEventCards: the bride-first build drops the groom-side functions', ()
 
 test('buildEventCards: a variant narrows the card to that guest\'s events', () => {
   const html = buildEventCards(composeNames(true), false, true, 'wedding');
-  assert.equal((html.match(/event-card/g) || []).length, 1);
+  // count card elements, not the "event-card" substring — the headliner card's
+  // class list ("event-card event-card--main") contains it twice
+  assert.equal((html.match(/<article class="event-card/g) || []).length, 1);
   assert.ok(/The Wedding/.test(html));
 });
 
@@ -110,4 +112,26 @@ test('buildEventCards: while gated, cards carry no per-card placeholder lines', 
   // what IS known still shows
   assert.ok(/At the groom&#39;s home/.test(html), 'a standing venue note survives the gate');
   assert.ok(/Shades of yellow/.test(html), 'dress codes are not gated');
+});
+
+test('buildEventCards: exactly one headliner card, and it is the wedding', () => {
+  const html = buildEventCards(composeNames(true), false, true, 'full');
+  const main = [...html.matchAll(/event-card event-card--main[\s\S]*?event-name">([^<]*)</g)];
+  assert.equal(main.length, 1, 'exactly one .event-card--main');
+  assert.equal(main[0][1], 'The Wedding');
+});
+
+// ---- runtime calendar wiring (js/app/config.js) ------------------------
+// The shipped config cannot import this file (leak-proofing), so its TITLES
+// copy can drift when events are added — which is exactly how the Mehndi and
+// Baraat cards shipped with "Add to calendar" buttons that could never
+// activate. This is the guard: every event on the card must have a runtime
+// EVENTS entry, or its button stays dead even after the reveal.
+import { EVENTS } from '../js/app/config.js';
+
+test('every EVENT_DEFS id has a runtime EVENTS entry for its calendar button', () => {
+  for (const def of EVENT_DEFS) {
+    assert.ok(EVENTS[def.id], `EVENTS['${def.id}'] missing — dead "Add to calendar" button`);
+    assert.ok(EVENTS[def.id].title.includes('—') || EVENTS[def.id].title.length > 0, 'entry carries a calendar title');
+  }
 });

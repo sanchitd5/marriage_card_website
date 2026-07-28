@@ -247,7 +247,10 @@ export function buildEventCards(
       const directions = g
         ? `<a class="btn-quiet" href="${map}" target="_blank" rel="noopener">Get directions</a>`
         : "";
-      return `<article class="event-card" data-tilt data-magnetic>
+      // The headliner keeps its highlighted treatment: all three skins style
+      // .event-card--main (gold frame / accent tick), driven by the def flag.
+      const cls = ev.headliner ? "event-card event-card--main" : "event-card";
+      return `<article class="${cls}" data-tilt data-magnetic>
               <p class="event-no">${no}</p>
               <h3 class="event-name">${htmlEscape(ev.name)}</h3>
               ${whenLine}
