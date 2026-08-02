@@ -27,7 +27,7 @@ from tokenised templates in `src/`.
 | Affair | When | Where | Dress code |
 |---|---|---|---|
 | Haldi | To be revealed | To be announced | Shades of yellow |
-| Cocktail & Engagement | To be revealed | To be announced | Dazzling as you dare |
+| Cocktail | To be revealed | To be announced | Dazzling as you dare |
 | The Wedding | To be revealed | To be announced | — |
 
 ## Build

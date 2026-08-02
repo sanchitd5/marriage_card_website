@@ -21,14 +21,14 @@ const V = EVENT_VENUES || {};
 const TITLES = {
   mehndi: `Mehndi — ${NAMES.pairTitle}`,
   haldi: `Haldi — ${NAMES.pairTitle}`,
-  cocktail: `Cocktail & Engagement — ${NAMES.pairTitle}`,
+  cocktail: `Cocktail — ${NAMES.pairTitle}`,
   baraat: `Baraat — ${NAMES.pairTitle}`,
   wedding: `Wedding of ${NAMES.pairTitle}`,
 };
 const BLURB = {
   mehndi: 'Henna, dholki and a late start to the week. Dress code: colour, and plenty of it.',
   haldi: 'The first affair of the celebrations. Dress code: shades of yellow.',
-  cocktail: 'An evening of toasts and rings. Dress code: dazzling as you dare.',
+  cocktail: 'An evening of toasts and dancing. Dress code: dazzling as you dare.',
   baraat: 'The procession. Bring noise. Dress code: dancing shoes, no exceptions.',
   wedding: 'The grand affair: baraat, pheras and forever. Dress code: traditional grandeur.',
 };

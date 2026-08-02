@@ -67,7 +67,7 @@ import { buildEventCards, composeNames } from '../build.js';
 test('buildEventCards: renders one card per event, numbered in order', () => {
   const html = buildEventCards(composeNames(true), false, true, 'full');
   const names = [...html.matchAll(/event-name">([^<]*)</g)].map((m) => m[1]);
-  assert.deepEqual(names, ['Mehndi', 'Haldi', 'Cocktail &amp; Engagement', 'Baraat', 'The Wedding']);
+  assert.deepEqual(names, ['Mehndi', 'Haldi', 'Cocktail', 'Baraat', 'The Wedding']);
   // the "Track NN" label was dropped: the DJ noun sat oddly on sacred functions,
   // and the number alone carries the running order
   assert.deepEqual([...html.matchAll(/event-no">(\d+)</g)].map((m) => m[1]), ['01', '02', '03', '04', '05']);

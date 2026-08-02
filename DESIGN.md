@@ -240,9 +240,10 @@ Do not report these as design defects. Recorded so they are not lost:
   gate are their moment as much as the groom's.
 - **No Sangeet**, which for a Punjabi wedding is the function friends most
   expect — and the one a techno-skinned card is best placed to sell. If it is
-  folded into "Cocktail & Engagement", the card should say so.
-- **Engagement listed after Haldi.** Confirmed correct by the couple, but elders
-  may read a future-tense engagement beside the wedding as odd.
+  folded into the Cocktail, the card should say so.
+- ~~**Engagement listed after Haldi.**~~ Resolved: the engagement was dropped
+  from the programme at the couple's request; the function is now just
+  "Cocktail", so the future-tense-engagement-beside-the-wedding reading is gone.
 - **The Wedding row is thin** for the central event: a guest cannot tell whether
   to arrive for the baraat, the phere or dinner.
 - **Bride-first shows three events and reads as short.** Whatever the final list,

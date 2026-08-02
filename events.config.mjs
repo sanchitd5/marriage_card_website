@@ -44,7 +44,7 @@
 export const SIDE = { BOTH: 'both', GROOM: 'groom', BRIDE: 'bride' };
 
 // The canonical programme. Order here is the RUN OF SHOW order and is
-// chronological: Haldi in the morning, then the Cocktail/Engagement, then the
+// chronological: Haldi in the morning, then the Cocktail, then the
 // Baraat and the Wedding on the 12th. Confirmed with the couple.
 //
 // `date` / `time` / `venue` / `map` are the gated fields — they are only ever
@@ -68,10 +68,10 @@ export const EVENT_DEFS = [
   },
   {
     id: 'cocktail',
-    name: 'Cocktail & Engagement',
+    name: 'Cocktail',
     side: SIDE.BOTH,
     dress: 'Dazzling as you dare',
-    blurb: 'Rings exchanged, then the floor opens.',
+    blurb: 'Toasts, and then the floor opens.',
   },
   {
     id: 'baraat',
