@@ -30,7 +30,8 @@ function veiledHTML() {
      </figure>`;
   }
   return `<figure class="gframe gframe--veiled fade-up">
-     <span class="orn" aria-hidden="true"></span>
+     <span class="veil-frames" aria-hidden="true"><i></i><i></i><i></i></span>
+     <span class="veil-kicker">Sealed until the celebration</span>
      <p class="veil-note">Our story stays close, until the celebration lets it out</p>
    </figure>`;
 }

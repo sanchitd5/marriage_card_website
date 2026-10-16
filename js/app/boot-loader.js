@@ -121,12 +121,13 @@
         resolve();
       }
       // Warm one track's metadata so the loader reflects "music can start".
-      // theme-1 always exists; the actual (shuffled) playback pool is chosen
-      // later by ui.js from the build-discovered SONGS list. The techno skin has
-      // its own playlist under assets/audio/techno/.
+      // Warm the track that actually plays first: ui.js pins theme-4 at the
+      // head of the Regency queue (couple's preference). The techno skin has
+      // its own shuffled playlist under assets/audio/techno/, where theme-1
+      // always exists.
       var track = document.documentElement.dataset.skin === 'techno'
         ? 'assets/audio/techno/theme-1.mp3'
-        : 'assets/audio/theme-1.mp3';
+        : 'assets/audio/theme-4.mp3';
       var audio = new Audio();
       audio.preload = 'metadata';
       audio.addEventListener('loadedmetadata', finish, { once: true });

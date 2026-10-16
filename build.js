@@ -253,6 +253,8 @@ const EVENT_MOTIFS = {
   mehndi: '<path d="M24 4c12 8 15 22 6 33-3 4-8 6-12 5 8-9 9-20 6-38z"/><path d="M24 10c-4 10-5 20 0 30"/><path d="M26 14c3 3 4 6 4 9M25 22c3 3 4 6 3 10" stroke-width=".8"/><circle cx="14" cy="38" r="1.8" fill="currentColor" stroke="none"/><circle cx="10" cy="31" r="1.2" fill="currentColor" stroke="none"/><circle cx="36" cy="10" r="1.2" fill="currentColor" stroke="none"/>',
   wedding: '<path d="M17 20c-5 4-6 12-3 18 1 3 3 5 6 5h8c3 0 5-2 6-5 3-6 2-14-3-18M16 20h16M19 16h10v4H19z"/><circle cx="24" cy="9" r="4.5" fill="currentColor" stroke="none"/><path d="M24 14c-8 0-14-3-16-8 6-1 12 2 16 8zM24 14c8 0 14-3 16-8-6-1-12 2-16 8zM24 14c-3-3-4-6-2-9M24 14c3-3 4-6 2-9" stroke-width="1"/><path d="M17 30h14M16 35h16" stroke-width=".9"/>',
 };
+const IC_PIN = '<svg class="ev-ic" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true" focusable="false"><path d="M8 14.5s4.5-4.2 4.5-8A4.5 4.5 0 0 0 3.5 6.5c0 3.8 4.5 8 4.5 8z"/><circle cx="8" cy="6.5" r="1.6"/></svg>';
+const IC_CAL = '<svg class="ev-ic" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true" focusable="false"><rect x="2" y="3" width="12" height="11" rx="1"/><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3"/></svg>';
 function eventMotif(id) {
   const body = EVENT_MOTIFS[id];
   return body
@@ -286,7 +288,7 @@ export function buildEventCards(
       const whenLine = g
         ? `<p class="event-when"><time datetime="${dt}">${g.when.split(" · ").map((x, k) => `<span class="ev-${k ? "t" : "d"}">${htmlEscape(x).replace(/(\d+) o&#39;clock/, "$1&nbsp;o&#39;clock")}</span>`).join("")}</time></p>`
         : reveal
-          ? `<p class="event-when event-when--tbc">${ev.date ? `<span class="ev-d">${htmlEscape(fmtDay(ev.date))}</span><span class="ev-t">time to follow</span>` : "Date and time to follow"}</p>`
+          ? `<p class="event-when event-when--tbc">${ev.date ? `<span class="ev-d">${htmlEscape(fmtDay(ev.date))}</span><span class="ev-t">Time to follow</span>` : `<span class="ev-d">Date to follow</span><span class="ev-t">Time to follow</span>`}</p>`
           : "";
       const venueText = g
         ? htmlEscape(g.venue)
@@ -300,14 +302,15 @@ export function buildEventCards(
         : "";
       // No date at all (reveal gated, or e.g. Mehndi) -> no button rendered.
       const cal =
-        reveal && eventCalendar(ev, g) ? `<button class="btn-quiet" data-ics="${ev.id}">Add to calendar</button>` : "";
+        reveal && eventCalendar(ev, g) ? `<button class="btn-quiet" data-ics="${ev.id}">${IC_CAL}<span>Add to calendar</span></button>` : "";
       const no = String(i + 1).padStart(2, "0");
       const directions = g
-        ? `<a class="btn-quiet" href="${map}" target="_blank" rel="noopener">Get directions</a>`
+        ? `<a class="btn-quiet" href="${map}" target="_blank" rel="noopener">${IC_PIN}<span>Get directions</span></a>`
         : "";
       // The headliner keeps its highlighted treatment: all three skins style
       // .event-card--main (gold frame / accent tick), driven by the def flag.
       const cls = ev.headliner ? "event-card event-card--main" : "event-card";
+      const actions = directions || cal ? `${directions}\n                ${cal}` : `<span class="event-pending">Details to follow</span>`;
       return `<article class="${cls}" data-tilt data-magnetic>
               ${eventMotif(ev.id)}
               <p class="event-no">${no}</p>
@@ -316,8 +319,7 @@ export function buildEventCards(
               ${venueLine}
               <p class="event-dress"><span>Dress code</span> ${htmlEscape(ev.dress)}</p>
               <div class="event-actions${directions || cal ? "" : " event-actions--pending"}">
-                ${directions}
-                ${cal}
+                ${actions}
               </div>
             </article>`;
     })

@@ -126,6 +126,8 @@ html[data-theme="dark"] .display-head em, html[data-theme="dark"] .gilt {
   color: hsl(var(--ink));
 }
 .family-motif, html[data-theme="dark"] .family-motif { mix-blend-mode: normal; background: #f4ecd9; padding: 7px; border: 2px solid hsl(var(--gold)); box-shadow: 0 0 0 5px hsl(347 55% 17%), 0 0 0 6px hsl(var(--gold) / .7); filter: none; }
+html[data-theme="dark"] .family-motif { background: #cfc0a0; }
+html[data-theme="dark"] .family-motif { filter: brightness(.9) sepia(.12); }
 .interlude-art img { filter: hue-rotate(-18deg) saturate(.85); }
 
 /* One divider motif for the whole page: hairline, lozenge-in-lozenge, hairline.
@@ -753,10 +755,9 @@ html[data-theme="dark"] .hero-veil {
   padding: clamp(1.6rem, 5vw, 2.2rem) 1.5rem;
   text-align: center;
 }
-/* content-driven acts: only hero/gate/countdown/events/interlude/footer hold a full screen */
+/* every .band + footer holds min-height:100svh at all viewports (CLAUDE.md, user rule) */
 @media (min-width: 760px) {
   .gframe--veiled { max-width: 34rem; margin-inline: auto; }
-  .band.gallery, .band.family { min-height: 0; padding-block: clamp(4.5rem, 9vh, 6.5rem); }
 }
 /* gallery.js still emits a glyph: swap it for the shared ornament, glyph hidden */
 .gframe--veiled .veil-motif { display: block; font-size: 0; line-height: 0; width: 8rem; height: 14px; position: relative;
@@ -897,11 +898,10 @@ html[data-theme="dark"] .event-when--tbc { color: hsl(38 50% 70%); }
 .hero-date { letter-spacing: .07em; }
 .scratch-hint { text-wrap: balance; }
 .interlude { background-image: radial-gradient(ellipse 62% 56% at 50% 44%, hsl(var(--gold) / .09), transparent 70%), var(--jaal); background-size: auto, 56px 56px; }
-.events > .wrap::before, .gallery > .wrap::before, .interlude-line::before {
+.events > .wrap::before {
   content: ""; display: block; width: 40px; height: 52px; margin: 0 auto 1.1rem;
   background: var(--mehrab) center / contain no-repeat;
 }
-.interlude-line::before { margin-bottom: .9rem; }
 
 /* ── Mobile: fixed moon/music buttons own a ~48px gutter on the right edge; keep
    card-bearing acts symmetric inside it so no button ever sits on a card. */
@@ -947,7 +947,7 @@ html[data-theme="dark"] .event-card--main { background: radial-gradient(ellipse 
 .event-card--main .event-name { font-size: 2.2rem; }
 /* 1 interlude: no dead space on mobile */
 @media (max-width: 600px) {
-  .band.interlude { min-height: 52svh; padding-block: 2.5rem; }
+  .band.interlude { padding-block: 2.5rem; }
   .interlude-art img { max-height: 40svh; }
   .interlude-line { margin-top: 1.3rem; }
   /* 11 kickers */
@@ -1021,9 +1021,9 @@ html[data-theme="dark"] .gframe--veiled { background: #34161f; }
 .event-name { min-height: 2.2rem; }
 .event-when { min-height: 2.6rem; }
 @media (min-width: 900px) { .event-grid { align-items: stretch; } .event-card--main { transform: none; } }
-/* mobile: act bands hug their content instead of holding a full screen */
+/* mobile band padding (bands keep min-height:100svh) */
 @media (max-width: 600px) {
-  .band.countdown, .band.family { min-height: 0; padding-block: 3rem; }
+  .band.countdown, .band.family { padding-block: 3rem; }
   /* fixed buttons never cover content: hidden while scrolling past the hero, a faint small seal at rest */
   html.dock-quiet #theme-toggle, html.dock-quiet #right-dock { transition: opacity .3s, transform .3s; opacity: .45; transform: scale(.75); }
   html.dock-quiet.is-scrolling #theme-toggle, html.dock-quiet.is-scrolling #right-dock { opacity: 0; pointer-events: none; }
@@ -1032,3 +1032,54 @@ html[data-theme="dark"] .gframe--veiled { background: #34161f; }
 }
 /* scratch foil label: engraved, readable */
 .scratch-frame { box-shadow: inset 0 0 0 4px hsl(347 42% 27%), inset 0 0 0 5px hsl(var(--gold-soft) / .8), 0 10px 26px rgba(0,0,0,.35); }
+
+/* ═══ REVIEW ROUND 9 ═════════════════════════════════════════ */
+/* 3+2 on desktop: six tracks, every card spans two, so row two sits on the same
+   column width and gutters as row one, centred beneath it. */
+@media (min-width: 900px) {
+  .event-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2.3rem; max-width: 74rem; margin-inline: auto; }
+  .event-grid > .event-card { grid-column: span 2; flex: none; }
+  .event-grid > .event-card:nth-child(4):nth-last-child(2) { grid-column: 2 / span 2; }
+  .event-grid > .event-card:nth-child(5):last-child { grid-column: 4 / span 2; }
+}
+/* date rows: every card reads date (ink) / time (italic ink); undated cards match */
+.event-when--tbc, html[data-theme="dark"] .event-when--tbc { color: inherit; font-style: normal; }
+.event-when--tbc .ev-t { font-style: italic; }
+.event-when { min-height: 0; }
+.event-when, .event-venue { margin-bottom: .2rem; }
+.event-venue { margin-top: .5rem; margin-bottom: 1.1rem; }
+/* cards with no buttons: a deliberate closing line pinned to the foot, not dead space */
+.event-actions--pending { margin-top: auto; padding-top: 1rem; }
+.event-pending { margin-inline: auto; text-align: center; }
+/* dark: card rules legible against maroon */
+html[data-theme="dark"] .event-card:not(.event-card--main) { border-color: hsl(var(--gold) / .95); box-shadow: 0 0 0 1px hsl(var(--gold) / .25), var(--shadow-lift); }
+html[data-theme="dark"] .event-card::before { border-color: hsl(var(--gold) / .85); }
+html[data-theme="dark"] .gframe--veiled { box-shadow: 0 0 0 1px hsl(var(--gold) / .6); border: 1px solid hsl(var(--gold) / .9); }
+/* action icons */
+.btn-quiet .ev-ic { flex: none; margin-right: .45em; }
+.btn-quiet { gap: 0; }
+/* mobile: both actions share one compact row */
+@media (max-width: 600px) {
+  .event-actions { flex-direction: row; flex-wrap: nowrap; gap: .5rem; justify-content: center; }
+  .event-actions .btn-quiet { flex: 1 1 0; width: auto; min-width: 0; min-height: 44px; padding: .4rem .35rem; font-size: .62rem; letter-spacing: .05em; white-space: normal; line-height: 1.2; }
+  .event-actions .btn-quiet .ev-ic { margin-right: .3em; width: 13px; height: 13px; }
+  .scratch-prompt, .scratch-hint { text-wrap: balance; }
+  .scratch-hint { font-size: .72rem; letter-spacing: .16em; }
+}
+.scratch-prompt { text-wrap: balance; }
+/* veiled gallery: three ghost arch frames + kicker so the plate reads as a sealed set */
+.veil-frames { display: flex; gap: .7rem; justify-content: center; }
+.veil-frames i { display: block; width: 2.6rem; height: 3.4rem; border: 1px solid hsl(var(--gold) / .75); border-radius: 999px 999px 3px 3px / 70% 70% 3px 3px; background: linear-gradient(180deg, hsl(var(--gold) / .12), transparent); }
+.veil-frames i:nth-child(2) { height: 4rem; margin-top: -.6rem; }
+.veil-kicker { font-size: .62rem; letter-spacing: .26em; text-transform: uppercase; color: hsl(var(--gold)); font-weight: 500; }
+html[data-theme="dark"] .veil-kicker { color: #e3c887; }
+
+/* ═══ REVIEW ROUND 9b ════════════════════════════════════════ */
+.count-num { font-variant-numeric: tabular-nums lining-nums; }
+.event-pending { border-top-style: solid; border-top-color: hsl(var(--gold-soft) / .6); }
+.footer { background-image: var(--jaal); background-size: 56px 56px; }
+@media (max-width: 600px) {
+  #theme-toggle, #music-toggle { background: hsl(var(--ivory) / .9); border: 1px solid hsl(var(--gold) / .8); box-shadow: 0 2px 10px rgba(0,0,0,.18); }
+  html.dock-quiet #theme-toggle, html.dock-quiet #right-dock { opacity: .7; }
+  .band.gallery { padding-block: 3.5rem; }
+}

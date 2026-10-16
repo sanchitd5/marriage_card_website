@@ -1,6 +1,6 @@
 import { REDUCED, $ } from './dom.js';
 import { appState } from './state.js';
-import { startMusic, attemptAutoFullscreen } from './ui.js';
+import { startMusic, startMusicOnFirstGesture, attemptAutoFullscreen } from './ui.js';
 import { startHeroVideo, heroEntrance } from './hero.js';
 import { videoSuffix } from './net.js';
 
@@ -29,6 +29,7 @@ export function initGate() {
     document.body.style.overflow = '';
     startHeroVideo();
     heroEntrance(true);
+    startMusicOnFirstGesture();
     return;
   }
 

@@ -6,13 +6,17 @@ const MUSIC_VOL = 0.65;
 const CROSSFADE = 6;              // seconds of overlap when automix is on
 const AUTOMIX_KEY = 'wedding-automix';
 
-const shuffled = () => {
-  const a = [...SONGS];
+const PREFERRED = 'theme-4';      // Regency: always opens the mix
+const MUTE_KEY = 'wedding-music-muted';
+const isRegency = () => document.documentElement.dataset.skin !== 'techno';
+
+const shuffled = (pinFirst) => {
+  const a = SONGS.filter((n) => n !== pinFirst);
   for (let j = a.length - 1; j > 0; j--) {
     const k = Math.floor(Math.random() * (j + 1));
     [a[j], a[k]] = [a[k], a[j]];
   }
-  return a;
+  return pinFirst && SONGS.includes(pinFirst) ? [pinFirst, ...a] : a;
 };
 
 function readAutomixPref() {
@@ -158,13 +162,27 @@ export function startMusic() {
   }
 
   if (m.automix === undefined) m.automix = readAutomixPref();
-  m.queue = shuffled();
+  m.queue = shuffled(isRegency() ? PREFERRED : undefined);
   m.qi = -1;          // nextName() bumps to 0 for the first track
   m.fails = 0;
   m.fading = false;
   m.paused = false;
   m.outgoing = null;
   advance(m, dock, false);
+}
+
+// Repeat visits skip the gate, so no gesture started the music. Try immediately
+// (autoplay may be allowed), else start on the first interaction. Honours a
+// stored pause choice.
+export function startMusicOnFirstGesture() {
+  try { if (localStorage.getItem(MUTE_KEY) === '1') return; } catch (e) { /* storage blocked */ }
+  const evs = ['pointerdown', 'keydown', 'touchstart', 'wheel'];
+  const off = () => evs.forEach((e) => window.removeEventListener(e, go, true));
+  function go(ev) { if (ev.target.closest && ev.target.closest('#music-dock')) return; off(); startMusic(); }
+  evs.forEach((e) => window.addEventListener(e, go, { capture: true, passive: true }));
+  startMusic();
+  const m = appState.music;
+  if (m.audio) m.audio.addEventListener('playing', off, { once: true });
 }
 
 function setPlaying(on) {
@@ -181,6 +199,7 @@ export function initMusicToggle() {
   btn.addEventListener('click', () => {
     const m = appState.music;
     if (!m.audio) return;
+    try { localStorage.setItem(MUTE_KEY, m.playing ? '1' : '0'); } catch (e) { /* storage blocked */ }
     if (m.playing) {
       m.paused = true;
       m.audio.pause();
