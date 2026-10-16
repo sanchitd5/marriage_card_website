@@ -1,4 +1,4 @@
-import { NAMES, SONGS, WEDDING_TS, REVEAL_DATE, EVENT_DATES, EVENT_VENUES, COUPLE_REVEAL_TS, OUTFIT_REVEAL_TS, GALLERY } from './couple.mjs';
+import { NAMES, SONGS, WEDDING_TS, REVEAL_DATE, EVENT_DATES, EVENT_VENUES, EVENT_COPY, COUPLE_REVEAL_TS, OUTFIT_REVEAL_TS, GALLERY } from './couple.mjs';
 
 // SONGS is auto-discovered from assets/audio/theme-N.mp3 at build time.
 // WEDDING_TS / EVENT_DATES / EVENT_VENUES are build-gated: null while
@@ -11,6 +11,9 @@ export { NAMES, SONGS, WEDDING_TS, REVEAL_DATE, COUPLE_REVEAL_TS, OUTFIT_REVEAL_
 
 const D = EVENT_DATES || {};
 const V = EVENT_VENUES || {};
+// Side-specific copy (side-hosted events) is emitted by the build only
+// on the side that hosts it, so the other side's dist never names it.
+const C = EVENT_COPY || {};
 
 // Only non-identifying copy (title + blurb + dress code) lives here; venue
 // name, map link and dates come from the generated module and are absent
@@ -33,18 +36,18 @@ const BLURB = {
   wedding: 'The grand affair: baraat, pheras and forever. Dress code: traditional grandeur.',
 };
 const mkEvent = (key) => ({
-  title: TITLES[key] || `${NAMES.pairTitle} — Wedding`,
-  description: BLURB[key] || '',
+  title: TITLES[key] || (C[key] && C[key].title) || `${NAMES.pairTitle} — Wedding`,
+  description: BLURB[key] || (C[key] && C[key].description) || '',
   ...(D[key] || {}),
   ...(V[key]
-    ? { location: V[key].location, description: [BLURB[key], `Directions: ${V[key].map}`].filter(Boolean).join(' ') }
+    ? { location: [V[key].location, V[key].address].filter(Boolean).join(', '), description: [BLURB[key] || (C[key] && C[key].description), V[key].note, `Directions: ${V[key].map}`].filter(Boolean).join(' ') }
     : {}),
 });
 // One entry per event we have copy for, PLUS any id the build revealed dates
 // or venues for: a newly revealed event must never render a dead
 // "Add to calendar" button just because this map went stale.
 export const EVENTS = Object.fromEntries(
-  [...new Set([...Object.keys(TITLES), ...Object.keys(D), ...Object.keys(V)])]
+  [...new Set([...Object.keys(TITLES), ...Object.keys(C), ...Object.keys(D), ...Object.keys(V)])]
     .map((key) => [key, mkEvent(key)]),
 );
 

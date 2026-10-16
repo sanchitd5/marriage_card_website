@@ -52,6 +52,20 @@ export const SIDE = { BOTH: 'both', GROOM: 'groom', BRIDE: 'bride' };
 // safe to ship while the dates are still hidden.
 export const EVENT_DEFS = [
   {
+    // Research (brief web pass found no Mata ki Chowki card-specific guidance;
+    // conventions below are from common practice, unverified): a devotional
+    // evening precedes the celebrations, is shown apart from the numbered
+    // programme (`prelude`), asks for modest dress with the head covered, and
+    // names the meal time on the card.
+    id: 'chowki',
+    name: 'Mata ki Chowki',
+    side: SIDE.GROOM,          // the groom's family hosts
+    prelude: true,             // shown above, unnumbered; not part of the 01..n programme
+    date: '2026-12-07',
+    dress: 'Traditional, modest; a dupatta or scarf to cover the head',
+    blurb: 'An evening of bhajans in devotion to Mata Rani.',
+  },
+  {
     id: 'mehndi',
     name: 'Mehndi',
     side: SIDE.GROOM,          // hosted at the groom's home
@@ -101,7 +115,7 @@ export const INVITE_VARIANTS = {
   // close family and the wedding party: everything their side hosts
   full:    { id: 'full',    label: 'All functions', events: null },
   // friends invited to the celebration functions but not the home Mehndi
-  friends: { id: 'friends', label: 'Celebrations', events: ['haldi', 'cocktail', 'baraat', 'wedding'] },
+  friends: { id: 'friends', label: 'Celebrations', events: ['haldi', 'cocktail', 'baraat', 'wedding'] } /* no chowki: full list only */,
   // the widest circle: the ceremony itself
   wedding: { id: 'wedding', label: 'Wedding only',  events: ['wedding'] },
 };
@@ -109,6 +123,11 @@ export const INVITE_VARIANTS = {
 export const DEFAULT_VARIANT = 'full';
 
 // ── Pure selectors (unit-tested; no filesystem, no side effects) ──────
+
+// Split a programme into the unnumbered prelude tier and the numbered main one.
+export function splitProgramme(list) {
+  return { prelude: list.filter((e) => e.prelude), main: list.filter((e) => !e.prelude) };
+}
 
 // Is this event hosted on the side the current build speaks for?
 export function isEventForSide(event, fromGroomSide) {

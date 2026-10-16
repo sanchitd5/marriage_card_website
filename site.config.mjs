@@ -62,6 +62,7 @@ export const wedding = {
   scratchDate: '12·12·2026',
   scratchSub: "seven o'clock in the evening",
   events: {
+    chowki:   { when: "Monday, 7 December 2026 · 6 o'clock in the evening", datetime: '2026-12-07T18:00+05:30', start: '20261207T123000Z', end: '20261207T163000Z', venue: 'Khukhrain Bhawan, Ambala Cantt', address: '1, Subhash Park Rd, Tribune Colony, Ambala Cantt, Haryana 133001', note: 'Dinner at 9 o\'clock', map: 'https://www.google.com/maps/search/?api=1&query=Khukhrain%20Bhawan%2C%201%20Subhash%20Park%20Rd%2C%20Tribune%20Colony%2C%20Ambala%20Cantt%2C%20Haryana%20133001' },
     haldi:    { when: "Friday, 11 December 2026 · 11 o'clock in the morning", datetime: '2026-12-11T11:00+05:30', start: '20261211T053000Z', end: '20261211T083000Z', venue: 'Radisson Hotel Chandigarh Zirakpur', map: 'https://maps.app.goo.gl/fQhBFytYAZKu4qBB7' },
     cocktail: { when: "Friday, 11 December 2026 · 8 o'clock in the evening",  datetime: '2026-12-11T20:00+05:30', start: '20261211T143000Z', end: '20261211T183000Z', venue: 'Radisson Hotel Chandigarh Zirakpur', map: 'https://maps.app.goo.gl/fQhBFytYAZKu4qBB7' },
     baraat:   { when: "Saturday, 12 December 2026 · 8 o'clock in the evening", datetime: '2026-12-12T20:00+05:30', start: '20261212T143000Z', end: '20261212T163000Z', venue: "De'vansh Resort, Ambala Cantt", map: 'https://maps.app.goo.gl/RdueUZ2XfNiAnbD18' },

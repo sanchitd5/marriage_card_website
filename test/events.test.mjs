@@ -26,7 +26,7 @@ test('side filter: a groom-side function is hidden from the bride-first build', 
 
 test('run of show is chronological, and the confirmed events are present', () => {
   const order = ids(EVENT_DEFS);
-  assert.deepEqual(order, ['mehndi', 'haldi', 'cocktail', 'baraat', 'wedding']);
+  assert.deepEqual(order, ['chowki', 'mehndi', 'haldi', 'cocktail', 'baraat', 'wedding']);
   // Haldi in the morning, then the engagement, then the wedding — confirmed.
   assert.ok(order.indexOf('haldi') < order.indexOf('cocktail'));
   assert.ok(order.indexOf('cocktail') < order.indexOf('wedding'));
@@ -37,7 +37,7 @@ test('run of show is chronological, and the confirmed events are present', () =>
 
 test('variant "full" means every event valid for the side, not a frozen list', () => {
   assert.equal(INVITE_VARIANTS.full.events, null);
-  assert.deepEqual(ids(eventsForInvite('full', true)), ['mehndi', 'haldi', 'cocktail', 'baraat', 'wedding']);
+  assert.deepEqual(ids(eventsForInvite('full', true)), ['chowki', 'mehndi', 'haldi', 'cocktail', 'baraat', 'wedding']);
   assert.deepEqual(ids(eventsForInvite('full', false)), ['haldi', 'cocktail', 'wedding']);
 });
 
@@ -67,7 +67,7 @@ import { buildEventCards, composeNames } from '../build.js';
 test('buildEventCards: renders one card per event, numbered in order', () => {
   const html = buildEventCards(composeNames(true), false, true, 'full');
   const names = [...html.matchAll(/event-name">([^<]*)</g)].map((m) => m[1]);
-  assert.deepEqual(names, ['Mehndi', 'Haldi', 'Cocktail', 'Baraat', 'The Wedding']);
+  assert.deepEqual(names, ['Mata ki Chowki', 'Mehndi', 'Haldi', 'Cocktail', 'Baraat', 'The Wedding']);
   // the "Track NN" label was dropped: the DJ noun sat oddly on sacred functions,
   // and the number alone carries the running order
   assert.deepEqual([...html.matchAll(/event-no">(\d+)</g)].map((m) => m[1]), ['01', '02', '03', '04', '05']);
@@ -161,4 +161,45 @@ test('buildEventCards: Mehndi renders no calendar button, Baraat does when revea
   assert.ok(!html.includes('data-ics="mehndi"'));
   assert.ok(html.includes('data-ics="baraat"'));
   assert.ok(html.includes('data-ics="haldi"'));
+});
+
+// ---- Mata ki Chowki prelude ---------------------------------------------
+import { splitProgramme } from '../events.config.mjs';
+import { buildHtmlTokens } from '../build.js';
+import { wedding } from '../site.config.mjs';
+
+test('splitProgramme: chowki is the prelude, programme numbering unchanged', () => {
+  const { prelude, main } = splitProgramme(eventsForInvite('full', true));
+  assert.deepEqual(ids(prelude), ['chowki']);
+  assert.deepEqual(ids(main), ['mehndi', 'haldi', 'cocktail', 'baraat', 'wedding']);
+});
+
+test('chowki: groom build only, full variant only, unnumbered and first', () => {
+  const g = buildEventCards(composeNames(true), true, true, 'full');
+  assert.ok(g.indexOf('Mata ki Chowki') < g.indexOf('Mehndi'));
+  assert.ok(/event-card--prelude/.test(g) && /Dinner at 9/.test(g) && /Khukhrain/.test(g));
+  assert.deepEqual([...g.matchAll(/event-no">(\d+)</g)].map((m) => m[1]), ['01', '02', '03', '04', '05']);
+  assert.ok(!/Chowki/.test(buildEventCards(composeNames(false), true, false, 'full')));
+  for (const v of ['friends', 'wedding']) assert.ok(!/Chowki/.test(buildEventCards(composeNames(true), true, true, v)));
+});
+
+test('chowki: hidden build leaks no venue/dinner; calendar entry is 18:00-22:00 IST', () => {
+  const h = buildEventCards(composeNames(true), false, true, 'full');
+  assert.ok(!/Khukhrain|Dinner|Subhash/.test(h));
+  assert.deepEqual(eventCalendar(EVENT_DEFS[0], wedding.events.chowki), { start: '20261207T123000Z', end: '20261207T163000Z' });
+});
+
+test('chowki: hero date range stays 11-12 December', () => {
+  const t = buildHtmlTokens(composeNames(true), true, 'regency', true, 'full');
+  assert.equal(t.DATE_RANGE, '11–12 December 2026');
+  assert.ok(!/7 December|Chowki/.test(t.TITLE_DATE + t.DATE_RANGE + t.HERO_LINE));
+});
+
+test('chowki: runtime calendar entry carries venue, address, map and dinner', () => {
+  const e = EVENTS.chowki;
+  assert.equal(e.start, '20261207T123000Z'); assert.equal(e.end, '20261207T163000Z');
+  assert.ok(/Khukhrain Bhawan.*Subhash Park Rd/.test(e.location));
+  assert.equal(e.title, 'Mata ki Chowki');
+  assert.ok(!/wedding|Sanchit|Riya/i.test(e.title + e.description), 'stands alone');
+  assert.ok(/Dinner at 9/.test(e.description) && /google\.com\/maps/.test(e.description));
 });

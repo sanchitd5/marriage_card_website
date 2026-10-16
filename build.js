@@ -29,6 +29,8 @@ import {
 import {
   EVENT_DEFS,
   eventsForInvite,
+  isEventForSide,
+  splitProgramme,
   resolveVariant,
   DEFAULT_VARIANT,
 } from "./events.config.mjs";
@@ -263,6 +265,7 @@ function fmtDay(ymd) {
 // Small gilt motif per event, same ornament language as the hashiya border:
 // hairline gold strokes with one filled accent. Keyed by event id.
 const EVENT_MOTIFS = {
+  chowki: '<path d="M24 4c3 4 3 7 0 10-3-3-3-6 0-10z" fill="currentColor" stroke="none"/><path d="M24 14v3M10 22c0 6 6 10 14 10s14-4 14-10zM8 22h32M18 38h12M24 32v6"/><path d="M14 18c-2 2-2 4 0 6M34 18c2 2 2 4 0 6" stroke-width=".8"/>',
   haldi: '<circle cx="24" cy="24" r="4" fill="currentColor" stroke="none"/><g transform="translate(24 24)"><ellipse cy="-11" rx="4" ry="7"/><ellipse cy="-11" rx="4" ry="7" transform="rotate(45)"/><ellipse cy="-11" rx="4" ry="7" transform="rotate(90)"/><ellipse cy="-11" rx="4" ry="7" transform="rotate(135)"/><ellipse cy="-11" rx="4" ry="7" transform="rotate(180)"/><ellipse cy="-11" rx="4" ry="7" transform="rotate(225)"/><ellipse cy="-11" rx="4" ry="7" transform="rotate(270)"/><ellipse cy="-11" rx="4" ry="7" transform="rotate(315)"/></g>',
   cocktail: '<path d="M24 3v6M18 9h12M19 9c-5 4-6 12-3 20h16c3-8 2-16-3-20M16 29h16l-2 5H18zM24 34v4"/><circle cx="24" cy="41" r="2.4" fill="currentColor" stroke="none"/><path d="M20 15c-1 5-1 9 0 14M28 15c1 5 1 9 0 14M24 12v17"/>',
   baraat: '<ellipse cx="24" cy="12" rx="13" ry="4"/><path d="M11 12c-2 8-2 16 0 24M37 12c2 8 2 16 0 24"/><ellipse cx="24" cy="36" rx="13" ry="4"/><path d="M11 14l6 20M17 15l7 20M24 16l7 19M31 15l6 19M37 13l-6 22M31 15l-7 20M24 16l-7 19M17 15l-6 20" stroke-width=".8"/><path d="M5 5l11 8M43 5L32 13" /><circle cx="5" cy="5" r="1.6" fill="currentColor" stroke="none"/><circle cx="43" cy="5" r="1.6" fill="currentColor" stroke="none"/>',
@@ -287,8 +290,9 @@ export function buildEventCards(
   const h = weddingHidden;
   const gated = reveal && wedding && wedding.events ? wedding.events : null;
   const list = eventsForInvite(variant, fromGroomSide);
+  let n = 0; // numbering counts the main programme only; the prelude is unnumbered
   return list
-    .map((ev, i) => {
+    .map((ev) => {
       const g = gated ? gated[ev.id] : null;
       const dt = g ? g.datetime : "";
       const map = g ? g.map : "";
@@ -321,20 +325,28 @@ export function buildEventCards(
       // No date at all (reveal gated, or e.g. Mehndi) -> no button rendered.
       const cal =
         reveal && eventCalendar(ev, g) ? `<button class="btn-quiet" data-ics="${ev.id}">${IC_CAL}<span>Add to calendar</span></button>` : "";
-      const no = String(i + 1).padStart(2, "0");
+      const isPre = !!ev.prelude;
+      const no = isPre ? "" : String(++n).padStart(2, "0");
+      const noLine = isPre
+        ? `<p class="event-no event-no--prelude">Evening of devotion</p><p class="event-jai" lang="hi">जय माता दी</p>`
+        : `<p class="event-no">${no}</p>`;
+      const noteLine = g && g.note ? `<p class="event-note">${htmlEscape(g.note)}</p>` : "";
+      const addrLine = g && g.address ? `<p class="event-addr">${htmlEscape(g.address)}</p>` : "";
       const directions = g && map
         ? `<a class="btn-quiet" href="${map}" target="_blank" rel="noopener">${IC_PIN}<span>Get directions</span></a>`
         : "";
       // The headliner keeps its highlighted treatment: all three skins style
       // .event-card--main (gold frame / accent tick), driven by the def flag.
-      const cls = ev.headliner ? "event-card event-card--main" : "event-card";
+      const cls = (ev.headliner ? "event-card event-card--main" : "event-card") + (isPre ? " event-card--prelude" : "");
       const actions = directions || cal ? `${directions}\n                ${cal}` : `<span class="event-pending">Details to follow</span>`;
       return `<article class="${cls}" data-tilt data-magnetic>
               ${eventMotif(ev.id)}
-              <p class="event-no">${no}</p>
+              ${noLine}
               <h3 class="event-name">${htmlEscape(ev.name)}</h3>
               ${whenLine}
+              ${noteLine}
               ${venueLine}
+              ${addrLine}
               <p class="event-dress"><span>Dress code</span> ${htmlEscape(ev.dress)}</p>
               <div class="event-actions${directions || cal ? "" : " event-actions--pending"}">
                 ${actions}
@@ -613,9 +625,19 @@ function runBuild() {
   // Emit dist/js/app/couple.mjs (build-generated, imported by config.js/ui.js).
   // Date fields are emitted ONLY when revealDate is true, so the shipped JS
   // never contains the wedding date/times while hidden.
+  const sideDefs = EVENT_DEFS.filter((d) => isEventForSide(d, fromGroomSide));
+  const sideIds = new Set(sideDefs.map((d) => d.id));
+  // Copy for prelude events lives here (not in the verbatim config.js) so the
+  // other side's build never ships it.
+  const eventCopy = Object.fromEntries(
+    sideDefs.filter((d) => d.prelude).map((d) => [d.id, {
+      title: d.name,
+      description: `${d.blurb} Dress code: ${d.dress[0].toLowerCase()}${d.dress.slice(1)}.`,
+    }]),
+  );
   const eventDates = reveal
     ? Object.fromEntries(
-        EVENT_DEFS.map((d) => [d.id, eventCalendar(d, wedding.events[d.id])])
+        sideDefs.map((d) => [d.id, eventCalendar(d, wedding.events[d.id])])
           .filter(([, c]) => c),
       )
     : null;
@@ -623,9 +645,9 @@ function runBuild() {
   // the shipped config.js (copied verbatim) never contains them while hidden.
   const eventVenues = reveal
     ? Object.fromEntries(
-        Object.entries(wedding.events).filter(([, v]) => v.venue).map(([k, v]) => [
+        Object.entries(wedding.events).filter(([k, v]) => v.venue && (sideIds.has(k) || !EVENT_DEFS.some((d) => d.id === k))).map(([k, v]) => [
           k,
-          { location: v.venue, map: v.map },
+          { location: v.venue, map: v.map, address: v.address, note: v.note },
         ]),
       )
     : null;
@@ -639,6 +661,7 @@ function runBuild() {
       ";",
     "export const EVENT_DATES = " + JSON.stringify(eventDates) + ";",
     "export const EVENT_VENUES = " + JSON.stringify(eventVenues) + ";",
+    "export const EVENT_COPY = " + JSON.stringify(eventCopy) + ";",
     "export const COUPLE_REVEAL_TS = " + JSON.stringify(coupleRevealTs) + ";",
     "export const OUTFIT_REVEAL_TS = " + JSON.stringify(outfitRevealTs) + ";",
     "export const GALLERY = " + JSON.stringify(gallery) + ";",
