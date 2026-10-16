@@ -14,6 +14,7 @@ import {
   htmlEscape,
   joinFamilies,
   buildFamilyBlessing,
+  buildFamilyHosts,
   buildHtmlTokens,
   buildManifestTokens,
   applyTokens,
@@ -152,6 +153,15 @@ test('buildHtmlTokens: FAMILY_BLESSING_NAMES carries the woven quotation', () =>
   assert.match(t.FAMILY_BLESSING_NAMES, /Dang &amp; Bhalla/);
   assert.match(t.FAMILY_BLESSING_NAMES, /Verma/);
   assert.doesNotMatch(t.FAMILY_BLESSING_NAMES, /To be announced/);
+});
+
+test('buildFamilyHosts: primary surname per side, flips with side order', () => {
+  const g = { role: 'groom', families: ['Dang', 'Bhalla'] };
+  const b = { role: 'bride', families: [{ tbd: true }, 'Verma'] };
+  assert.equal(buildFamilyHosts(g, b), 'The <span class="fq-fam">Dang</span> and <span class="fq-fam">Verma</span> families');
+  assert.match(buildFamilyHosts(b, g), /Verma<\/span> and <span class="fq-fam">Dang/);
+  assert.equal(buildFamilyHosts(g, { families: [] }), 'Two families');
+  assert.doesNotMatch(buildFamilyHosts(g, b), /Bhalla/);
 });
 
 // ---- applyTokens ------------------------------------------------------

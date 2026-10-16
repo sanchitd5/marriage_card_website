@@ -18,6 +18,20 @@ export function initGate() {
   // Regency path (both videos present) is unchanged.
   const hasVideo = !!(dayVideo && nightVideo);
 
+  // Repeat visit: the full gate already played once on this device, so skip it.
+  const SEEN_KEY = 'wedding-gate-seen';
+  let seen = false;
+  try { seen = localStorage.getItem(SEEN_KEY) === '1'; } catch (e) { /* storage blocked */ }
+  if (seen) {
+    gateEl.remove();
+    history.scrollRestoration = 'manual';
+    window.scrollTo(0, 0);
+    document.body.style.overflow = '';
+    startHeroVideo();
+    heroEntrance(true);
+    return;
+  }
+
   const gateVideos = hasVideo ? [dayVideo, nightVideo] : [];
   const themeVideo = theme => (theme === 'dark' ? nightVideo : dayVideo);
 
@@ -190,7 +204,30 @@ export function initGate() {
     fadeDur = FADE;
   }
 
+  // Small "Skip" after 1.5s: jumps straight to the invitation (a tap = gesture,
+  // so music can start). Only offered before the seal is opened.
+  const skipBtn = document.createElement('button');
+  skipBtn.type = 'button';
+  skipBtn.textContent = 'Skip';
+  skipBtn.setAttribute('aria-label', 'Skip the opening');
+  skipBtn.style.cssText = 'position:absolute;right:1rem;bottom:1rem;z-index:10;min-width:44px;min-height:44px;padding:0 .9rem;background:none;border:0;color:inherit;font:inherit;font-size:.8rem;letter-spacing:.14em;text-transform:uppercase;opacity:.7;cursor:pointer';
+  skipBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    if (opened) return;
+    opened = true;
+    appState.ignited = true;
+    clearTimeout(autoOpen);
+    skipBtn.remove();
+    attemptAutoFullscreen();
+    startMusic();
+    finish(true);
+  });
+  const skipTimer = setTimeout(() => { if (!opened) gateEl.appendChild(skipBtn); }, 1500);
+
   function finish(instant) {
+    clearTimeout(skipTimer);
+    skipBtn.remove();
+    try { localStorage.setItem(SEEN_KEY, '1'); } catch (e) { /* storage blocked */ }
     if (appState.smoother) appState.smoother.scrollTop(0); else window.scrollTo(0, 0);
     startHeroVideo(); // ensure the background hero is live (idempotent)
     heroEntrance(instant);

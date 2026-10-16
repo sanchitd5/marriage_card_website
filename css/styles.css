@@ -1,46 +1,49 @@
 /* ═══════════════════════════════════════════════════════════════
    Riya & Sanchit · Shubh Vivah
-   Regency romance × royal Indian palace. Bridgerton anchor palette:
-   ivory ground, wisteria + powder blue + blush pastels, champagne gold.
+   Antique Indian heirloom: deep maroon (lehenga) + aged gold zari on warm
+   parchment. Two colours only. (--wisteria/--powder names kept as aliases so
+   JS and older rules keep resolving; they now carry maroon / parchment-tan.)
    ═══════════════════════════════════════════════════════════════ */
 
 :root {
-  --ivory: 40 36% 97%;
-  --parchment: 39 32% 93%;
-  --wisteria: 264 22% 62%;
-  --wisteria-deep: 265 20% 38%;
-  --powder: 210 32% 78%;
-  --blush: 11 42% 86%;
-  --gold: 40 45% 52%;
-  --gold-soft: 42 50% 72%;
-  --marigold: 33 78% 60%;
-  --ink: 268 14% 24%;
+  --ivory: 41 40% 95%;
+  --parchment: 39 34% 90%;
+  --wisteria: 347 48% 32%;        /* maroon */
+  --wisteria-deep: 347 60% 22%;   /* deep maroon */
+  --powder: 38 30% 78%;
+  --blush: 8 38% 78%;
+  --gold: 40 52% 40%;             /* antique gold, readable on parchment */
+  --gold-soft: 40 38% 62%;
+  --marigold: 36 70% 52%;
+  --ink: 348 24% 15%;
+  /* burnished gold: light catches the top-left, falls into bronze */
+  --gilt: linear-gradient(135deg, #7a5420 0%, #c9a24d 22%, #f1dc9c 40%, #b8903d 58%, #8a6226 78%, #d2ad5c 100%);
 
   --font-script: "Great Vibes", cursive;
   --font-display: "Cormorant Garamond", "Times New Roman", serif;
   --font-body: "Lora", Georgia, serif;
 
   --ease-luxe: cubic-bezier(.25, 1, .5, 1);
-  --shadow-lift: 0 20px 50px -15px hsl(var(--wisteria-deep) / .18);
+  --shadow-lift: 0 20px 50px -15px hsl(347 60% 18% / .24);
 }
 
 /* ── night mode ─────────────────────────────────────────────── */
 html[data-theme="dark"] {
-  --ivory: 263 24% 11%;
-  --parchment: 263 22% 15%;
-  --wisteria: 264 32% 74%;
-  --wisteria-deep: 263 38% 82%;
-  --powder: 212 22% 24%;
-  --blush: 11 30% 66%;
-  --gold: 42 58% 64%;
-  --gold-soft: 42 40% 52%;
-  --marigold: 33 72% 62%;
-  --ink: 40 32% 90%;
-  --shadow-lift: 0 20px 50px -15px hsl(263 40% 4% / .6);
+  --ivory: 346 34% 8%;
+  --parchment: 346 30% 11%;
+  --wisteria: 42 46% 68%;
+  --wisteria-deep: 42 44% 80%;
+  --powder: 345 22% 20%;
+  --blush: 8 30% 60%;
+  --gold: 42 56% 62%;
+  --gold-soft: 41 38% 46%;
+  --marigold: 36 66% 58%;
+  --ink: 40 34% 90%;
+  --shadow-lift: 0 20px 50px -15px hsl(346 50% 3% / .65);
 }
 html[data-theme="dark"] body { background-color: hsl(var(--ivory)); }
-html { background-color: hsl(40 36% 97%); }
-html[data-theme="dark"] { background-color: hsl(263 24% 11%); }
+html { background-color: hsl(41 40% 95%); }
+html[data-theme="dark"] { background-color: hsl(346 34% 8%); }
 
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -52,7 +55,7 @@ body {
   color: hsl(var(--ink));
   background-color: hsl(var(--ivory));
   /* faint paper grain */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.4 0 0 0 0 0.35 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.42 0 0 0 0 0.3 0 0 0 0 0.2 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
   overflow-x: hidden;
 }
 img, video { max-width: 100%; display: block; }
@@ -88,9 +91,10 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
   margin-bottom: 1.4rem;
 }
 .script-head {
-  font-family: var(--font-script);
+  font-family: var(--font-display);
+  font-style: italic;
   font-weight: 400;
-  font-size: clamp(2.5rem, 8vw, 4.2rem);
+  font-size: clamp(2.3rem, 7vw, 3.8rem);
   line-height: 1.15;
   color: hsl(var(--wisteria-deep));
   margin-bottom: 2.5rem;
@@ -103,15 +107,52 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
   letter-spacing: .01em;
   margin-bottom: 3rem;
 }
-.display-head em { font-style: italic; color: hsl(var(--gold)); }
-
-.family-blessing {
-  margin-top: 1.3rem; /* pulled up to resolve the union line, one arc not two */
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: 1.15rem;
-  color: hsl(var(--wisteria-deep) / .9);
+.display-head em, .script-head em { font-style: italic; color: hsl(var(--gold)); }
+.display-head em, .gilt {
+  background: var(--gilt); -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
 }
+html[data-theme="dark"] .display-head em, html[data-theme="dark"] .gilt {
+  background-image: linear-gradient(135deg, #b8903d 0%, #e9cf8a 30%, #fff0bd 45%, #d4ae5a 65%, #a67d34 100%);
+}
+.display-head { margin-bottom: 1.2rem; }
+
+/* Maroon acts: countdown + blessings are lacquered maroon fields with gold zari
+   text, so the page alternates maroon / parchment instead of one cream sheet. */
+.countdown, .family {
+  --ink: 40 36% 94%; --wisteria: 42 50% 72%; --wisteria-deep: 42 52% 82%;
+  --gold: 42 58% 68%; --gold-soft: 41 42% 52%; --ivory: 347 50% 12%; --parchment: 347 55% 17%;
+  background: radial-gradient(ellipse at 50% 0%, hsl(347 55% 22%), hsl(347 58% 14%) 70%);
+  color: hsl(var(--ink));
+}
+.family-motif, html[data-theme="dark"] .family-motif { mix-blend-mode: normal; background: #f4ecd9; padding: 7px; border: 2px solid hsl(var(--gold)); box-shadow: 0 0 0 5px hsl(347 55% 17%), 0 0 0 6px hsl(var(--gold) / .7); filter: none; }
+.interlude-art img { filter: hue-rotate(-18deg) saturate(.85); }
+
+/* One divider motif for the whole page: hairline, lozenge-in-lozenge, hairline.
+   Gold zari picked out in the burnished gradient. */
+.orn {
+  display: block; width: min(14rem, 60%); height: 14px; margin: 0 auto 2.4rem; position: relative;
+  background:
+    linear-gradient(90deg, transparent, hsl(var(--gold) / .9)) left center / calc(50% - 16px) 1px no-repeat,
+    linear-gradient(90deg, hsl(var(--gold) / .9), transparent) right center / calc(50% - 16px) 1px no-repeat;
+}
+.orn::before, .orn::after { content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(45deg); }
+.orn::before { width: 10px; height: 10px; background: var(--gilt); }
+.orn::after { width: 18px; height: 18px; border: 1px solid hsl(var(--gold) / .85); }
+
+/* Hashiya: the double-ruled, corner-notched border of an antique card. Pseudo
+   elements only, so the markup (incl. build.js event cards) stays untouched. */
+.hashiya, .event-card, .gframe--veiled { position: relative; }
+.hashiya::before, .event-card::before, .gframe--veiled::before {
+  content: ""; position: absolute; inset: 7px; pointer-events: none;
+  border: 1px solid hsl(var(--gold) / .55);
+  background:
+    radial-gradient(circle at 0 0, hsl(var(--gold)) 0 3px, transparent 3.5px) top left / 14px 14px no-repeat,
+    radial-gradient(circle at 100% 0, hsl(var(--gold)) 0 3px, transparent 3.5px) top right / 14px 14px no-repeat,
+    radial-gradient(circle at 0 100%, hsl(var(--gold)) 0 3px, transparent 3.5px) bottom left / 14px 14px no-repeat,
+    radial-gradient(circle at 100% 100%, hsl(var(--gold)) 0 3px, transparent 3.5px) bottom right / 14px 14px no-repeat;
+}
+
 
 /* ═══ INTRO GATE ═════════════════════════════════════════════ */
 #gate {
@@ -143,7 +184,7 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
   border: 0;
   /* soft wisteria-tinted shadow (follows the frosted shape) seats the panel a
      few mm in front of the drape rather than pasting it flat on top */
-  filter: drop-shadow(4px 11px 20px hsl(var(--wisteria-deep) / .42));
+  filter: drop-shadow(4px 11px 20px hsl(var(--wisteria-deep) / .5));
 }
 /* Frosted sheer panel behind the content: the painted drape blurs and tints
    THROUGH it, so the card reads as the gauzy centre of the closed curtain —
@@ -207,7 +248,7 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
 /* Hero sits over video → soft shadow keeps the gold legible on any frame. */
 .hero-invocation .invocation-motif,
 .hero-invocation .shloka {
-  filter: drop-shadow(0 1px 4px hsl(263 30% 12% / .45));
+  filter: drop-shadow(0 1px 4px hsl(346 40% 8% / .5));
 }
 /* Short / landscape phones: trim the invocation so the wax seal stays above
    the fold and tappable (#gate is centered + overflow:hidden, no scroll). */
@@ -249,8 +290,8 @@ html.js.reduce-motion .interlude-line { opacity: 1; }
 .seal-monogram {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
-  font-family: "Prata", var(--font-display); font-weight: 400;
-  font-size: 1.15rem; letter-spacing: .06em;
+  font-family: var(--font-display); font-weight: 500;
+  font-size: 1.2rem; letter-spacing: .06em;
   color: hsl(40 60% 95% / .92);
   text-shadow: 0 1px 3px hsl(20 30% 15% / .5);
 }
@@ -329,7 +370,8 @@ html[data-theme="dark"] #theme-toggle .icon-sun { display: block; }
   text-align: center;
   overflow: hidden;
 }
-.hero-media { position: absolute; inset: -8% 0; z-index: 0; }
+/* the painted courtyard is wisteria-lilac: warm it toward sepia/aged gold so it sits in the maroon+gold system */
+.hero-media { position: absolute; inset: -8% 0; z-index: 0; filter: sepia(.45) hue-rotate(-18deg) saturate(.95) contrast(1.02); }
 .hero-media video, .hero-poster {
   position: absolute; inset: 0; width: 100%; height: 100%;
   object-fit: cover; object-position: center 62%;
@@ -341,16 +383,17 @@ html.reduce-motion .hero-poster { opacity: 1; animation: none; }
 .hero-veil {
   position: absolute; inset: 0; z-index: 1;
   background:
-    linear-gradient(180deg, hsl(40 36% 97% / .28) 0%, hsl(40 36% 97% / 0) 30%),
-    linear-gradient(0deg, hsl(40 36% 97% / .92) 0%, hsl(40 36% 97% / .45) 26%, hsl(40 36% 97% / 0) 55%),
-    radial-gradient(ellipse at center 60%, hsl(40 36% 97% / .38) 0%, hsl(40 36% 97% / 0) 65%);
+    linear-gradient(180deg, hsl(41 40% 95% / .3) 0%, hsl(41 40% 95% / 0) 30%),
+    linear-gradient(0deg, hsl(41 40% 95% / .93) 0%, hsl(41 40% 95% / .5) 26%, hsl(41 40% 95% / 0) 55%),
+    radial-gradient(ellipse at center 58%, hsl(41 40% 95% / .5) 0%, hsl(41 40% 95% / 0) 68%),
+    radial-gradient(ellipse at 50% 50%, transparent 50%, hsl(347 60% 20% / .38) 100%);
 }
 /* night: dusk wash so the pale painting can carry light text */
 html[data-theme="dark"] .hero-veil {
   background:
-    linear-gradient(180deg, hsl(263 24% 11% / .62) 0%, hsl(263 24% 11% / .3) 32%),
-    linear-gradient(0deg, hsl(263 24% 11% / .97) 0%, hsl(263 24% 11% / .6) 28%, hsl(263 24% 11% / .28) 58%),
-    radial-gradient(ellipse at center 58%, hsl(263 28% 9% / .45) 0%, hsl(263 24% 11% / .2) 70%);
+    linear-gradient(180deg, hsl(346 34% 8% / .62) 0%, hsl(346 34% 8% / .3) 32%),
+    linear-gradient(0deg, hsl(346 34% 8% / .97) 0%, hsl(346 34% 8% / .6) 28%, hsl(346 34% 8% / .28) 58%),
+    radial-gradient(ellipse at center 58%, hsl(346 40% 6% / .5) 0%, hsl(346 34% 8% / .2) 70%);
 }
 .hero-inner {
   /* z 45 (not 2): clears the fixed petal/particle layers (40-41) so nothing
@@ -366,8 +409,12 @@ html[data-theme="dark"] .hero-veil {
 .hero-top    { align-self: end; }      /* invocation + kicker: sit just above centre */
 .hero-bottom { align-self: start; }    /* date + hashtag: sit just below centre */
 .hero-inner > .hero-names { grid-row: 2; margin-block: .5rem; }
-.hero .kicker { max-width: 34rem; margin-inline: auto; text-transform: none; letter-spacing: .12em; font-style: italic; font-size: .95rem; color: hsl(var(--wisteria-deep) / .85); }
+.hero .kicker { max-width: 36rem; margin-inline: auto; text-transform: none; letter-spacing: .05em; font-family: var(--font-display); font-style: italic; font-weight: 500; font-size: clamp(1rem, 3.4vw, 1.2rem); line-height: 1.5; color: hsl(var(--wisteria-deep)); }
+.hero-hosts-names { display: block; }
+.hero-hosts-names .fq-fam { font-style: normal; font-weight: 600; }
+.hero-hosts-ask { display: block; margin-top: .3rem; font-size: .8em; letter-spacing: .16em; text-transform: uppercase; font-style: normal; font-family: var(--font-body); font-weight: 600; color: hsl(38 62% 30%); }
 .hero-names {
+  color: hsl(var(--wisteria-deep));
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: .02em;
   margin-block: .8rem .4rem;
@@ -379,12 +426,13 @@ html[data-theme="dark"] .hero-veil {
 }
 .hero-name { padding-inline: .12em; /* room for script flourishes */ }
 .hero-amp {
-  font-family: "Allura", var(--font-script);
+  font-family: var(--font-script);
   font-size: .55em;
   line-height: .85;
   margin-block: 0 .04em;
   color: hsl(var(--gold));
 }
+.hero-names .hero-amp { background: var(--gilt); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; padding-inline: .1em; }
 @media (min-width: 760px) {
   .hero-names {
     flex-direction: row; align-items: center;
@@ -400,13 +448,14 @@ html[data-theme="dark"] .hero-veil {
   /* same oldstyle fault as the countdown: "II & I2 December 2o26" */
   font-variant-numeric: lining-nums;
 }
-.hero-date .hero-amp span { color: hsl(var(--gold)); }
+.hero-date .hero-amp { font-size: .85em; margin: 0 .15em; color: hsl(var(--gold)); }
 @media (max-width: 600px) {
   .hero-date-sep { display: none; }
   .hero-date-location { display: block; }
 }
 .hero-tag {
   margin-top: .9rem;
+  text-shadow: 0 0 6px hsl(var(--ivory) / .8);
   font-family: var(--font-body);
   font-size: .78rem; font-weight: 500;
   letter-spacing: .22em; text-transform: none;
@@ -522,7 +571,7 @@ html[data-theme="dark"] .hero-veil {
   font-size: clamp(2.2rem, 9vw, 3.2rem); letter-spacing: .1em;
   color: hsl(var(--gold));
 }
-.scratch-sub { font-family: var(--font-script); font-size: 1.25rem; color: hsl(var(--wisteria-deep)); }
+.scratch-sub { font-family: var(--font-display); font-style: italic; font-size: 1.2rem; color: hsl(var(--wisteria-deep)); }
 #scratch-canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
 
 /* ═══ EVENTS ═════════════════════════════════════════════════ */
@@ -532,17 +581,20 @@ html[data-theme="dark"] .hero-veil {
   grid-template-columns: 1fr;
   max-width: 24rem; margin-inline: auto;
 }
+/* 5 cards sit as 3 + 2 centred (and 3, or 3 + 1, stay centred too). */
 @media (min-width: 900px) {
-  .event-grid { grid-template-columns: repeat(3, 1fr); max-width: none; align-items: stretch; }
+  .event-grid { display: flex; flex-wrap: wrap; justify-content: center; max-width: none; align-items: stretch; }
+  .event-grid > .event-card { flex: 0 1 calc((100% - 4.6rem) / 3); }
 }
 .event-card {
   background: hsl(var(--ivory));
   border: 1px solid hsl(var(--gold-soft) / .7);
   box-shadow: var(--shadow-lift);
-  padding: 1.1rem 1.4rem 1.9rem;
+  padding: 1.9rem 1.6rem 2rem;
   transform-style: preserve-3d;
 }
-.event-card--main { border-color: hsl(var(--gold)); box-shadow: inset 0 0 0 4px hsl(var(--ivory)), inset 0 0 0 5px hsl(var(--gold-soft) / .6), var(--shadow-lift); }
+.event-card--main { border-color: hsl(var(--gold)); background: linear-gradient(180deg, hsl(var(--parchment)), hsl(var(--ivory))); }
+.event-card--main::before { border-width: 2px; }
 .arch {
   border-radius: 999px 999px 6px 6px / 88% 88% 6px 6px;
   overflow: hidden;
@@ -552,20 +604,24 @@ html[data-theme="dark"] .hero-veil {
 }
 .arch img { width: 100%; aspect-ratio: 3 / 3.6; object-fit: cover; }
 .event-no { font-size: .62rem; letter-spacing: .28em; text-transform: uppercase; color: hsl(var(--gold)); font-weight: 500; margin-bottom: .4rem; }
+.event-card .event-name { color: hsl(var(--wisteria-deep)); }
 .event-name { font-family: var(--font-display); font-weight: 400; font-size: 1.9rem; line-height: 1.15; margin-bottom: .8rem; }
 .event-when { font-size: .95rem; margin-bottom: .2rem; }
 .event-venue { font-family: var(--font-display); font-style: italic; font-size: 1.12rem; color: hsl(var(--wisteria-deep)); margin-bottom: .9rem; }
 .event-dress { font-size: .88rem; color: hsl(var(--ink) / .75); margin-bottom: 1.4rem; }
 .event-dress span { display: block; font-size: .6rem; letter-spacing: .24em; text-transform: uppercase; color: hsl(var(--wisteria)); margin-bottom: .15rem; }
-.event-actions { display: flex; justify-content: center; gap: 1.6rem; }
+.event-card { display: flex; flex-direction: column; }
+.event-actions { display: flex; justify-content: center; gap: 1.6rem; margin-top: auto; }
 .btn-quiet {
-  font-size: .8rem; letter-spacing: .12em; text-transform: uppercase;
+  white-space: nowrap; font-size: .8rem; letter-spacing: .12em; text-transform: uppercase;
   color: hsl(var(--wisteria-deep));
   padding-bottom: .25rem;
   border-bottom: 1px solid hsl(var(--gold));
   text-decoration: none;
+  display: inline-flex; align-items: center; min-height: 44px; /* hit area */
   transition: color .25s, border-color .25s;
 }
+.btn-quiet[hidden] { display: none; }
 .btn-quiet:hover, .btn-quiet:focus-visible { color: hsl(var(--gold)); border-color: hsl(var(--wisteria)); }
 
 @media (max-width: 600px) {
@@ -601,6 +657,7 @@ html[data-theme="dark"] .hero-veil {
     border: 1px solid hsl(var(--gold-soft));
     border-bottom-color: hsl(var(--gold));
   }
+  .btn-quiet[hidden] { display: none; }
 }
 
 /* ═══ INTERLUDE ══════════════════════════════════════════════ */
@@ -609,14 +666,13 @@ html[data-theme="dark"] .hero-veil {
    align-items:center clipped it upward — which read to every panel seat as
    "art pinned to the top, caption exiled to the bottom". Smaller padding plus
    the 66svh cap below lets the whole group sit optically centred instead.
-   The lilac wash is deliberate: the painting's wisteria/lilac is the only
-   chromatic event on an otherwise ivory page, and three seats independently
+   The faint gold wash echoes the painting's zari against the page, and three seats independently
    said the fault was that it appears exactly ONCE, reading as accident rather
    than accent. One faint echo behind the frame makes it read as chosen. */
 .interlude {
   text-align: center;
   padding-block: clamp(3rem, 6vh, 4.5rem);
-  background-image: radial-gradient(ellipse 62% 56% at 50% 44%, hsl(264 30% 62% / .10), transparent 70%);
+  background-image: radial-gradient(ellipse 62% 56% at 50% 44%, hsl(var(--gold) / .09), transparent 70%);
 }
 /* The painted portrait is a PORTRAIT-aspect asset in a LANDSCAPE viewport. Left
    uncapped it grew to ~100svh, which pushed .interlude-line below the fold: the
@@ -633,8 +689,8 @@ html[data-theme="dark"] .hero-veil {
 }
 .interlude-art {
   display: inline-block;
-  border: 1px solid hsl(var(--gold-soft));
-  box-shadow: inset 0 0 0 6px hsl(var(--parchment)), inset 0 0 0 7px hsl(var(--gold-soft) / .55), var(--shadow-lift);
+  border: 3px solid hsl(var(--gold));
+  box-shadow: inset 0 0 0 6px hsl(var(--parchment)), inset 0 0 0 7px hsl(var(--gold-soft) / .7), 0 0 0 5px hsl(347 55% 22%), 0 0 0 7px hsl(var(--gold) / .8), var(--shadow-lift);
   padding: .9rem;
   background: hsl(var(--parchment));
 }
@@ -693,14 +749,21 @@ html[data-theme="dark"] .hero-veil {
 .gframe--veiled {
   display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: clamp(1rem, 3vw, 1.5rem);
-  width: 100%; min-height: 220px;
-  padding: clamp(2rem, 6vw, 3rem) 1.5rem;
+  width: 100%; min-height: 0;
+  padding: clamp(1.6rem, 5vw, 2.2rem) 1.5rem;
   text-align: center;
 }
+/* content-driven acts: only hero/gate/countdown/events/interlude/footer hold a full screen */
 @media (min-width: 760px) {
-  .gframe--veiled { min-height: 320px; max-width: 46rem; margin-inline: auto; }
+  .gframe--veiled { max-width: 34rem; margin-inline: auto; }
+  .band.gallery, .band.family { min-height: 0; padding-block: clamp(4.5rem, 9vh, 6.5rem); }
 }
-.gframe--veiled .veil-motif { font-size: 2rem; color: hsl(var(--gold)); line-height: 1; }
+/* gallery.js still emits a glyph: swap it for the shared ornament, glyph hidden */
+.gframe--veiled .veil-motif { display: block; font-size: 0; line-height: 0; width: 8rem; height: 14px; position: relative;
+  background: linear-gradient(90deg, transparent, hsl(var(--gold) / .9)) left center / calc(50% - 16px) 1px no-repeat, linear-gradient(90deg, hsl(var(--gold) / .9), transparent) right center / calc(50% - 16px) 1px no-repeat; }
+.gframe--veiled .veil-motif::before, .gframe--veiled .veil-motif::after { content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(45deg); }
+.gframe--veiled .veil-motif::before { width: 10px; height: 10px; background: var(--gilt); }
+.gframe--veiled .veil-motif::after { width: 18px; height: 18px; border: 1px solid hsl(var(--gold) / .85); }
 .gframe--veiled .veil-note {
   font-family: var(--font-display); font-style: italic;
   font-size: clamp(1.15rem, 3.6vw, 1.55rem); line-height: 1.5;
@@ -712,8 +775,6 @@ html[data-theme="dark"] .hero-veil {
 .family-motif { width: clamp(120px, 22vw, 170px); margin: 0 auto 1.8rem; border-radius: 50%; mix-blend-mode: multiply; }
 html[data-theme="dark"] .family-motif {
   mix-blend-mode: normal;
-  border: 1px solid hsl(var(--gold-soft));
-  filter: brightness(.94);
 }
 /* ── Blessings quotation ──────────────────────────────────────
    The family surnames are woven into one declarative union line ("In the joining
@@ -721,11 +782,8 @@ html[data-theme="dark"] .family-motif {
    become one."). A single gold fleuron crowns it. Set as a light italic serif so
    the names sit gently on the eye; the surnames themselves are upright so they
    read out of the italic prose. Scales for 1..n names and flips per side. */
-.family-quote-mark {
-  color: hsl(var(--gold) / .8);
-  font-size: clamp(.9rem, 3vw, 1.15rem);
-  margin: clamp(1.4rem, 5vw, 2.2rem) 0 clamp(1rem, 3.5vw, 1.5rem);
-}
+.hashiya { padding: clamp(2.2rem, 6vw, 3.2rem) clamp(1.4rem, 5vw, 3rem); border: 1px solid hsl(var(--gold) / .8); background: hsl(var(--ivory) / .55); }
+.hashiya .orn { margin-bottom: 1.4rem; }
 /* Measure is tuned, not arbitrary: the surname group is a nowrap token, so too
    narrow a measure strands "Batra" from the noun "families" and leaves "united
    in love" as a two-word orphan. 42ch lets the first surname group + "families"
@@ -755,17 +813,22 @@ html[data-theme="dark"] .family-motif {
 .footer {
   text-align: center;
   padding-block: clamp(4rem, 9vw, 6.5rem);
-  background: hsl(265 20% 28%);
-  color: hsl(40 36% 97% / .92);
+  background: hsl(var(--parchment));
+  color: hsl(var(--ink));
 }
-html[data-theme="dark"] .footer { background: hsl(263 28% 7%); }
-.footer-monogram { font-family: "Prata", var(--font-display); font-weight: 400; font-size: 2.4rem; letter-spacing: .06em; }
-.footer-monogram em { font-family: var(--font-script); font-style: normal; font-size: .62em; color: hsl(42 50% 72%); }
-.footer-rule { display: block; width: 72px; height: 1px; margin: 1.4rem auto 1.8rem; background: hsl(42 50% 72% / .7); }
-.footer-line { font-family: var(--font-display); font-style: italic; font-size: 1.15rem; line-height: 1.65; max-width: 30rem; margin-inline: auto; color: hsl(40 36% 97% / .8); }
-.footer-sign { margin-top: 1.6rem; font-size: .9rem; color: hsl(40 36% 97% / .65); }
-.footer-sign span { font-family: var(--font-script); font-size: 1.7rem; color: hsl(42 50% 72%); display: inline-block; margin-top: .4rem; }
-.footer-tag { margin-top: 1.4rem; font-size: .75rem; font-weight: 500; letter-spacing: .22em; color: hsl(42 50% 72% / .85); }
+html[data-theme="dark"] .footer { background: #2a0f16; color: hsl(40 36% 97% / .92); }
+.footer-monogram { font-family: var(--font-display); font-weight: 500; font-size: 4.5rem; line-height: 1.1; background: var(--gilt); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: .06em; }
+.footer-monogram em { -webkit-text-fill-color: hsl(var(--gold)); font-family: var(--font-script); font-style: normal; font-size: .62em; color: hsl(var(--gold)); }
+.footer-rule { margin: 1.4rem auto 1.8rem; }
+.footer-line { font-family: var(--font-display); font-style: italic; font-size: 1.15rem; line-height: 1.65; max-width: 30rem; margin-inline: auto; color: hsl(var(--ink) / .82); }
+.footer-sign { margin-top: 1.6rem; font-size: .9rem; color: hsl(var(--ink) / .68); }
+.footer-sign span { font-family: var(--font-script); font-size: 1.9rem; color: hsl(var(--wisteria-deep)); display: inline-block; margin-top: .4rem; }
+.footer .shloka, .footer .shloka-roman, .footer .invocation-motif { color: hsl(38 62% 34%); }
+.footer-tag { margin-top: 1.4rem; font-size: .75rem; font-weight: 500; letter-spacing: .22em; color: hsl(38 62% 34%); }
+html[data-theme="dark"] .footer .shloka, html[data-theme="dark"] .footer .shloka-roman, html[data-theme="dark"] .footer .invocation-motif { color: hsl(42 62% 74%); }
+html[data-theme="dark"] .footer-line { color: hsl(40 36% 97% / .8); }
+html[data-theme="dark"] .footer-sign { color: hsl(40 36% 97% / .65); }
+html[data-theme="dark"] .footer-sign span, html[data-theme="dark"] .footer-tag { color: hsl(42 50% 72%); }
 
 /* ═══ CSS AMBIENCE (fallback layer under tsParticles) ════════
    Keyframes taken from the bridgerton reference bundle. */
@@ -809,6 +872,49 @@ html[data-theme="dark"] .footer { background: hsl(263 28% 7%); }
   .scroll-cue { display: none; }
 }
 
+/* ═══ HEIRLOOM TEXTURE: zari jaal + mehrab ═══════════════════
+   Cream bands (events, gallery, interlude) get a faint gold lattice (jaal) and one
+   recurring motif: a mehrab (pointed-arch niche) with a lotus finial, set above each
+   act's heading. Same arch everywhere so it reads as a chosen device. */
+:root {
+  --jaal: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56' fill='none' stroke='%23a67d34' stroke-opacity='.09' stroke-width='.8'%3E%3Cpath d='M28 0 56 28 28 56 0 28Z'/%3E%3Cpath d='M28 12 44 28 28 44 12 28Z' stroke-opacity='.05'/%3E%3Ccircle cx='28' cy='28' r='2.2' fill='%23a67d34' fill-opacity='.09' stroke='none'/%3E%3Ccircle cx='0' cy='0' r='1.4' fill='%23a67d34' fill-opacity='.08' stroke='none'/%3E%3Ccircle cx='56' cy='0' r='1.4' fill='%23a67d34' fill-opacity='.08' stroke='none'/%3E%3Ccircle cx='0' cy='56' r='1.4' fill='%23a67d34' fill-opacity='.08' stroke='none'/%3E%3Ccircle cx='56' cy='56' r='1.4' fill='%23a67d34' fill-opacity='.08' stroke='none'/%3E%3C/svg%3E");
+  --mehrab: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 46 60' fill='none' stroke='%23a67d34' stroke-width='1.2' stroke-linecap='round'%3E%3Cpath d='M4 58V27Q4 15 23 5Q42 15 42 27V58'/%3E%3Cpath d='M10 58V28Q10 19 23 12Q36 19 36 28V58' stroke-opacity='.7'/%3E%3Cpath d='M23 5V1M20.5 3.2 23 .6 25.5 3.2' stroke-width='1'/%3E%3Cpath d='M23 30 28 38 23 46 18 38Z' fill='%23a67d34' fill-opacity='.22'/%3E%3C/svg%3E");
+}
+html[data-theme="dark"] {
+  --jaal: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56' fill='none' stroke='%23d4ae5a' stroke-opacity='.06' stroke-width='.8'%3E%3Cpath d='M28 0 56 28 28 56 0 28Z'/%3E%3Cpath d='M28 12 44 28 28 44 12 28Z' stroke-opacity='.04'/%3E%3Ccircle cx='28' cy='28' r='2.2' fill='%23d4ae5a' fill-opacity='.07' stroke='none'/%3E%3C/svg%3E");
+  --mehrab: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 46 60' fill='none' stroke='%23d4ae5a' stroke-width='1.2' stroke-linecap='round'%3E%3Cpath d='M4 58V27Q4 15 23 5Q42 15 42 27V58'/%3E%3Cpath d='M10 58V28Q10 19 23 12Q36 19 36 28V58' stroke-opacity='.7'/%3E%3Cpath d='M23 5V1M20.5 3.2 23 .6 25.5 3.2' stroke-width='1'/%3E%3Cpath d='M23 30 28 38 23 46 18 38Z' fill='%23d4ae5a' fill-opacity='.22'/%3E%3C/svg%3E");
+}
+.events, .gallery { background-image: var(--jaal); background-size: 56px 56px; }
+/* maroon-tinted night surfaces so the maroon identity survives in dark */
+html[data-theme="dark"] .events, html[data-theme="dark"] .gallery { background-color: hsl(347 38% 11%); }
+html[data-theme="dark"] .event-card { background: hsl(347 36% 15%); }
+html[data-theme="dark"] .hero .kicker, html[data-theme="dark"] .hero-hosts-ask { color: #e3c887; text-shadow: 0 1px 12px rgba(20,8,12,.75); }
+html[data-theme="dark"] .hero-veil { background: linear-gradient(180deg, hsl(347 40% 8% / .6) 0%, hsl(347 40% 8% / .45) 35%, hsl(347 40% 8% / .9) 100%); }
+.event-actions { min-height: 48px; }
+.event-when--tbc { color: hsl(30 40% 34%); font-style: italic; }
+html[data-theme="dark"] .event-when--tbc { color: hsl(38 50% 70%); }
+.event-when { text-wrap: balance; }
+.hero-date { letter-spacing: .07em; }
+.scratch-hint { text-wrap: balance; }
+.interlude { background-image: radial-gradient(ellipse 62% 56% at 50% 44%, hsl(var(--gold) / .09), transparent 70%), var(--jaal); background-size: auto, 56px 56px; }
+.events > .wrap::before, .gallery > .wrap::before, .interlude-line::before {
+  content: ""; display: block; width: 40px; height: 52px; margin: 0 auto 1.1rem;
+  background: var(--mehrab) center / contain no-repeat;
+}
+.interlude-line::before { margin-bottom: .9rem; }
+
+/* ── Mobile: fixed moon/music buttons own a ~48px gutter on the right edge; keep
+   card-bearing acts symmetric inside it so no button ever sits on a card. */
+@media (max-width: 600px) {
+  #theme-toggle, #music-toggle, #fullscreen-toggle { width: 40px; height: 40px; }
+  #theme-toggle { right: .35rem; top: .6rem; }
+  #right-dock { right: .35rem; bottom: .6rem; }
+  .events > .wrap, .gallery > .wrap { padding-inline: 3rem; }
+  .btn-quiet { white-space: normal; text-align: center; max-width: 100%; letter-spacing: .1em; }
+  .hero-names { flex-direction: row; flex-wrap: nowrap; gap: 0 .1em; font-size: clamp(2.9rem, 14vw, 4.6rem); white-space: nowrap; }
+  .hero-amp { transform: translateY(-.04em); margin-block: 0; }
+}
+
 /* ── Day↔night circular reveal (View Transitions API) ──────────────────
    New theme wipes in as an expanding circle from the toggle button (driven in
    js/app/ui.js). Disable the default crossfade so the clip reveal reads clean. */
@@ -816,3 +922,85 @@ html[data-theme="dark"] .footer { background: hsl(263 28% 7%); }
 ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
 ::view-transition-new(root) { z-index: 1; }
 ::view-transition-old(root) { z-index: 0; }
+
+/* ═══ REVIEW ROUND 3 ═════════════════════════════════════════ */
+/* 3 countdown: masked glyphs sized like real digits, gold, never a loader */
+.count-num { font-size: clamp(3.5rem, 12vw, 6rem); font-weight: 400; color: hsl(var(--gold)); line-height: 1.1; }
+.count-label { color: hsl(var(--ink) / .85); font-size: .66rem; }
+.countdown .scratch-frame { background: hsl(347 42% 27%); box-shadow: inset 0 0 0 4px hsl(347 42% 27%), inset 0 0 0 5px hsl(var(--gold-soft) / .6), var(--shadow-lift); }
+.countdown .scratch-prompt { color: hsl(var(--ink) / .88); }
+/* 2 pending row on cards with no actions */
+.event-actions--pending { align-items: center; }
+.event-pending { font-family: var(--font-display); font-style: italic; font-size: 1.05rem; color: hsl(30 40% 34%); border-top: 1px dashed hsl(var(--gold-soft)); padding-top: .8rem; min-width: 60%; }
+html[data-theme="dark"] .event-pending { color: hsl(38 50% 70%); }
+.event-grid { align-items: start; }
+@media (min-width: 900px) { .event-grid { align-items: stretch; } }
+/* 9 main event: lacquered maroon, gold zari type, ribbon label */
+.event-card--main {
+  --ink: 40 36% 94%; --wisteria: 42 50% 72%; --wisteria-deep: 42 52% 82%; --gold: 42 58% 68%; --gold-soft: 41 42% 52%;
+  background: radial-gradient(ellipse at 50% 0%, hsl(347 55% 24%), hsl(347 58% 15%) 75%);
+  border: 2px solid hsl(var(--gold)); color: hsl(var(--ink));
+  box-shadow: 0 0 0 4px hsl(var(--ivory)), 0 0 0 5px hsl(42 52% 40%), var(--shadow-lift);
+}
+html[data-theme="dark"] .event-card--main { background: radial-gradient(ellipse at 50% 0%, hsl(347 55% 24%), hsl(347 58% 15%) 75%); }
+.event-card--main .event-no::after { content: " \00B7  The Main Event"; }
+.event-card--main .event-name { font-size: 2.2rem; }
+/* 1 interlude: no dead space on mobile */
+@media (max-width: 600px) {
+  .band.interlude { min-height: 52svh; padding-block: 2.5rem; }
+  .interlude-art img { max-height: 40svh; }
+  .interlude-line { margin-top: 1.3rem; }
+  /* 11 kickers */
+  .kicker { font-size: .82rem; font-weight: 600; letter-spacing: .22em; color: hsl(var(--wisteria-deep)); }
+  .hero .kicker { font-size: clamp(1rem, 3.4vw, 1.2rem); font-weight: 500; letter-spacing: .05em; }
+  /* 4 hero: sit lower, fill the bottom */
+  .hero-inner { padding: 14vh 1.25rem 7vh; }
+  .hero-bottom { padding-bottom: 6vh; }
+  .hero-date { font-size: clamp(1.5rem, 6vw, 1.9rem); }
+  .hero-tag { font-size: .88rem; margin-top: 1.4rem; }
+  .hero-bottom::after { content: ""; display: block; width: 8rem; height: 1px; margin: 1.6rem auto 0; background: linear-gradient(90deg, transparent, hsl(var(--gold)), transparent); }
+}
+/* 4 dark hero: scrim behind the invitation lines */
+.hero-top { position: relative; }
+html[data-theme="dark"] .hero-top::before { content: ""; position: absolute; inset: -4rem -6rem; z-index: -1; background: radial-gradient(ellipse closest-side at center, hsl(347 45% 5% / .55) 0%, hsl(347 45% 5% / .3) 55%, transparent 100%); }
+html[data-theme="dark"] .hero-hosts-ask { color: #f0d796; }
+/* 7 dark portrait matte */
+html[data-theme="dark"] .interlude-art { background: #3a1520; box-shadow: inset 0 0 0 6px #3a1520, inset 0 0 0 7px hsl(var(--gold-soft) / .7), 0 0 0 5px hsl(347 55% 22%), 0 0 0 7px hsl(var(--gold) / .8), var(--shadow-lift); }
+/* 10 veiled gallery is never a void; events lone card */
+.gallery-grid:empty { min-height: 12rem; }
+/* 12 jewellery controls on desktop */
+@media (min-width: 900px) {
+  #theme-toggle, #music-toggle, #fullscreen-toggle, #floating-cue {
+    width: 52px; height: 52px;
+    background: radial-gradient(circle at 35% 30%, hsl(var(--ivory)), hsl(var(--parchment)));
+    border: 1px solid hsl(var(--gold));
+    box-shadow: 0 0 0 3px hsl(var(--ivory) / .85), 0 0 0 4px hsl(var(--gold-soft) / .8), 0 8px 20px -6px hsl(347 60% 12% / .45), inset 0 1px 0 hsl(0 0% 100% / .35);
+    color: hsl(var(--gold));
+    transition: box-shadow .4s var(--ease-luxe), transform .4s var(--ease-luxe);
+  }
+  #theme-toggle { right: 1.8rem; top: 1.6rem; }
+  #right-dock { right: 1.8rem; bottom: 1.6rem; gap: .9rem; }
+  #theme-toggle:hover, #music-toggle:hover, #fullscreen-toggle:hover { transform: rotate(8deg); box-shadow: 0 0 0 3px hsl(var(--ivory) / .85), 0 0 0 4px hsl(var(--gold)), 0 0 18px hsl(var(--gold) / .5); }
+}
+/* 10 desktop: let action rows wrap so five cards sit 3 + 2, never 2 + 2 + 1 */
+@media (min-width: 900px) {
+  .event-grid > .event-card { min-width: 0; padding-inline: 1.2rem; }
+  .event-actions { flex-wrap: wrap; gap: .2rem 1.2rem; }
+  .event-card .btn-quiet { letter-spacing: .08em; }
+}
+
+/* ═══ REVIEW ROUND 3b ═══════════════════════════════════════ */
+html[data-theme="dark"] .event-card:not(.event-card--main) { background: #34161f; border-color: hsl(var(--gold) / .55); }
+html[data-theme="dark"] .event-card--main { background: radial-gradient(ellipse at 50% 0%, #5a1626, #3c0f1a 80%); }
+html[data-theme="dark"] .hero-veil { background: linear-gradient(180deg, rgba(26,10,16,.55) 0%, rgba(34,12,20,.5) 40%, rgba(42,15,24,.92) 100%); }
+html:not([data-theme="dark"]) .footer-monogram { background-image: linear-gradient(135deg, #7a5420 0%, #b88a2e 40%, #8a6226 70%, #a67d34 100%); }
+.footer-sign span { word-spacing: .12em; }
+.gframe--veiled .veil-note { color: hsl(var(--ink) / .85); }
+html[data-theme="dark"] .gframe--veiled { background: #34161f; }
+@media (max-width: 600px) {
+  .gframe--veiled { min-height: 260px; }
+  .gframe--veiled .veil-note { font-size: clamp(1.15rem, 4.6vw, 1.4rem); }
+  .family-motif { width: clamp(150px, 46vw, 190px); }
+  .family-quote { font-size: clamp(1.25rem, 5.4vw, 1.6rem); }
+  .interlude-line { font-size: clamp(1.15rem, 4.8vw, 1.4rem); }
+}

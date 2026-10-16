@@ -18,7 +18,7 @@
   <meta name="twitter:title" content="{{PAIR_TITLE_RAW}} — Shubh Vivah">
   <meta name="twitter:description" content="You are cordially invited to the most anticipated affair of the season. {{DATE_RANGE}}.">
   <meta name="twitter:image" content="{{SITE_URL}}/assets/images/{{SHARE_IMG}}">
-  <meta name="theme-color" content="#f7f4ee">
+  <meta name="theme-color" content="#f6f0e4">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -36,9 +36,9 @@
       place-items: center;
       background:
         radial-gradient(circle at 20% 20%, hsl(40 45% 52% / .18), transparent 45%),
-        radial-gradient(circle at 80% 78%, hsl(264 22% 62% / .22), transparent 42%),
-        linear-gradient(180deg, #f7f4ee 0%, #ece4d7 100%);
-      color: #5e4c38;
+        radial-gradient(circle at 80% 78%, hsl(345 45% 32% / .2), transparent 42%),
+        linear-gradient(180deg, #f6f0e4 0%, #e9dcc6 100%);
+      color: #4a2a22;
       font-family: "Lora", Georgia, serif;
       letter-spacing: .08em;
       text-transform: uppercase;
@@ -47,8 +47,8 @@
     html[data-theme="dark"].theme-decision-pending #theme-boot-loader {
       background:
         radial-gradient(circle at 20% 20%, hsl(42 58% 64% / .12), transparent 45%),
-        radial-gradient(circle at 80% 78%, hsl(264 32% 74% / .14), transparent 42%),
-        linear-gradient(180deg, #191322 0%, #100b16 100%);
+        radial-gradient(circle at 80% 78%, hsl(345 40% 30% / .2), transparent 42%),
+        linear-gradient(180deg, #1a0c10 0%, #100608 100%);
       color: #efe3c8;
     }
     #theme-boot-loader .boot-inner { display: grid; place-items: center; gap: .9rem; }
@@ -85,13 +85,13 @@
     #theme-boot-loader .boot-monogram {
       position: relative;
       z-index: 1;
-      font-family: "Prata", "Cormorant Garamond", Georgia, serif;
+      font-family: "Cormorant Garamond", Georgia, serif;
       font-size: 2.55rem;
       line-height: 1;
       letter-spacing: .06em;
       /* gilt sheen: a subtle moving highlight that only ADDS light over the base
          ink (low alpha so no glyph looks washed mid-sweep), clipped to the glyphs */
-      background: linear-gradient(100deg, transparent 40%, hsl(44 62% 82% / .5) 50%, transparent 60%) hsl(265 20% 38%);
+      background: linear-gradient(100deg, transparent 40%, hsl(44 62% 82% / .5) 50%, transparent 60%) hsl(345 55% 24%);
       background-size: 220% 100%;
       -webkit-background-clip: text; background-clip: text;
       -webkit-text-fill-color: transparent;
@@ -121,7 +121,7 @@
       text-transform: uppercase;
       letter-spacing: .16em;
       font-size: .66rem;
-      color: hsl(268 14% 24% / .66);
+      color: hsl(345 30% 20% / .7);
     }
     @keyframes boot-sheen { 0%, 100% { background-position: 120% 0; } 50% { background-position: -20% 0; } }
     @media (prefers-reduced-motion: reduce) {
@@ -229,7 +229,7 @@
       document.documentElement.dataset.theme = resolveAutoTheme();
 
       var meta = document.querySelector('meta[name="theme-color"]');
-      if (meta) meta.content = document.documentElement.dataset.theme === 'dark' ? '#191322' : '#f7f4ee';
+      if (meta) meta.content = document.documentElement.dataset.theme === 'dark' ? '#1a0c10' : '#f6f0e4';
 
       window.__weddingThemeDecisionReady = true;
       window.dispatchEvent(new Event('wedding-theme-ready'));
@@ -237,7 +237,7 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Allura&family=Prata&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
   <!-- Devanagari for the Ganesha invocation only. Separate link with a `text=`
        subset (॥ श्री गणेशाय नमः ॥) + display=block so the sacred line never
        flashes a system-font fallback or tofu; text= is request-global so it
@@ -290,7 +290,7 @@
     <div class="gate-stage">
       <picture>
         <source media="(min-width: 768px)" srcset="assets/images/art-gate-closed-wide.jpg">
-        <img class="gate-still gate-still--closed" src="assets/images/art-gate-closed.jpg" alt="Closed lavender drapes with marigold garland">
+        <img class="gate-still gate-still--closed" src="assets/images/art-gate-closed.jpg" alt="Closed drapes with marigold garland">
       </picture>
       <picture>
         <source media="(min-width: 768px)" srcset="assets/images/art-gate-open-wide.jpg">
@@ -312,8 +312,8 @@
         <span class="shloka" lang="sa">॥ श्री गणेशाय नमः ॥</span>
         <span class="shloka-roman" aria-hidden="true">Shri Ganeshaya Namah</span>
       </p>
-      <p class="gate-kicker">With hearts full of joy</p>
-      <p class="gate-line">Dearest friends and family, our celebration awaits&nbsp;you</p>
+      <p class="gate-kicker">An invitation</p>
+      <p class="gate-line">You are warmly&nbsp;invited</p>
       <button id="seal" class="seal" aria-label="Break the seal and open the invitation">
         <img src="assets/images/art-seal.jpg" alt="" aria-hidden="true">
         <span class="seal-monogram">{{INITIAL_A}}<em>&amp;</em>{{INITIAL_B}}</span>
@@ -350,7 +350,7 @@
           <video id="hero-video" playsinline muted loop preload="auto" poster="assets/images/art-hero.jpg">
             <source src="assets/videos/hero-loop-boomerang.mp4" type="video/mp4">
           </video>
-          <img class="hero-poster" src="assets/images/art-hero.jpg" alt="Painted ivory palace courtyard with wisteria and marigold garlands">
+          <img class="hero-poster" src="assets/images/art-hero.jpg" alt="Painted ivory palace courtyard with marigold garlands">
         </div>
         <div class="hero-veil"></div>
         <div class="hero-inner">
@@ -362,7 +362,7 @@
               <svg class="invocation-motif" aria-hidden="true" focusable="false"><use href="#ganesha-motif"/></svg>
               <span class="shloka" lang="sa">॥ श्री गणेशाय नमः ॥</span>
             </p>
-            <p class="kicker hero-seq">Dearest friends &amp; family, it is with the greatest pleasure that we announce the union of</p>
+            <p class="kicker hero-hosts hero-seq"><span class="hero-hosts-names">{{FAMILY_HOSTS}}</span> <span class="hero-hosts-ask">request the pleasure of your company at the wedding of</span></p>
           </div>
           <h1 class="hero-names">
             <span class="hero-name hero-seq">{{FIRST_A}}</span>
@@ -372,7 +372,7 @@
           <div class="hero-bottom">
             <p class="hero-date hero-seq">{{HERO_LINE}}</p>
             <p class="hero-tag hero-seq" id="hero-hashtag">
-              <span class="hero-tag-text" data-tags="{{TAG_PRIMARY}},{{TAG_SECONDARY}}">{{TAG_PRIMARY}}</span>
+              <span class="hero-tag-text">{{TAG_PRIMARY}}</span>
             </p>
           </div>
         </div>
@@ -386,13 +386,13 @@
       <!-- ══════════ COUNTDOWN + SCRATCH ══════════ -->
       <section class="band band--tint countdown" id="countdown">
         <div class="wrap">
-          <p class="kicker fade-up">The most anticipated affair of the season</p>
-          <h2 class="script-head fade-up">Until we say forever</h2>
+          <p class="kicker fade-up">Counting the days to the celebration</p>
+          <h2 class="script-head fade-up">Until we say <em>forever</em></h2>
           <div class="count-grid" role="timer" aria-live="off">
-            <div class="count-cell fade-up"><span class="count-num" id="cd-days">–</span><span class="count-label">Days</span></div>
-            <div class="count-cell fade-up"><span class="count-num" id="cd-hours">–</span><span class="count-label">Hours</span></div>
-            <div class="count-cell fade-up"><span class="count-num" id="cd-mins">–</span><span class="count-label">Minutes</span></div>
-            <div class="count-cell fade-up"><span class="count-num" id="cd-secs">–</span><span class="count-label">Seconds</span></div>
+            <div class="count-cell fade-up"><span class="count-num" id="cd-days">✦✦</span><span class="count-label">Days</span></div>
+            <div class="count-cell fade-up"><span class="count-num" id="cd-hours">✦✦</span><span class="count-label">Hours</span></div>
+            <div class="count-cell fade-up"><span class="count-num" id="cd-mins">✦✦</span><span class="count-label">Minutes</span></div>
+            <div class="count-cell fade-up"><span class="count-num" id="cd-secs">✦✦</span><span class="count-label">Seconds</span></div>
           </div>
           <div class="scratch fade-up">
             <p class="scratch-prompt">“Some dates are written in the stars. This one is written in gold.”</p>
@@ -412,7 +412,8 @@
       <section class="band events" id="events">
         <div class="wrap">
           <p class="kicker fade-up">The order of the days</p>
-          <h2 class="display-head fade-up">Every celebration,<br><em>two hearts</em></h2>
+          <h2 class="display-head fade-up">Join us in <em>celebration</em></h2>
+          <span class="orn fade-up" aria-hidden="true"></span>
           <p class="event-gate-note" {{SECRET_ONLY}}>{{EVENT_GATE_NOTE}}</p>
           <div class="event-grid">
 
@@ -434,7 +435,7 @@
                applied to PAINTED ART ONLY, never to a text layer: drifting copy is
                what makes parallax read as a gimmick rather than as depth. -->
           <div class="interlude-art" data-speed="clamp(0.9)"><img src="assets/images/art-couple.jpg" alt="Regency-style oil painting of the couple beneath a gilded jharokha arch" loading="lazy"></div>
-          <p class="interlude-line">“Written in the stars, long before they ever met.”</p>
+          <p class="interlude-line">“Meant for one another, long before they ever met.”</p>
         </div>
       </section>
 
@@ -443,6 +444,7 @@
         <div class="wrap">
           <p class="kicker fade-up">A courtship, in portraits</p>
           <h2 class="display-head fade-up">The story <em>so far</em></h2>
+          <span class="orn fade-up" aria-hidden="true"></span>
           <div class="gallery-grid" id="gallery-grid"><!-- populated by js --></div>
         </div>
       </section>
@@ -456,9 +458,10 @@
                reader nothing. -->
           <img class="family-motif fade-up" src="assets/images/art-peacock.jpg" data-speed="clamp(0.94)" alt="" aria-hidden="true" loading="lazy">
           <p class="kicker fade-up">With the blessings of our elders</p>
-          <div class="family-quote-mark fade-up" aria-hidden="true">❖</div>
-          <p class="family-quote fade-up">{{FAMILY_BLESSING_NAMES}}</p>
-          <p class="family-blessing fade-up">Your presence is the only gift we seek</p>
+          <div class="hashiya fade-up">
+            <span class="orn" aria-hidden="true"></span>
+            <p class="family-quote">{{FAMILY_BLESSING_NAMES}}</p>
+          </div>
         </div>
       </section>
 
@@ -471,9 +474,9 @@
             <span class="shloka-roman" aria-hidden="true">Shri Ganeshaya Namah</span>
           </p>
           <p class="footer-monogram">{{INITIAL_A}}<em>&amp;</em>{{INITIAL_B}}</p>
-          <span class="footer-rule" aria-hidden="true"></span>
+          <span class="orn footer-rule" aria-hidden="true"></span>
           <p class="footer-line">Some love stories cannot merely be told, they must be witnessed. We would be honoured to have you with us.</p>
-          <p class="footer-sign">Yours, in the greatest anticipation,<br><span>{{FIRST_A}} &amp; {{FIRST_B}}</span></p>
+          <p class="footer-sign">With love and gratitude,<br><span>{{FIRST_A}} &amp; {{FIRST_B}}</span></p>
           <p class="footer-tag">{{HASHTAG}}</p>
         </div>
       </footer>

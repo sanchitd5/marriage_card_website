@@ -385,10 +385,13 @@ function icsFor(ev) {
     'BEGIN:VEVENT',
     `UID:${ev.start}-${slug}-wedding@${slugNoDash}`,
     `DTSTAMP:${new Date().toISOString().replace(/[-:]|\.\d{3}/g, '')}`,
-    `DTSTART:${ev.start}`, `DTEND:${ev.end}`,
+    // all-day entries carry a bare YYYYMMDD (no time part)
+    ...(ev.start.length === 8
+      ? [`DTSTART;VALUE=DATE:${ev.start}`, `DTEND;VALUE=DATE:${ev.end}`]
+      : [`DTSTART:${ev.start}`, `DTEND:${ev.end}`]),
     `SUMMARY:${icsEscape(ev.title)}`,
-    `DESCRIPTION:${icsEscape(ev.description)}`,
-    `LOCATION:${icsEscape(ev.location)}`,
+    `DESCRIPTION:${icsEscape(ev.description || '')}`,
+    ...(ev.location ? [`LOCATION:${icsEscape(ev.location)}`] : []),
     'END:VEVENT', 'END:VCALENDAR'].map(icsFold).join('\r\n');
 }
 
@@ -551,6 +554,11 @@ export function initScrollCue() {
     const max = document.documentElement.scrollHeight - window.innerHeight;
     const pct = max > 0 ? window.scrollY / max : 0;
     cue.classList.toggle('cue-gone', pct < 0.10 || pct > 0.85);
+    // Phones: the FAB sits over card text, so retire it after the first real scroll
+    if (window.scrollY > 40 && matchMedia('(max-width: 767px)').matches) {
+      cue.style.display = 'none';
+      window.removeEventListener('scroll', update);
+    }
   }
   window.addEventListener('scroll', update, { passive: true });
   update();

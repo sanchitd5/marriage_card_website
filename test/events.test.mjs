@@ -135,3 +135,30 @@ test('every EVENT_DEFS id has a runtime EVENTS entry for its calendar button', (
     assert.ok(EVENTS[def.id].title.includes('—') || EVENTS[def.id].title.length > 0, 'entry carries a calendar title');
   }
 });
+
+// ---- eventCalendar (Add to calendar data) -------------------------------
+import { eventCalendar } from '../build.js';
+
+test('eventCalendar: timed event passes start/end through', () => {
+  assert.deepEqual(
+    eventCalendar({ id: 'haldi' }, { start: '20261211T053000Z', end: '20261211T083000Z' }),
+    { start: '20261211T053000Z', end: '20261211T083000Z' },
+  );
+});
+
+test('eventCalendar: date-only event becomes all-day with exclusive next-day end', () => {
+  assert.deepEqual(eventCalendar({ date: '2026-12-12' }, undefined),
+    { start: '20261212', end: '20261213', allDay: true });
+  assert.equal(eventCalendar({ date: '2026-12-31' }).end, '20270101');
+});
+
+test('eventCalendar: no date at all gives null (no button)', () => {
+  assert.equal(eventCalendar({ id: 'mehndi' }, undefined), null);
+});
+
+test('buildEventCards: Mehndi renders no calendar button, Baraat does when revealed', () => {
+  const html = buildEventCards(composeNames(true), true, true, 'full');
+  assert.ok(!html.includes('data-ics="mehndi"'));
+  assert.ok(html.includes('data-ics="baraat"'));
+  assert.ok(html.includes('data-ics="haldi"'));
+});

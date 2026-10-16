@@ -48,7 +48,7 @@ export const siteUrl = siteUrls.groom;
 // While `false`, NO date (hero line, countdown, scratch reveal, event
 // times, meta/OG copy, ICS files) is emitted into the built site — the
 // date cannot leak from page source before you choose to reveal it.
-export const revealDate = false; // false → hide all date info, true → show real date info
+export const revealDate = true; // false → hide all date info, true → show real date info
 
 // Real date data. Emitted into the build ONLY when revealDate is true.
 export const wedding = {

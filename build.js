@@ -26,6 +26,7 @@ import {
   coupleRevealOffsetHours,
 } from "./site.config.mjs";
 import {
+  EVENT_DEFS,
   eventsForInvite,
   resolveVariant,
   DEFAULT_VARIANT,
@@ -179,13 +180,23 @@ export function joinFamilies(families, opts) {
 export function buildFamilyBlessing(sideA, sideB) {
   const primary = joinFamilies(sideA && sideA.families);
   const other = joinFamilies(sideB && sideB.families, { limit: 1 });
-  // No terminal period: an unpunctuated flourish, matching the kicker and the
-  // closing "Your presence is the only gift we seek" line.
+  // No terminal period: an unpunctuated flourish, matching the kicker.
   const s =
     primary && other
       ? `${primary} and ${other}, united in love`
       : "Two families, united in love";
   return s.charAt(0).toUpperCase() + s.slice(1); // "the …" → "The …"
+}
+
+// Hero host line: ONLY each side's primary (first) surname, e.g. "The Dang and
+// Verma families". Short enough for the hero at 390px; the full list of
+// families lives in the blessings section. Flips with FROM_GROOM_SIDE because
+// sideA/sideB do. Falls back to the neutral phrase when a side has no name.
+export function buildFamilyHosts(sideA, sideB) {
+  const a = familyNames(sideA && sideA.families, { limit: 1 }).map(htmlEscape)[0];
+  const b = familyNames(sideB && sideB.families, { limit: 1 }).map(htmlEscape)[0];
+  if (!a || !b) return "Two families";
+  return `The <span class="fq-fam">${a}</span> and <span class="fq-fam">${b}</span> families`;
 }
 
 // REVEAL_DATE=true|false overrides site.config's `revealDate` for one build,
@@ -212,6 +223,26 @@ export function resolveRevealDate(
 // site.config.mjs's `wedding.events` and emitted ONLY when reveal is true —
 // same leak-proofing rule as every other date token. Events with no entry there
 // yet simply render the hidden placeholders.
+// Calendar data for one event, or null when there is nothing to add.
+// Timed (gated `start`/`end`, UTC basic format) wins; otherwise a def with only
+// a `date` (YYYY-MM-DD) yields an all-day entry (DTEND is exclusive: next day).
+export function eventCalendar(def, g) {
+  if (g && g.start) return { start: g.start, end: g.end };
+  const m = def && /^(\d{4})-(\d{2})-(\d{2})$/.exec(def.date || "");
+  if (!m) return null;
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3] + 1));
+  const ymd = (x) => x.toISOString().slice(0, 10).replace(/-/g, "");
+  return { start: m[1] + m[2] + m[3], end: ymd(d), allDay: true };
+}
+
+// "2026-12-12" -> "Saturday, 12 December 2026" (UTC so the host TZ cannot shift it)
+function fmtDay(ymd) {
+  const d = new Date(`${ymd}T00:00:00Z`);
+  return isNaN(d)
+    ? ymd
+    : d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).replace(/^(\w+) /, "$1, ");
+}
+
 export function buildEventCards(
   names,
   reveal = revealDate,
@@ -232,17 +263,27 @@ export function buildEventCards(
       // dominating the act and reading as an unpopulated CMS. The programme states
       // it ONCE, above the list (EVENT_GATE_NOTE), and each card keeps only what is
       // actually known: its name, its dress code, and any standing venue note.
+      // Revealed build: every card carries the same date / venue / dress rows. An
+      // event with no gated entry (Mehndi, Baraat) gets a graceful "to follow"
+      // line instead of a hole. Hidden build keeps the single programme-level note.
       const whenLine = g
-        ? `<p class="event-when"><time datetime="${dt}">${g.when}</time></p>`
-        : "";
+        ? `<p class="event-when"><time datetime="${dt}">${g.when.replace(/(\d+) o'clock/, "$1&nbsp;o'clock")}</time></p>`
+        : reveal
+          ? `<p class="event-when event-when--tbc">${ev.date ? `${htmlEscape(fmtDay(ev.date))} · time to follow` : "Date and time to follow"}</p>`
+          : "";
       const venueText = g
         ? htmlEscape(g.venue)
         : ev.venueNote
           ? htmlEscape(ev.venueNote)
-          : "";
+          : reveal
+            ? "Venue to follow"
+            : "";
       const venueLine = venueText
         ? `<p class="event-venue">${venueText}</p>`
         : "";
+      // No date at all (reveal gated, or e.g. Mehndi) -> no button rendered.
+      const cal =
+        reveal && eventCalendar(ev, g) ? `<button class="btn-quiet" data-ics="${ev.id}">Add to calendar</button>` : "";
       const no = String(i + 1).padStart(2, "0");
       const directions = g
         ? `<a class="btn-quiet" href="${map}" target="_blank" rel="noopener">Get directions</a>`
@@ -256,9 +297,9 @@ export function buildEventCards(
               ${whenLine}
               ${venueLine}
               <p class="event-dress"><span>Dress code</span> ${htmlEscape(ev.dress)}</p>
-              <div class="event-actions">
+              <div class="event-actions${directions || cal ? "" : " event-actions--pending"}">
                 ${directions}
-                <button class="btn-quiet" data-ics="${ev.id}">Add to calendar</button>
+                ${cal}${directions || cal ? "" : reveal ? `<span class="event-pending">Details to follow</span>` : ""}
               </div>
             </article>`;
     })
@@ -327,6 +368,7 @@ export function buildHtmlTokens(
     PAIR_TITLE: htmlEscape(names.pairTitle),
     PAIR_TITLE_RAW: names.pairTitle, // for meta content where "&" is fine
     FAMILY_BLESSING_NAMES: buildFamilyBlessing(names.sideA, names.sideB),
+    FAMILY_HOSTS: buildFamilyHosts(names.sideA, names.sideB),
     SITE_URL: htmlEscape(names.siteUrl),
     // Per-side social share card (name order differs); see gen-share-cards.mjs.
     SHARE_IMG: names.fromGroomSide
@@ -534,10 +576,8 @@ function runBuild() {
   // never contains the wedding date/times while hidden.
   const eventDates = reveal
     ? Object.fromEntries(
-        Object.entries(wedding.events).map(([k, v]) => [
-          k,
-          { start: v.start, end: v.end },
-        ]),
+        EVENT_DEFS.map((d) => [d.id, eventCalendar(d, wedding.events[d.id])])
+          .filter(([, c]) => c),
       )
     : null;
   // Venue name + map link are venue-identifying — emit only when revealed, so

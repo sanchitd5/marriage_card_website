@@ -34,6 +34,7 @@ const BLURB = {
 };
 const mkEvent = (key) => ({
   title: TITLES[key] || `${NAMES.pairTitle} — Wedding`,
+  description: BLURB[key] || '',
   ...(D[key] || {}),
   ...(V[key]
     ? { location: V[key].location, description: [BLURB[key], `Directions: ${V[key].map}`].filter(Boolean).join(' ') }
