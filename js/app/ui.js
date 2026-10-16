@@ -50,7 +50,11 @@ function prevName(m) {
 function makeAudio(name) {
   const audio = new Audio(`assets/audio/${name}.mp3`);
   audio.volume = MUSIC_VOL;
-  audio.preload = 'auto';
+  // 'metadata', not 'auto': music starts on the gate tap, the same moment the
+  // gate-reveal video is downloading. 'auto' told the browser to pull the whole
+  // track eagerly (theme-4 is 5 MB / 5 min), starving the reveal video on slower
+  // connections. play() still streams progressively, buffering just ahead.
+  audio.preload = 'metadata';
   return audio;
 }
 
