@@ -176,9 +176,17 @@ export function startMusic() {
 // stored pause choice.
 export function startMusicOnFirstGesture() {
   try { if (localStorage.getItem(MUTE_KEY) === '1') return; } catch (e) { /* storage blocked */ }
-  const evs = ['pointerdown', 'keydown', 'touchstart', 'wheel'];
+  // Only these events grant "user activation" for audio. touchstart, wheel,
+  // scroll and touch pointerdown do NOT (iOS/Chrome reject play() there), so
+  // listening to them and unhooking on the first one left music silent forever.
+  // Keep listening until audio is actually playing; retry on every gesture.
+  const evs = ['pointerup', 'touchend', 'click', 'keydown'];
   const off = () => evs.forEach((e) => window.removeEventListener(e, go, true));
-  function go(ev) { if (ev.target.closest && ev.target.closest('#music-dock')) return; off(); startMusic(); }
+  function go(ev) {
+    if (ev.target.closest && ev.target.closest('#music-dock')) return;
+    if (appState.music.playing) { off(); return; }
+    startMusic();
+  }
   evs.forEach((e) => window.addEventListener(e, go, { capture: true, passive: true }));
   startMusic();
   const m = appState.music;
