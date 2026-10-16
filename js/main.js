@@ -1,6 +1,7 @@
 /* Riya & Sanchit · Shubh Vivah — site engine (modular) */
 
 import { buildGallery } from './app/gallery.js';
+import { initOutfitReveal } from './app/outfit.js';
 import { initGsap } from './app/animations.js';
 import { initGate } from './app/gate.js';
 import { initScratch } from './app/scratch.js';
@@ -20,6 +21,7 @@ import {
 
 // DOM-ready execution order preserved from the original single-file script.
 buildGallery();
+initOutfitReveal();
 initMusicToggle();
 initFullscreenToggle();
 initDockQuiet();

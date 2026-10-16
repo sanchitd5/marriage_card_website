@@ -20,6 +20,8 @@ import {
   applyTokens,
   computeCoupleRevealTs,
   COUPLE_REVEAL_OFFSET_MS,
+  computeOutfitRevealTs,
+  OUTFIT_REVEAL_OFFSET_MS,
 } from '../build.js';
 import { groom, bride } from '../site.config.mjs';
 
@@ -298,4 +300,12 @@ test('computeCoupleRevealTs: REVEAL_COUPLE=false → null (stay hidden)', () => 
 test('computeCoupleRevealTs: invalid timestamp → null (fail safe)', () => {
   assert.equal(computeCoupleRevealTs(undefined, undefined), null);
   assert.equal(computeCoupleRevealTs([2026, 11], undefined), null);
+});
+
+test('computeOutfitRevealTs: weddingTs + 4h, overrides, fail-safe', () => {
+  assert.equal(OUTFIT_REVEAL_OFFSET_MS, 4 * 3600 * 1000);
+  assert.equal(computeOutfitRevealTs(WTS, undefined), Date.UTC(...WTS) + 4 * 3600 * 1000);
+  assert.equal(computeOutfitRevealTs(WTS, 'true'), 0);
+  assert.equal(computeOutfitRevealTs(WTS, 'false'), null);
+  assert.equal(computeOutfitRevealTs(undefined, undefined), null);
 });

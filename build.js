@@ -24,6 +24,7 @@ import {
   weddingHidden,
   gallery,
   coupleRevealOffsetHours,
+  outfitRevealOffsetHours,
 } from "./site.config.mjs";
 import {
   EVENT_DEFS,
@@ -74,14 +75,29 @@ export const COUPLE_REVEAL_OFFSET_MS =
 // authoritative server time (js/app/time.js + gallery.js), so the gallery
 // self-reveals with no redeploy. Special values: `0` = reveal immediately,
 // `null` = stay hidden (REVEAL_COUPLE=false, or a fail-safe on a bad timestamp).
+export function computeRevealTs(weddingTsUTC, offsetMs, env) {
+  if (env === "true") return 0;
+  if (env === "false") return null;
+  if (!Array.isArray(weddingTsUTC) || weddingTsUTC.length < 6) return null;
+  return Date.UTC(...weddingTsUTC) + offsetMs;
+}
+
 export function computeCoupleRevealTs(
   weddingTsUTC,
   env = process.env.REVEAL_COUPLE,
 ) {
-  if (env === "true") return 0;
-  if (env === "false") return null;
-  if (!Array.isArray(weddingTsUTC) || weddingTsUTC.length < 6) return null;
-  return Date.UTC(...weddingTsUTC) + COUPLE_REVEAL_OFFSET_MS;
+  return computeRevealTs(weddingTsUTC, COUPLE_REVEAL_OFFSET_MS, env);
+}
+
+// Outfit veil: art-couple-veiled.jpg (from FINAL couple-mughal-1) until weddingTs + outfitRevealOffsetHours,
+// then art-couple-true.jpg (same runtime server-time check). REVEAL_OUTFIT forces.
+export const OUTFIT_REVEAL_OFFSET_MS =
+  (outfitRevealOffsetHours || 0) * 60 * 60 * 1000;
+export function computeOutfitRevealTs(
+  weddingTsUTC,
+  env = process.env.REVEAL_OUTFIT,
+) {
+  return computeRevealTs(weddingTsUTC, OUTFIT_REVEAL_OFFSET_MS, env);
 }
 
 export function composeNames(
@@ -456,6 +472,7 @@ function runBuild() {
   // at this moment using authoritative server time (no redeploy needed).
   // REVEAL_COUPLE=true|false forces reveal-now / stay-hidden.
   const coupleRevealTs = computeCoupleRevealTs(wedding.weddingTsUTC);
+  const outfitRevealTs = computeOutfitRevealTs(wedding.weddingTsUTC);
 
   const root = __dirname;
   const dist = path.join(root, "dist");
@@ -621,6 +638,7 @@ function runBuild() {
     "export const EVENT_DATES = " + JSON.stringify(eventDates) + ";",
     "export const EVENT_VENUES = " + JSON.stringify(eventVenues) + ";",
     "export const COUPLE_REVEAL_TS = " + JSON.stringify(coupleRevealTs) + ";",
+    "export const OUTFIT_REVEAL_TS = " + JSON.stringify(outfitRevealTs) + ";",
     "export const GALLERY = " + JSON.stringify(gallery) + ";",
     "",
   ].join("\n");

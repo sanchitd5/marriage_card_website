@@ -109,6 +109,13 @@ export const weddingHidden = {
 // (art-couple.jpg) is intentionally NOT gated.
 export const coupleRevealOffsetHours = 5;
 
+// Outfit reveal: the couple illustration shows a recoloured ("veiled") outfit
+// until this many hours after weddingTsUTC (4h = 23:00 IST on the day), then the
+// browser swaps in the true colours via server time. Same runtime gate and same
+// trade-off as the photos: NOT leak-proof, art-couple-true.jpg ships in dist.
+// Force with REVEAL_OUTFIT=true|false node build.js.
+export const outfitRevealOffsetHours = 4;
+
 // Gallery source of truth. `src` maps to assets/photos/<src>.jpg. Shipped in
 // full; gallery.js decides at runtime when to render it (see above).
 export const gallery = [

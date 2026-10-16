@@ -1,4 +1,4 @@
-import { NAMES, SONGS, WEDDING_TS, REVEAL_DATE, EVENT_DATES, EVENT_VENUES, COUPLE_REVEAL_TS, GALLERY } from './couple.mjs';
+import { NAMES, SONGS, WEDDING_TS, REVEAL_DATE, EVENT_DATES, EVENT_VENUES, COUPLE_REVEAL_TS, OUTFIT_REVEAL_TS, GALLERY } from './couple.mjs';
 
 // SONGS is auto-discovered from assets/audio/theme-N.mp3 at build time.
 // WEDDING_TS / EVENT_DATES / EVENT_VENUES are build-gated: null while
@@ -7,7 +7,7 @@ import { NAMES, SONGS, WEDDING_TS, REVEAL_DATE, EVENT_DATES, EVENT_VENUES, COUPL
 // COUPLE_REVEAL_TS is the epoch-ms when the couple's gallery photos unlock
 // (weddingTs + offset); gallery.js reveals them at RUNTIME against authoritative
 // server time (0 = reveal now, null = stay hidden). No redeploy needed.
-export { NAMES, SONGS, WEDDING_TS, REVEAL_DATE, COUPLE_REVEAL_TS, GALLERY };
+export { NAMES, SONGS, WEDDING_TS, REVEAL_DATE, COUPLE_REVEAL_TS, OUTFIT_REVEAL_TS, GALLERY };
 
 const D = EVENT_DATES || {};
 const V = EVENT_VENUES || {};
