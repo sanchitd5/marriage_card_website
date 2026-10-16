@@ -243,6 +243,23 @@ function fmtDay(ymd) {
     : d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).replace(/^(\w+) /, "$1, ");
 }
 
+
+// Small gilt motif per event, same ornament language as the hashiya border:
+// hairline gold strokes with one filled accent. Keyed by event id.
+const EVENT_MOTIFS = {
+  haldi: '<circle cx="24" cy="24" r="4" fill="currentColor" stroke="none"/><g transform="translate(24 24)"><ellipse cy="-11" rx="4" ry="7"/><ellipse cy="-11" rx="4" ry="7" transform="rotate(45)"/><ellipse cy="-11" rx="4" ry="7" transform="rotate(90)"/><ellipse cy="-11" rx="4" ry="7" transform="rotate(135)"/><ellipse cy="-11" rx="4" ry="7" transform="rotate(180)"/><ellipse cy="-11" rx="4" ry="7" transform="rotate(225)"/><ellipse cy="-11" rx="4" ry="7" transform="rotate(270)"/><ellipse cy="-11" rx="4" ry="7" transform="rotate(315)"/></g>',
+  cocktail: '<path d="M24 3v6M18 9h12M19 9c-5 4-6 12-3 20h16c3-8 2-16-3-20M16 29h16l-2 5H18zM24 34v4"/><circle cx="24" cy="41" r="2.4" fill="currentColor" stroke="none"/><path d="M20 15c-1 5-1 9 0 14M28 15c1 5 1 9 0 14M24 12v17"/>',
+  baraat: '<ellipse cx="24" cy="12" rx="13" ry="4"/><path d="M11 12c-2 8-2 16 0 24M37 12c2 8 2 16 0 24"/><ellipse cx="24" cy="36" rx="13" ry="4"/><path d="M11 14l6 20M17 15l7 20M24 16l7 19M31 15l6 19M37 13l-6 22M31 15l-7 20M24 16l-7 19M17 15l-6 20" stroke-width=".8"/><path d="M5 5l11 8M43 5L32 13" /><circle cx="5" cy="5" r="1.6" fill="currentColor" stroke="none"/><circle cx="43" cy="5" r="1.6" fill="currentColor" stroke="none"/>',
+  mehndi: '<path d="M24 4c12 8 15 22 6 33-3 4-8 6-12 5 8-9 9-20 6-38z"/><path d="M24 10c-4 10-5 20 0 30"/><path d="M26 14c3 3 4 6 4 9M25 22c3 3 4 6 3 10" stroke-width=".8"/><circle cx="14" cy="38" r="1.8" fill="currentColor" stroke="none"/><circle cx="10" cy="31" r="1.2" fill="currentColor" stroke="none"/><circle cx="36" cy="10" r="1.2" fill="currentColor" stroke="none"/>',
+  wedding: '<path d="M17 20c-5 4-6 12-3 18 1 3 3 5 6 5h8c3 0 5-2 6-5 3-6 2-14-3-18M16 20h16M19 16h10v4H19z"/><circle cx="24" cy="9" r="4.5" fill="currentColor" stroke="none"/><path d="M24 14c-8 0-14-3-16-8 6-1 12 2 16 8zM24 14c8 0 14-3 16-8-6-1-12 2-16 8zM24 14c-3-3-4-6-2-9M24 14c3-3 4-6 2-9" stroke-width="1"/><path d="M17 30h14M16 35h16" stroke-width=".9"/>',
+};
+function eventMotif(id) {
+  const body = EVENT_MOTIFS[id];
+  return body
+    ? `<svg class="event-motif" viewBox="0 0 48 48" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${body}</svg>`
+    : "";
+}
+
 export function buildEventCards(
   names,
   reveal = revealDate,
@@ -267,9 +284,9 @@ export function buildEventCards(
       // event with no gated entry (Mehndi, Baraat) gets a graceful "to follow"
       // line instead of a hole. Hidden build keeps the single programme-level note.
       const whenLine = g
-        ? `<p class="event-when"><time datetime="${dt}">${g.when.replace(/(\d+) o'clock/, "$1&nbsp;o'clock")}</time></p>`
+        ? `<p class="event-when"><time datetime="${dt}">${g.when.split(" · ").map((x, k) => `<span class="ev-${k ? "t" : "d"}">${htmlEscape(x).replace(/(\d+) o&#39;clock/, "$1&nbsp;o&#39;clock")}</span>`).join("")}</time></p>`
         : reveal
-          ? `<p class="event-when event-when--tbc">${ev.date ? `${htmlEscape(fmtDay(ev.date))} · time to follow` : "Date and time to follow"}</p>`
+          ? `<p class="event-when event-when--tbc">${ev.date ? `<span class="ev-d">${htmlEscape(fmtDay(ev.date))}</span><span class="ev-t">time to follow</span>` : "Date and time to follow"}</p>`
           : "";
       const venueText = g
         ? htmlEscape(g.venue)
@@ -292,6 +309,7 @@ export function buildEventCards(
       // .event-card--main (gold frame / accent tick), driven by the def flag.
       const cls = ev.headliner ? "event-card event-card--main" : "event-card";
       return `<article class="${cls}" data-tilt data-magnetic>
+              ${eventMotif(ev.id)}
               <p class="event-no">${no}</p>
               <h3 class="event-name">${htmlEscape(ev.name)}</h3>
               ${whenLine}
@@ -299,7 +317,7 @@ export function buildEventCards(
               <p class="event-dress"><span>Dress code</span> ${htmlEscape(ev.dress)}</p>
               <div class="event-actions${directions || cal ? "" : " event-actions--pending"}">
                 ${directions}
-                ${cal}${directions || cal ? "" : reveal ? `<span class="event-pending">Details to follow</span>` : ""}
+                ${cal}
               </div>
             </article>`;
     })

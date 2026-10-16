@@ -573,3 +573,16 @@ export function initScrollCue() {
     else next.scrollIntoView({ behavior: 'smooth' });
   });
 }
+
+// Mobile: fade the fixed theme/music buttons while scrolling past the hero and
+// leave them as a small faint seal at rest, so they never sit on top of content.
+export function initDockQuiet() {
+  const root = document.documentElement;
+  let t;
+  window.addEventListener('scroll', () => {
+    root.classList.toggle('dock-quiet', window.scrollY > innerHeight * 0.8);
+    root.classList.add('is-scrolling');
+    clearTimeout(t);
+    t = setTimeout(() => root.classList.remove('is-scrolling'), 900);
+  }, { passive: true });
+}

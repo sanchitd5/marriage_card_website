@@ -15,12 +15,14 @@ import {
   initScrollCue,
   initMusicToggle,
   initFullscreenToggle,
+  initDockQuiet,
 } from './app/ui.js';
 
 // DOM-ready execution order preserved from the original single-file script.
 buildGallery();
 initMusicToggle();
 initFullscreenToggle();
+initDockQuiet();
 initCountdown();
 initScratch();
 initCalendarButtons();

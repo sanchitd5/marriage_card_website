@@ -1004,3 +1004,31 @@ html[data-theme="dark"] .gframe--veiled { background: #34161f; }
   .family-quote { font-size: clamp(1.25rem, 5.4vw, 1.6rem); }
   .interlude-line { font-size: clamp(1.15rem, 4.8vw, 1.4rem); }
 }
+
+/* ═══ REVIEW ROUND 7 ═════════════════════════════════════════ */
+/* event times: date and time are separate lines, so no orphan "·" can ever lead one */
+.event-when time span { display: block; }
+.event-when .ev-t { font-style: italic; }
+.event-when--tbc span { display: block; }
+.event-when--tbc { min-height: 0; }
+.event-actions--pending { min-height: 0; }
+/* distinct gilt motif per card, same hairline language as the hashiya border */
+.event-motif { display: block; width: 54px; height: 54px; margin: .1rem auto .6rem; color: hsl(var(--gold)); }
+.event-no { margin-bottom: .5rem; }
+/* main card: same type scale + 1px extra padding for its 2px border, so rows align with card 4 */
+.event-card--main { padding: calc(1.9rem - 1px) calc(1.6rem - 1px) calc(2rem - 1px); }
+.event-card--main .event-name { font-size: 1.9rem; }
+.event-name { min-height: 2.2rem; }
+.event-when { min-height: 2.6rem; }
+@media (min-width: 900px) { .event-grid { align-items: stretch; } .event-card--main { transform: none; } }
+/* mobile: act bands hug their content instead of holding a full screen */
+@media (max-width: 600px) {
+  .band.countdown, .band.family { min-height: 0; padding-block: 3rem; }
+  /* fixed buttons never cover content: hidden while scrolling past the hero, a faint small seal at rest */
+  html.dock-quiet #theme-toggle, html.dock-quiet #right-dock { transition: opacity .3s, transform .3s; opacity: .45; transform: scale(.75); }
+  html.dock-quiet.is-scrolling #theme-toggle, html.dock-quiet.is-scrolling #right-dock { opacity: 0; pointer-events: none; }
+  html.dock-quiet #right-dock { transform-origin: bottom right; }
+  html.dock-quiet #theme-toggle { transform-origin: top right; }
+}
+/* scratch foil label: engraved, readable */
+.scratch-frame { box-shadow: inset 0 0 0 4px hsl(347 42% 27%), inset 0 0 0 5px hsl(var(--gold-soft) / .8), 0 10px 26px rgba(0,0,0,.35); }
