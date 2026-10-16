@@ -306,7 +306,9 @@ export function buildEventCards(
         : reveal
           ? `<p class="event-when event-when--tbc">${ev.date ? `<span class="ev-d">${htmlEscape(fmtDay(ev.date))}</span><span class="ev-t">Time to follow</span>` : `<span class="ev-d">Date to follow</span><span class="ev-t">Time to follow</span>`}</p>`
           : "";
-      const venueText = g
+      // A revealed event can have a time before its venue is confirmed (Baraat):
+      // fall through to the note / "Venue to follow" instead of "undefined".
+      const venueText = g && g.venue
         ? htmlEscape(g.venue)
         : ev.venueNote
           ? htmlEscape(ev.venueNote)
@@ -320,7 +322,7 @@ export function buildEventCards(
       const cal =
         reveal && eventCalendar(ev, g) ? `<button class="btn-quiet" data-ics="${ev.id}">${IC_CAL}<span>Add to calendar</span></button>` : "";
       const no = String(i + 1).padStart(2, "0");
-      const directions = g
+      const directions = g && map
         ? `<a class="btn-quiet" href="${map}" target="_blank" rel="noopener">${IC_PIN}<span>Get directions</span></a>`
         : "";
       // The headliner keeps its highlighted treatment: all three skins style
@@ -621,7 +623,7 @@ function runBuild() {
   // the shipped config.js (copied verbatim) never contains them while hidden.
   const eventVenues = reveal
     ? Object.fromEntries(
-        Object.entries(wedding.events).map(([k, v]) => [
+        Object.entries(wedding.events).filter(([, v]) => v.venue).map(([k, v]) => [
           k,
           { location: v.venue, map: v.map },
         ]),

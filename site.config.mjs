@@ -64,6 +64,7 @@ export const wedding = {
   events: {
     haldi:    { when: "Friday, 11 December 2026 · 11 o'clock in the morning", datetime: '2026-12-11T11:00+05:30', start: '20261211T053000Z', end: '20261211T083000Z', venue: 'Radisson Hotel Chandigarh Zirakpur', map: 'https://maps.app.goo.gl/fQhBFytYAZKu4qBB7' },
     cocktail: { when: "Friday, 11 December 2026 · 8 o'clock in the evening",  datetime: '2026-12-11T20:00+05:30', start: '20261211T143000Z', end: '20261211T183000Z', venue: 'Radisson Hotel Chandigarh Zirakpur', map: 'https://maps.app.goo.gl/fQhBFytYAZKu4qBB7' },
+    baraat:   { when: "Saturday, 12 December 2026 · 8 o'clock in the evening", datetime: '2026-12-12T20:00+05:30', start: '20261212T143000Z', end: '20261212T163000Z', venue: "De'vansh Resort, Ambala Cantt", map: 'https://maps.app.goo.gl/RdueUZ2XfNiAnbD18' },
     wedding:  { when: "Saturday, 12 December 2026 · 7 o'clock in the evening", datetime: '2026-12-12T19:00+05:30', start: '20261212T133000Z', end: '20261212T183000Z', venue: "De'vansh Resort, Ambala Cantt", map: 'https://maps.app.goo.gl/RdueUZ2XfNiAnbD18' },
   },
 };
