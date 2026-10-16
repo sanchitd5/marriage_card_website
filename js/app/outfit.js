@@ -1,7 +1,7 @@
 import { OUTFIT_REVEAL_TS } from './config.js';
 import { fetchTrustedNowMs } from './time.js';
 
-// Outfit veil: the couple illustration ships recoloured (art-couple-veiled.jpg)
+// Outfit veil: the couple illustration ships recoloured (art-couple-veiled-v2.jpg)
 // and swaps to the true colours once authoritative server time (not the device
 // clock) passes OUTFIT_REVEAL_TS. 0 = reveal now, null/no trusted time = stay veiled.
 // Trade-off (same as the gallery photos): NOT leak-proof, the true image ships in

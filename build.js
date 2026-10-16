@@ -89,7 +89,7 @@ export function computeCoupleRevealTs(
   return computeRevealTs(weddingTsUTC, COUPLE_REVEAL_OFFSET_MS, env);
 }
 
-// Outfit veil: art-couple-veiled.jpg (from FINAL couple-mughal-1) until weddingTs + outfitRevealOffsetHours,
+// Outfit veil: art-couple-veiled-v2.jpg (from FINAL couple-mughal-1) until weddingTs + outfitRevealOffsetHours,
 // then art-couple-true.jpg (same runtime server-time check). REVEAL_OUTFIT forces.
 export const OUTFIT_REVEAL_OFFSET_MS =
   (outfitRevealOffsetHours || 0) * 60 * 60 * 1000;
